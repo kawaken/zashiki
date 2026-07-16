@@ -60,11 +60,42 @@ PATH="/opt/homebrew/opt/zig@0.15/bin:$PATH" zig build -Doptimize=ReleaseFast -Dx
 ```
 
 - 成果物: `zig-out/Ghostty.app`（実体は `macos/build/ReleaseLocal/Ghostty.app`）
-- インストール: Ghostty を終了してから `/Applications` へコピー
+
+## 端末へのリリース（/Applications の正規版をパッチ版に差し替える）
+
+### 事前準備（初回のみ）
+
+Ghostty の設定ファイル（`~/.config/ghostty/config` など）に以下を追加する:
+
+```
+auto-update = off
+```
+
+**これをやらないと Sparkle の自動アップデートが公式ビルドで上書きして
+パッチが消える。** リリース追随は本メモの rebase 手順で手動で行う。
+
+### 差し替え手順
 
 ```sh
+# 1. Ghostty を完全終了（Cmd+Q）。以降は Terminal.app 等の別ターミナルで実行
+#    （Ghostty 内で実行するとコピー中に自分のセッションが死ぬ）
+
+# 2. 差し替え
+rm -rf /Applications/Ghostty.app
 cp -R zig-out/Ghostty.app /Applications/
+
+# 3. 起動して動作確認（下記「動作確認」参照）
 ```
+
+補足:
+
+- ローカルビルドは ad-hoc 署名になるため、公式ビルド（Developer ID 署名）
+  から差し替えた直後は、システム設定で Ghostty に与えていた権限
+  （フルディスクアクセス等）が再要求されることがある
+- 設定ファイルや履歴はアプリバンドルの外（`~/.config/ghostty` 等）に
+  あるので差し替えで消えない
+- 公式ビルドに戻したい場合は https://ghostty.org/download から
+  dmg を落として同じ手順で上書きすればよい
 
 ## 動作確認
 
@@ -86,9 +117,10 @@ git rebase --onto <new-tag> <old-tag> atok-preedit
 # 4. Zig バージョン確認（brew の zig@ と一致しているか）
 grep minimum_zig_version build.zig.zon
 
-# 5. ビルドして入れ替え
+# 5. ビルド
 PATH="/opt/homebrew/opt/zig@0.15/bin:$PATH" zig build -Doptimize=ReleaseFast -Dxcframework-target=native
-cp -R zig-out/Ghostty.app /Applications/
+
+# 6. 「端末へのリリース」の差し替え手順で /Applications を更新
 ```
 
 リベースで競合した場合は、上の変更ファイル表を参考に該当箇所を手で解決する。
