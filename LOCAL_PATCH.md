@@ -24,6 +24,24 @@ ATOK 等の IME が変換中テキスト（preedit）に付与する文節ごと
 
 スタイル値の意味: コードポイントごとに 1 バイト。`2` 以上 = 注目文節、それ以外 = 通常。
 
+## 別マシンでの初回セットアップ
+
+```sh
+# 1. clone してブランチを取得
+git clone https://github.com/kawaken/ghostty.git
+cd ghostty
+git switch atok-preedit
+
+# 2. リリース追随用に upstream リモートを追加
+git remote add upstream https://github.com/ghostty-org/ghostty.git
+
+# 3. Zig を Homebrew で導入（keg-only なので PATH には入らない）
+brew install zig@0.15
+
+# 4. Xcode の準備（下記「ビルド環境」参照）
+sudo xcode-select --switch /Applications/Xcode.app
+```
+
 ## ビルド環境
 
 - **Xcode 26**（macOS 26 SDK / iOS SDK / Metal Toolchain 含む）が必須
