@@ -893,7 +893,15 @@ pub const Surface = struct {
     }
 
     pub fn preeditCallback(self: *Surface, preedit_: ?[]const u8) void {
-        _ = self.core_surface.preeditCallback(preedit_) catch |err| {
+        self.preeditStyledCallback(preedit_, null);
+    }
+
+    pub fn preeditStyledCallback(
+        self: *Surface,
+        preedit_: ?[]const u8,
+        styles_: ?[]const u8,
+    ) void {
+        _ = self.core_surface.preeditStyledCallback(preedit_, styles_) catch |err| {
             log.err("error in preedit callback err={}", .{err});
             return;
         };
@@ -1817,6 +1825,24 @@ pub const CAPI = struct {
         len: usize,
     ) void {
         surface.preeditCallback(if (len == 0) null else ptr[0..len]);
+    }
+
+    /// Same as ghostty_surface_preedit but with an optional style array
+    /// containing one byte per Unicode codepoint of the preedit text.
+    /// A value of 2 or greater marks the codepoint as part of the
+    /// emphasized segment (e.g. the active clause during Japanese IME
+    /// conversion).
+    export fn ghostty_surface_preedit_styled(
+        surface: *Surface,
+        ptr: [*]const u8,
+        len: usize,
+        styles_ptr: ?[*]const u8,
+        styles_len: usize,
+    ) void {
+        surface.preeditStyledCallback(
+            if (len == 0) null else ptr[0..len],
+            if (styles_ptr) |s| s[0..styles_len] else null,
+        );
     }
 
     /// Returns true if the surface currently has mouse capturing

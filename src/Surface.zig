@@ -2539,6 +2539,18 @@ fn balancePaddingIfNeeded(self: *Surface) void {
 ///
 /// The preedit input must be UTF-8 encoded.
 pub fn preeditCallback(self: *Surface, preedit_: ?[]const u8) !void {
+    return self.preeditStyledCallback(preedit_, null);
+}
+
+/// Same as preeditCallback but with an optional style array containing
+/// one byte per Unicode codepoint in `preedit_`. A value of 2 or greater
+/// marks the codepoint as part of the emphasized segment (e.g. the active
+/// clause during Japanese IME conversion); any other value is normal.
+pub fn preeditStyledCallback(
+    self: *Surface,
+    preedit_: ?[]const u8,
+    styles_: ?[]const u8,
+) !void {
     // log.debug("text preeditCallback value={any}", .{preedit_});
 
     // Crash metadata in case we crash in here
@@ -2583,7 +2595,8 @@ pub fn preeditCallback(self: *Surface, preedit_: ?[]const u8) !void {
     const Codepoint = rendererpkg.State.Preedit.Codepoint;
     var codepoints: std.ArrayList(Codepoint) = .empty;
     defer codepoints.deinit(self.alloc);
-    while (it.nextCodepoint()) |cp| {
+    var cp_i: usize = 0;
+    while (it.nextCodepoint()) |cp| : (cp_i += 1) {
         const width: usize = @intCast(unicode.table.get(cp).width);
 
         // I've never seen a preedit text with a zero-width character. In
@@ -2591,9 +2604,11 @@ pub fn preeditCallback(self: *Surface, preedit_: ?[]const u8) !void {
         // Let's just ignore it.
         if (width <= 0) continue;
 
+        const emphasized = if (styles_) |s| (cp_i < s.len and s[cp_i] >= 2) else false;
+
         try codepoints.append(
             self.alloc,
-            .{ .codepoint = cp, .wide = width >= 2 },
+            .{ .codepoint = cp, .wide = width >= 2, .emphasized = emphasized },
         );
     }
 

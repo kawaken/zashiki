@@ -3331,10 +3331,13 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
                 },
             });
 
-            // Add underline
-            try self.addUnderline(@intCast(coord.x), @intCast(coord.y), .single, screen_fg, 255);
+            // Add underline. The emphasized segment (e.g. the active clause
+            // during Japanese IME conversion) gets a double underline so it
+            // can be distinguished from the rest of the preedit.
+            const underline: terminal.Attribute.Underline = if (cp.emphasized) .double else .single;
+            try self.addUnderline(@intCast(coord.x), @intCast(coord.y), underline, screen_fg, 255);
             if (cp.wide and coord.x < self.cells.size.columns - 1) {
-                try self.addUnderline(@intCast(coord.x + 1), @intCast(coord.y), .single, screen_fg, 255);
+                try self.addUnderline(@intCast(coord.x + 1), @intCast(coord.y), underline, screen_fg, 255);
             }
         }
 

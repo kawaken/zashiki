@@ -1927,7 +1927,10 @@ extension Ghostty.SurfaceView: NSTextInputClient {
     }
 
     func validAttributesForMarkedText() -> [NSAttributedString.Key] {
-        return []
+        // Accept underline attributes so IMEs (e.g. ATOK, Kotoeri) send us
+        // per-clause underline styles for the preedit text. The thick
+        // underline marks the active conversion clause.
+        return [.underlineStyle, .markedClauseSegment]
     }
 
     func attributedSubstring(forProposedRange range: NSRange, actualRange: NSRangePointer?) -> NSAttributedString? {
@@ -2086,9 +2089,17 @@ extension Ghostty.SurfaceView: NSTextInputClient {
             let str = markedText.string
             let len = str.utf8CString.count
             if len > 0 {
+                let styles = preeditStyles()
                 markedText.string.withCString { ptr in
-                    // Subtract 1 for the null terminator
-                    ghostty_surface_preedit(surface, ptr, UInt(len - 1))
+                    styles.withUnsafeBufferPointer { stylesPtr in
+                        // Subtract 1 for the null terminator
+                        ghostty_surface_preedit_styled(
+                            surface,
+                            ptr,
+                            UInt(len - 1),
+                            stylesPtr.baseAddress,
+                            UInt(styles.count))
+                    }
                 }
             }
         } else if clearIfNeeded {
@@ -2112,6 +2123,34 @@ extension Ghostty.SurfaceView: NSTextInputClient {
             return false
         }
         return scalar.value < 0x20
+    }
+
+    /// Build a per-Unicode-codepoint style array for the preedit text:
+    /// 2 for codepoints in the emphasized (active) conversion clause, 1
+    /// otherwise. IMEs such as ATOK and Kotoeri mark the active clause
+    /// with a thick underline attribute on the marked text.
+    private func preeditStyles() -> [UInt8] {
+        // Collect the UTF-16 ranges the IME marked with anything stronger
+        // than a plain single underline (e.g. NSUnderlineStyle.thick).
+        var emphasized: [NSRange] = []
+        markedText.enumerateAttribute(
+            .underlineStyle,
+            in: NSRange(location: 0, length: markedText.length)
+        ) { value, range, _ in
+            if let v = value as? NSNumber,
+               v.intValue > NSUnderlineStyle.single.rawValue {
+                emphasized.append(range)
+            }
+        }
+
+        var styles: [UInt8] = []
+        var utf16Offset = 0
+        for scalar in markedText.string.unicodeScalars {
+            let isEmphasized = emphasized.contains { NSLocationInRange(utf16Offset, $0) }
+            styles.append(isEmphasized ? 2 : 1)
+            utf16Offset += UTF16.width(scalar)
+        }
+        return styles
     }
 }
 

@@ -125,6 +125,11 @@ pub const Preedit = struct {
     pub const Codepoint = struct {
         codepoint: u21,
         wide: bool = false,
+
+        /// True if this codepoint belongs to the emphasized segment of
+        /// the preedit, e.g. the active clause during Japanese IME
+        /// conversion. Renderers should visually distinguish this.
+        emphasized: bool = false,
     };
 
     /// Deinit this preedit that was cre
