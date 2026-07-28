@@ -8,7 +8,7 @@ upstream への PR は作らない。
 **macos: render IME clause underlines in preedit**
 
 ATOK 等の IME が変換中テキスト（preedit）に付与する文節ごとの下線属性を
-描画に反映する。注目文節（変換対象の文節）は二重下線、それ以外は一本下線。
+描画に反映する。注目文節（変換対象の文節）は太め下線、それ以外は通常の一本下線。
 
 変更ファイル（追加中心・既存 API のシグネチャ変更なし。リベース時の競合を
 最小化する方針）:
@@ -20,7 +20,9 @@ ATOK 等の IME が変換中テキスト（preedit）に付与する文節ごと
 | `src/apprt/embedded.zig` | 上記 C API の実装（既存 `ghostty_surface_preedit` は温存） |
 | `src/Surface.zig` | `preeditStyledCallback` を追加。既存 `preeditCallback` は委譲のみ |
 | `src/renderer/State.zig` | `Preedit.Codepoint` に `emphasized: bool` を追加 |
-| `src/renderer/generic.zig` | `emphasized` なセルは `.double` 下線で描画 |
+| `src/font/sprite.zig` | `underline_thick` スプライトを追加 |
+| `src/font/sprite/draw/special.zig` | `underline_thick` の描画関数を追加（通常下線の約1.6倍の太さ、隙間なし1本線） |
+| `src/renderer/generic.zig` | `addUnderlineSprite` を追加（`terminal.Attribute.Underline` を経由せず直接スプライト指定）。`emphasized` なセルは `underline_thick` で描画 |
 
 スタイル値の意味: コードポイントごとに 1 バイト。`2` 以上 = 注目文節、それ以外 = 通常。
 
@@ -49,14 +51,17 @@ sudo xcode-select --switch /Applications/Xcode.app
     Command Line Tools だけでは `zig build test` すら動かない
   - 初回: `sudo xcode-select --switch /Applications/Xcode.app` を実行し、
     Xcode を一度起動してコンポーネントをインストールする
-- **Zig**: Homebrew の `zig@0.15`（keg-only）。リリースごとに
-  `build.zig.zon` の `minimum_zig_version` を確認し、合わなければ
-  `brew install zig@0.<N>` で追加する
+- **Zig**: Homebrew の `zig`（無印、PATH に入る）。2026-07-28 時点で
+  `0.16.0`。リリースごとに `build.zig.zon` の `minimum_zig_version` を
+  確認し、`zig version` と合わなければ `brew upgrade zig` する
+  - 以前は keg-only の `zig@0.15` を PATH プレフィックス付きで使っていたが、
+    upstream が `minimum_zig_version = 0.16.0` に上げたタイミングで
+    無印 `zig`（0.16.0）に切り替え済み
 
 ## ビルド手順
 
 ```sh
-PATH="/opt/homebrew/opt/zig@0.15/bin:$PATH" zig build -Doptimize=ReleaseFast -Dxcframework-target=native
+zig build -Doptimize=ReleaseFast -Dxcframework-target=native
 ```
 
 - 成果物: `zig-out/Ghostty.app`（実体は `macos/build/ReleaseLocal/Ghostty.app`）
@@ -99,8 +104,8 @@ cp -R zig-out/Ghostty.app /Applications/
 
 ## 動作確認
 
-ATOK で日本語を入力し、スペースで変換 → 変換中に注目文節だけ二重下線、
-他の文節が一本下線になっていれば OK。
+ATOK で日本語を入力し、スペースで変換 → 変換中に注目文節だけ太め下線、
+他の文節が通常の一本下線になっていれば OK。
 
 ## 新リリースへの追随手順
 
@@ -114,13 +119,17 @@ git fetch upstream --tags
 # 3. パッチを新タグへ載せ替え（<old> は手順1の結果）
 git rebase --onto <new-tag> <old-tag> atok-preedit
 
-# 4. Zig バージョン確認（brew の zig@ と一致しているか）
+# 4. Zig バージョン確認（brew の zig と一致しているか）
 grep minimum_zig_version build.zig.zon
+zig version
 
-# 5. ビルド
-PATH="/opt/homebrew/opt/zig@0.15/bin:$PATH" zig build -Doptimize=ReleaseFast -Dxcframework-target=native
+# 5. 上記が一致しなければアップグレード
+brew upgrade zig
 
-# 6. 「端末へのリリース」の差し替え手順で /Applications を更新
+# 6. ビルド
+zig build -Doptimize=ReleaseFast -Dxcframework-target=native
+
+# 7. 「端末へのリリース」の差し替え手順で /Applications を更新
 ```
 
 リベースで競合した場合は、上の変更ファイル表を参考に該当箇所を手で解決する。
