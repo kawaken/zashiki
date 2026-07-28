@@ -3059,6 +3059,21 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
                 .curly => .underline_curly,
             };
 
+            try self.addUnderlineSprite(x, y, sprite, color, alpha);
+        }
+
+        /// Same as addUnderline but takes the sprite directly, for
+        /// underline decorations that don't correspond to a
+        /// terminal.Attribute.Underline style (e.g. the thick underline
+        /// used to mark the active clause in IME preedit text).
+        fn addUnderlineSprite(
+            self: *Self,
+            x: terminal.size.CellCountInt,
+            y: terminal.size.CellCountInt,
+            sprite: font.Sprite,
+            color: terminal.color.RGB,
+            alpha: u8,
+        ) !void {
             const render = try self.font_grid.renderGlyph(
                 self.alloc,
                 font.sprite_index,
@@ -3332,12 +3347,12 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             });
 
             // Add underline. The emphasized segment (e.g. the active clause
-            // during Japanese IME conversion) gets a double underline so it
+            // during Japanese IME conversion) gets a thicker underline so it
             // can be distinguished from the rest of the preedit.
-            const underline: terminal.Attribute.Underline = if (cp.emphasized) .double else .single;
-            try self.addUnderline(@intCast(coord.x), @intCast(coord.y), underline, screen_fg, 255);
+            const underline: font.Sprite = if (cp.emphasized) .underline_thick else .underline;
+            try self.addUnderlineSprite(@intCast(coord.x), @intCast(coord.y), underline, screen_fg, 255);
             if (cp.wide and coord.x < self.cells.size.columns - 1) {
-                try self.addUnderline(@intCast(coord.x + 1), @intCast(coord.y), underline, screen_fg, 255);
+                try self.addUnderlineSprite(@intCast(coord.x + 1), @intCast(coord.y), underline, screen_fg, 255);
             }
         }
 

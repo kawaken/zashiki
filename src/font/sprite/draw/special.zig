@@ -36,6 +36,39 @@ pub fn underline(
     }, .on);
 }
 
+pub fn underline_thick(
+    cp: u32,
+    canvas: *font.sprite.Canvas,
+    width: u32,
+    height: u32,
+    metrics: font.Metrics,
+) !void {
+    _ = cp;
+
+    // A single underline, but roughly 1.6x as thick. Used to mark the
+    // active clause during IME conversion without the double-underline's
+    // gap making it read as two separate lines.
+    const thickness: u32 = @intFromFloat(
+        @ceil(@as(f64, @floatFromInt(metrics.underline_thickness)) * 1.6),
+    );
+
+    // We can go beyond the height of the cell a bit, but
+    // we want to be sure never to exceed the height of the
+    // canvas, which extends a quarter cell below the cell
+    // height.
+    const y = @min(
+        metrics.underline_position,
+        height +| canvas.padding_y -| thickness,
+    );
+
+    canvas.rect(.{
+        .x = 0,
+        .y = @intCast(y),
+        .width = @intCast(width),
+        .height = @intCast(thickness),
+    }, .on);
+}
+
 pub fn underline_double(
     cp: u32,
     canvas: *font.sprite.Canvas,
