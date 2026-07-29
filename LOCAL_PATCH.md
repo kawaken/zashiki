@@ -1,7 +1,13 @@
-# ローカルパッチ運用メモ（atok-preedit ブランチ）
+# フォーク運用メモ（独自ターミナル開発）
 
-このブランチは **リリースタグ + ローカルパッチ** で運用する個人ビルド用ブランチ。
-upstream への PR は作らない。
+このリポジトリは ghostty-org/ghostty のフォークで、**main が独自開発ライン**。
+upstream の tip をベースに、独自パッチ（下記の ATOK 対応など）を積んでいく。
+upstream への PR は作らない。upstream の変更（脆弱性・不具合修正）には
+マージで追随する（「upstream への追随手順」参照）。
+
+経緯: 最初は `atok-preedit` ブランチで「リリースタグ + パッチ + rebase」の
+運用だったが、独自開発に方針転換し 2026-07-29 に main へ fast-forward
+マージした。`atok-preedit` ブランチは記録として温存（今後は更新しない）。
 
 ## パッチ内容
 
@@ -10,8 +16,8 @@ upstream への PR は作らない。
 ATOK 等の IME が変換中テキスト（preedit）に付与する文節ごとの下線属性を
 描画に反映する。注目文節（変換対象の文節）は太め下線、それ以外は通常の一本下線。
 
-変更ファイル（追加中心・既存 API のシグネチャ変更なし。リベース時の競合を
-最小化する方針）:
+変更ファイル（追加中心・既存 API のシグネチャ変更なし。upstream マージ時の
+競合を最小化する方針）:
 
 | ファイル | 変更 |
 | --- | --- |
@@ -29,16 +35,15 @@ ATOK 等の IME が変換中テキスト（preedit）に付与する文節ごと
 ## 別マシンでの初回セットアップ
 
 ```sh
-# 1. clone してブランチを取得
+# 1. clone（デフォルトブランチの main で作業する）
 git clone https://github.com/kawaken/ghostty.git
 cd ghostty
-git switch atok-preedit
 
-# 2. リリース追随用に upstream リモートを追加
+# 2. upstream 追随用にリモートを追加
 git remote add upstream https://github.com/ghostty-org/ghostty.git
 
-# 3. Zig を Homebrew で導入（keg-only なので PATH には入らない）
-brew install zig@0.15
+# 3. Zig を Homebrew で導入
+brew install zig
 
 # 4. Xcode の準備（下記「ビルド環境」参照）
 sudo xcode-select --switch /Applications/Xcode.app
@@ -77,7 +82,7 @@ auto-update = off
 ```
 
 **これをやらないと Sparkle の自動アップデートが公式ビルドで上書きして
-パッチが消える。** リリース追随は本メモの rebase 手順で手動で行う。
+パッチが消える。** upstream への追随は本メモのマージ手順で手動で行う。
 
 ### 差し替え手順
 
@@ -107,31 +112,48 @@ cp -R zig-out/Ghostty.app /Applications/
 ATOK で日本語を入力し、スペースで変換 → 変換中に注目文節だけ太め下線、
 他の文節が通常の一本下線になっていれば OK。
 
-## 新リリースへの追随手順
+## upstream への追随手順（マージ方式）
+
+独自コミットを積んでいくため、rebase ではなく **upstream をマージで
+取り込む**。履歴は汚れるが、自分のコミットのハッシュが変わらず、
+何をどこで取り込んだかが履歴に残る。
+
+取り込む単位は 2 択:
+
+- **安定タグ（`vX.Y.Z`）**: 基本はこちら。リリースされた品質のものだけ入る
+- **`upstream/main`（tip）**: 未リリースの修正がすぐ欲しいときだけ
 
 ```sh
-# 1. 現在のベースタグを確認（例: v1.3.1）
-git describe --tags --abbrev=0 atok-preedit
+# 1. main で作業していることを確認
+git switch main
 
-# 2. 新しいタグを取得
+# 2. upstream の最新を取得
 git fetch upstream --tags
 
-# 3. パッチを新タグへ載せ替え（<old> は手順1の結果）
-git rebase --onto <new-tag> <old-tag> atok-preedit
+# 3. マージ（安定タグの例。tip なら upstream/main を指定）
+git merge v1.4.0
 
-# 4. Zig バージョン確認（brew の zig と一致しているか）
+# 4. 競合したら解決してコミット（下記「競合解決の指針」参照）
+
+# 5. Zig バージョン確認（合わなければ brew upgrade zig）
 grep minimum_zig_version build.zig.zon
 zig version
 
-# 5. 上記が一致しなければアップグレード
-brew upgrade zig
-
-# 6. ビルド
+# 6. ビルドして動作確認
 zig build -Doptimize=ReleaseFast -Dxcframework-target=native
 
 # 7. 「端末へのリリース」の差し替え手順で /Applications を更新
+
+# 8. push
+git push origin main
 ```
 
-リベースで競合した場合は、上の変更ファイル表を参考に該当箇所を手で解決する。
-upstream 側で preedit 周りが変わっていたら（特に `syncPreedit` /
-`preeditCallback` / `addPreeditCell`）、同じ方針で当て直す。
+### 競合解決の指針
+
+- 独自パッチは追加中心なので競合は起きにくい。起きた場合は
+  上の変更ファイル表を参考に、upstream 側の変更を活かしつつ
+  独自部分を当て直す
+- upstream 側で preedit 周りが変わっていたら（特に `syncPreedit` /
+  `preeditCallback` / `addPreeditCell`）、同じ方針で実装し直す
+- 解決に迷ったら `git merge --abort` で一旦戻し、upstream 側の
+  変更内容を確認してからやり直す
