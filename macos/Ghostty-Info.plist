@@ -116,9 +116,9 @@
 				<string>public.data</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>Ghostty Surface Identifier</string>
+			<string>Zashiki Surface Identifier</string>
 			<key>UTTypeIdentifier</key>
-			<string>com.mitchellh.ghosttySurfaceId</string>
+			<string>dev.kawaken.zashikiSurfaceId</string>
 			<key>UTTypeTagSpecification</key>
 			<dict/>
 		</dict>
