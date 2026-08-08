@@ -8,9 +8,15 @@ name: Test
 #
 # 対象はmacOS + Zigコア + Swift(macOSアプリ)のみ。Linux/Windows/GTK/Nix等
 # 本家のマルチプラットフォーム対応は個人フォークでは扱わない。
+#
+# pushはmainブランチのみを対象にする。feature branchへのpushは
+# pull_requestイベント経由でのみ実行し、同じコミットに対して
+# push/pull_requestの両方が発火して二重実行になるのを避ける。
 
 on:
-  push: {}
+  push:
+    branches:
+      - main
   pull_request: {}
   workflow_dispatch: {}
 
