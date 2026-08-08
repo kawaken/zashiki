@@ -19,16 +19,16 @@ ATOK 等の IME が変換中テキスト（preedit）に付与する文節ごと
 変更ファイル（追加中心・既存 API のシグネチャ変更なし。upstream マージ時の
 競合を最小化する方針）:
 
-| ファイル | 変更 |
-| --- | --- |
-| `macos/.../SurfaceView_AppKit.swift` | `validAttributesForMarkedText` で `underlineStyle` を受理。太下線範囲をコードポイント単位のスタイル配列にして送信 |
-| `include/ghostty.h` | `ghostty_surface_preedit_styled` を追加 |
-| `src/apprt/embedded.zig` | 上記 C API の実装（既存 `ghostty_surface_preedit` は温存） |
-| `src/Surface.zig` | `preeditStyledCallback` を追加。既存 `preeditCallback` は委譲のみ |
-| `src/renderer/State.zig` | `Preedit.Codepoint` に `emphasized: bool` を追加 |
-| `src/font/sprite.zig` | `underline_thick` スプライトを追加 |
-| `src/font/sprite/draw/special.zig` | `underline_thick` の描画関数を追加（通常下線の約1.6倍の太さ、隙間なし1本線） |
-| `src/renderer/generic.zig` | `addUnderlineSprite` を追加（`terminal.Attribute.Underline` を経由せず直接スプライト指定）。`emphasized` なセルは `underline_thick` で描画 |
+| ファイル                             | 変更                                                                                                                                       |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `macos/.../SurfaceView_AppKit.swift` | `validAttributesForMarkedText` で `underlineStyle` を受理。太下線範囲をコードポイント単位のスタイル配列にして送信                          |
+| `include/ghostty.h`                  | `ghostty_surface_preedit_styled` を追加                                                                                                    |
+| `src/apprt/embedded.zig`             | 上記 C API の実装（既存 `ghostty_surface_preedit` は温存）                                                                                 |
+| `src/Surface.zig`                    | `preeditStyledCallback` を追加。既存 `preeditCallback` は委譲のみ                                                                          |
+| `src/renderer/State.zig`             | `Preedit.Codepoint` に `emphasized: bool` を追加                                                                                           |
+| `src/font/sprite.zig`                | `underline_thick` スプライトを追加                                                                                                         |
+| `src/font/sprite/draw/special.zig`   | `underline_thick` の描画関数を追加（通常下線の約1.6倍の太さ、隙間なし1本線）                                                               |
+| `src/renderer/generic.zig`           | `addUnderlineSprite` を追加（`terminal.Attribute.Underline` を経由せず直接スプライト指定）。`emphasized` なセルは `underline_thick` で描画 |
 
 スタイル値の意味: コードポイントごとに 1 バイト。`2` 以上 = 注目文節、それ以外 = 通常。
 

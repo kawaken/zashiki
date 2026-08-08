@@ -1,0 +1,91 @@
+name: Release
+
+# 個人用フォーク(kawaken/zashiki)向けの最小リリース構成。
+# 本家のrelease-tag.yml/publish-tag.ymlはApple証明書・notarization・
+# Sparkle自動更新・Cloudflare R2など15個のsecretsに依存し、しかも
+# GitHub Releaseへの添付すら行わない設計だったため、
+# 「タグを打ったらad-hoc署名のZashiki.appをzipにしてGitHub Releaseに
+# 添付する」だけの最小構成に全面書き換えたもの。
+#
+# Apple Developer Program登録後にnotarization・Developer ID署名・
+# Sparkle自動更新を追加するのは別タスク。
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "リリースバージョン（例: v0.1.0）"
+        required: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Xcode Select
+        run: |
+          XCODE_PATH=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n1)
+          if [ -z "$XCODE_PATH" ]; then
+            echo "Xcode 26.x not found on this runner, falling back to the default Xcode"
+            XCODE_PATH=$(xcode-select -p | sed 's|/Contents/Developer||')
+          fi
+          echo "Using $XCODE_PATH"
+          sudo xcode-select -s "$XCODE_PATH"
+
+      - name: Xcode Version
+        run: xcodebuild -version
+
+      - name: Get required Zig version
+        id: zig
+        run: |
+          echo "version=$(sed -n -E 's/^\s*\.?minimum_zig_version\s*=\s*"([^"]+)".*/\1/p' build.zig.zon)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: ${{ steps.zig.outputs.version }}
+
+      - name: Build Zashiki.app
+        run: zig build -Doptimize=ReleaseFast -Dxcframework-target=native
+
+      - name: Zip Zashiki.app
+        run: |
+          cd zig-out
+          zip -9 -r --symlinks "../Zashiki-${{ steps.version.outputs.value }}-macos.zip" Zashiki.app
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          tag_name: ${{ steps.version.outputs.value }}
+          name: Zashiki ${{ steps.version.outputs.value }}
+          files: Zashiki-*-macos.zip
+          generate_release_notes: true
+          body: |
+            ad-hoc署名のローカルビルドです。Apple Developer Program未登録のため
+            notarizationはされていません。初回起動時にGatekeeperの警告が出る
+            場合は、右クリック→「開く」を選ぶか、以下を実行してください:
+
+            ```sh
+            xattr -cr Zashiki.app
+            ```
