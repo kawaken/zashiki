@@ -2,24 +2,40 @@
 <h1>
 <p align="center">
   <img src="https://github.com/user-attachments/assets/fe853809-ba8b-400b-83ab-a9a0da25be8a" alt="Logo" width="128">
-  <br>Ghostty
+  <br>Zashiki
 </h1>
   <p align="center">
-    Fast, native, feature-rich terminal emulator pushing modern features.
+    A personal fork of <a href="https://github.com/ghostty-org/ghostty">Ghostty</a>,
+    the fast, native, feature-rich terminal emulator.
     <br />
-    A native GUI or embeddable library via <code>libghostty</code>.
-    <br />
-    <a href="#about">About</a>
+    <a href="#about-this-fork">About this fork</a>
     ·
-    <a href="https://ghostty.org/download">Download</a>
+    <a href="https://ghostty.org/download">Download Ghostty</a>
     ·
     <a href="https://ghostty.org/docs">Documentation</a>
     ·
-    <a href="CONTRIBUTING.md">Contributing</a>
-    ·
-    <a href="HACKING.md">Developing</a>
+    <a href="LOCAL_PATCH.md">Fork changes &amp; build instructions</a>
   </p>
 </p>
+
+## About this fork
+
+**Zashiki** is a personal, "for myself" fork of [Ghostty](https://github.com/ghostty-org/ghostty)
+maintained by [@kawaken](https://github.com/kawaken). It tracks upstream Ghostty
+closely (merging in updates rather than diverging) while adding independent
+features for personal use, currently:
+
+- ATOK / Japanese IME preedit underline styling (a thicker underline on the
+  focused clause during conversion)
+- An in-app Markdown preview pane (planned, see
+  [MARKDOWN_PREVIEW_PLAN.md](MARKDOWN_PREVIEW_PLAN.md))
+
+This is not an attempt to replace or compete with Ghostty — all credit for
+the underlying terminal emulator goes to Mitchell Hashimoto and the Ghostty
+contributors. See [LOCAL_PATCH.md](LOCAL_PATCH.md) for the full list of
+fork-specific changes, local build instructions, and the upstream-tracking
+workflow. The sections below are Ghostty's own project description, kept
+as-is since Zashiki is built on the same core engine.
 
 ## About
 

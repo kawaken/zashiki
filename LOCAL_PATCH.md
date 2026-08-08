@@ -69,13 +69,17 @@ sudo xcode-select --switch /Applications/Xcode.app
 zig build -Doptimize=ReleaseFast -Dxcframework-target=native
 ```
 
-- 成果物: `zig-out/Ghostty.app`（実体は `macos/build/ReleaseLocal/Ghostty.app`）
+- 成果物: `zig-out/Zashiki.app`（実体は `macos/build/ReleaseLocal/Zashiki.app`）
 
-## 端末へのリリース（/Applications の正規版をパッチ版に差し替える）
+## 端末へのインストール（/Applications にZashikiを配置する）
+
+アプリ名・Bundle ID（`dev.kawaken.zashiki`）を公式Ghostty（`com.mitchellh.ghostty`）と
+分離済みのため、**公式Ghosttyを上書きするのではなく、別アプリとして共存インストールする**。
 
 ### 事前準備（初回のみ）
 
-Ghostty の設定ファイル（`~/.config/ghostty/config` など）に以下を追加する:
+Zashikiの設定ファイル（`~/.config/ghostty/config` など、パス自体は公式Ghosttyと共通）に
+以下を追加する:
 
 ```
 auto-update = off
@@ -84,28 +88,29 @@ auto-update = off
 **これをやらないと Sparkle の自動アップデートが公式ビルドで上書きして
 パッチが消える。** upstream への追随は本メモのマージ手順で手動で行う。
 
-### 差し替え手順
+### インストール手順
 
 ```sh
-# 1. Ghostty を完全終了（Cmd+Q）。以降は Terminal.app 等の別ターミナルで実行
-#    （Ghostty 内で実行するとコピー中に自分のセッションが死ぬ）
+# 1. Zashiki を完全終了（Cmd+Q）。以降は Terminal.app 等の別ターミナルで実行
+#    （Zashiki 内で実行するとコピー中に自分のセッションが死ぬ）
 
-# 2. 差し替え
-rm -rf /Applications/Ghostty.app
-cp -R zig-out/Ghostty.app /Applications/
+# 2. 配置（既存のZashiki.appがあれば入れ替え。公式Ghostty.appには触れない）
+rm -rf /Applications/Zashiki.app
+cp -R zig-out/Zashiki.app /Applications/
 
 # 3. 起動して動作確認（下記「動作確認」参照）
 ```
 
 補足:
 
-- ローカルビルドは ad-hoc 署名になるため、公式ビルド（Developer ID 署名）
-  から差し替えた直後は、システム設定で Ghostty に与えていた権限
-  （フルディスクアクセス等）が再要求されることがある
+- ローカルビルドは ad-hoc 署名。公式Ghosttyとは別のBundle IDのアプリとして
+  初回起動時にフルディスクアクセス等の権限を改めて要求される（公式Ghosttyに
+  既に許可済みでも引き継がれない）
 - 設定ファイルや履歴はアプリバンドルの外（`~/.config/ghostty` 等）に
-  あるので差し替えで消えない
-- 公式ビルドに戻したい場合は https://ghostty.org/download から
-  dmg を落として同じ手順で上書きすればよい
+  あるので入れ替えで消えない。ただし `~/Library/Application Support/` 配下は
+  Bundle ID単位（`dev.kawaken.zashiki`）で分離されている
+- 公式Ghosttyは `/Applications/Ghostty.app` のまま別途共存可能（配布元:
+  https://ghostty.org/download ）
 
 ## 動作確認
 
