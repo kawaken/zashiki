@@ -13,10 +13,10 @@ When you're developing, it's very likely that you will want to build a
 _debug_ build to diagnose issues more easily. This is already the default for
 Zig builds, so simply run `zig build` **without any `-Doptimize` flags**.
 
-| Command          | Description                                                                                         |
-| ----------------- | ---------------------------------------------------------------------------------------------------- |
-| `zig build run`   | Runs Ghostty                                                                                          |
-| `zig build test`  | Runs unit tests (accepts `-Dtest-filter=<filter>` to only run tests whose name matches the filter)   |
+| Command          | Description                                                                                        |
+| ---------------- | -------------------------------------------------------------------------------------------------- |
+| `zig build run`  | Runs Ghostty                                                                                       |
+| `zig build test` | Runs unit tests (accepts `-Dtest-filter=<filter>` to only run tests whose name matches the filter) |
 
 ## Xcode Version and SDKs
 
