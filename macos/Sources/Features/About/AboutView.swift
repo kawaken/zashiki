@@ -3,7 +3,7 @@ import SwiftUI
 struct AboutView: View {
     @Environment(\.openURL) var openURL
 
-    private let githubURL = URL(string: "https://github.com/ghostty-org/ghostty")
+    private let githubURL = URL(string: "https://github.com/kawaken/zashiki")
     private let docsURL = URL(string: "https://ghostty.org/docs")
 
     /// Read the commit from the bundle.
@@ -83,7 +83,7 @@ struct AboutView: View {
                     Text("Zashiki")
                         .bold()
                         .font(.title)
-                    Text("Fast, native, feature-rich terminal \nemulator pushing modern features.")
+                    Text("A personal, macOS-only fork of Ghostty, \ntracking upstream rather than diverging from it.")
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                         .font(.caption)
