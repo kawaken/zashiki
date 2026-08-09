@@ -20,3 +20,5 @@ A file for [guiding coding agents](https://agents.md/).
 
 - Shared Zig core: `src/`
 - macOS app: `macos/`
+- Feature/implementation plan docs (not yet built, or design notes for a
+  change in progress): `plan/`
