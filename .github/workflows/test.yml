@@ -62,6 +62,10 @@ jobs:
     name: zig build (macOS app)
     runs-on: macos-15
     timeout-minutes: 30
+    # macOSランナーは無料枠消費が重いので、.appの実ビルドはリリース
+    # 準備の時だけ手動実行(workflow_dispatch)する。push/PRでは走らせない。
+    # リリース戦略自体は別途検討する。
+    if: github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

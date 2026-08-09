@@ -16,17 +16,30 @@ A file for [guiding coding agents](https://agents.md/).
 - **Formatting (Swift)**: `swiftlint lint --strict --fix`
 - **Formatting (other)**: `prettier -w .`
 
-## libghostty-vt
+## Xcode
 
-- Build: `zig build -Demit-lib-vt`
-- Build WASM: `zig build -Demit-lib-vt -Dtarget=wasm32-freestanding -Doptimize=ReleaseSmall`
-- Test: `zig build test-lib-vt -Dtest-filter=<filter>`
-  - Prefer this when the change is in a libghostty-vt file
-- All C enums in `include/ghostty/vt/` must have a `_MAX_VALUE = GHOSTTY_ENUM_MAX_VALUE`
-  sentinel as the last entry to force int enum sizing (pre-C23 portability).
+Building the macOS app requires Xcode, the macOS SDK, the iOS SDK, and Metal
+Toolchain all installed. If the wrong Xcode version is selected, fix it with:
+
+```shell-session
+sudo xcode-select --switch /Applications/Xcode.app
+```
+
+## Logging
+
+macOS unified logging is enabled by default. View logs with:
+
+```shell-session
+sudo log stream --level debug --predicate 'subsystem=="com.mitchellh.ghostty"'
+```
+
+The `GHOSTTY_LOG` environment variable controls log destinations (`stderr`,
+`macos`); prefix with `no-` to disable, comma-separate to combine, or use
+`true`/`false` to enable/disable all.
 
 ## Directory Structure
 
 - Shared Zig core: `src/`
 - macOS app: `macos/`
-- GTK (Linux and FreeBSD) app: `src/apprt/gtk`
+- Feature/implementation plan docs (not yet built, or design notes for a
+  change in progress): `plan/`
