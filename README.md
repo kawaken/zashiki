@@ -16,9 +16,7 @@ work day to day and isn't meant for general use — all credit for the
 terminal itself goes to upstream Ghostty.
 
 It tracks upstream rather than diverging from it, and is macOS-only (no
-Linux/GTK, Windows, or packaging). See [LOCAL_PATCH.md](LOCAL_PATCH.md) for
-the full diff against upstream, the tracking workflow, and build
-instructions.
+Linux/GTK, Windows, or packaging).
 
 ## Fork-specific features
 
