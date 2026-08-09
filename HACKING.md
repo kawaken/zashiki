@@ -2,7 +2,8 @@
 
 This document describes the technical details behind Ghostty's development.
 If you'd like to open any pull requests or would like to implement new features
-into Ghostty, please make sure to read our ["Contributing to Ghostty"](CONTRIBUTING.md)
+into Ghostty, please make sure to read upstream's
+["Contributing to Ghostty"](https://github.com/ghostty-org/ghostty/blob/main/CONTRIBUTING.md)
 document first.
 
 To start development on Ghostty, you need to build Ghostty from a Git checkout,
