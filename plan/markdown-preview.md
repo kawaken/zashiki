@@ -32,6 +32,14 @@
 
 代わりに、独自URLスキーム `zashiki://` をCFBundleURLTypesに登録し、`open "zashiki://..."` から起動・操作できるようにする。
 
+### ビルド/エコシステム表記の方針（2026-08-10）
+
+Swiftモジュール名（`PRODUCT_MODULE_NAME = Ghostty`）等の**コード内部の表記**はライブラリ利用に近いものとして許容する一方、**ビルドコマンド・スキーム名などビルド/エコシステム面での`Ghostty`表記は避ける**方針とした。この方針に基づき、Step 1の作業中に見つかった以下の対応を実施済み:
+
+- 共有Xcodeスキームファイル `Ghostty.xcscheme` → `Zashiki.xcscheme` にリネーム（スキーム内部の`BlueprintName`は元々`Zashiki`を指していたが、ファイル名＝`xcodebuild -scheme`で指定する名前だけが古いままだった）
+- `macos/build.nu`のデフォルト`--scheme`値を`"Ghostty"` → `"Zashiki"`に変更
+- `macos/AGENTS.md`のビルド手順・出力パス例を`Ghostty.app` → `Zashiki.app`に更新
+
 ### レンダリング方式の方針転換（2026-08-10）
 
 当初案（WKWebView + 同梱markdown-it/highlight.js）から、SwiftUIネイティブレンダリング（`Textual`ライブラリ）に転換。
@@ -111,9 +119,9 @@ MarkdownPreviewFileWatcher (DispatchSourceFileSystemObject)
 
 ## 実装ステップ（段階的に動作確認）
 
-1. **SPMパッケージ追加 + デプロイターゲット引き上げ + 試験表示**
-   `Textual`をpbxprojに追加、Zashiki関連ターゲットのデプロイターゲットをmacOS 15.0に引き上げる。テスト用に適当なSwiftUIビュー（後で削除可）で `StructuredText(markdown: "# test\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n\`\`\`swift\nlet x = 1\n\`\`\`")`を表示し、GFMテーブル・コードハイライト・ダークモード切替を確認
-検証:`macos/build.nu --configuration Debug` が通る。ビルド後のアプリでテスト表示が正しくレンダリングされる
+1. **SPMパッケージ追加 + デプロイターゲット引き上げ + 試験表示**（✅完了、2026-08-10）
+   `Textual`をpbxprojに追加、Zashiki関連ターゲットのデプロイターゲットをmacOS 15.0に引き上げ。`macos/Sources/Features/Markdown Preview/MarkdownPreviewSmokeTestView.swift`（一時ファイル、後で削除）に`StructuredText(markdown:)`でGFMテーブル・コードブロックを表示するテストビューを実装
+   検証: `macos/build.nu --scheme Zashiki --configuration Debug` 相当のビルドが成功し、`Zashiki.app/Contents/Resources/`に`textual_Textual.bundle`/`swiftui-math_SwiftUIMath.bundle`が同梱されることを確認済み。**画面上でのレンダリング確認（テーブル・ハイライト・ダークモード）はまだ未実施**（テストビューをまだどこにも表示していないため）。Step 2で実際のペインに組み込んだ際に併せて確認する
 2. **Model + ペインUI + TerminalView統合 + メニュー**（watcher以外）
    検証: トグルで空状態ペイン表示/非表示（Cmd+Shift+M含む）、Open File...でmd表示、ディバイダドラッグ、**トグル前後でシェルセッション生存**（`sleep 100` 継続・スクロールバック保持）、スプリット/タブ/フルスクリーンで崩れなし。リンククリックが`NSWorkspace`に委譲されること、スクロール位置維持の挙動を確認
 3. **ライブ更新（watcher）**
@@ -128,7 +136,8 @@ MarkdownPreviewFileWatcher (DispatchSourceFileSystemObject)
 
 ## 主要リスクと対処
 
-- **pbxproj手編集**: ID重複に注意（24桁hexを新規採番）。build.nuの成否で即検出。2026-08-08時点でpbxprojはリネーム・アイコン差し替え・TEST_HOST修正等で何度も手編集済みなので、既存の「変更前1行が唯一であることをassertしてから置換する」スクリプト方式を踏襲する。ただしSPMパッケージ参照（`XCRemoteSwiftPackageReference`/`XCSwiftPackageProductDependency`）の追加はこれまでのファイル参照追加より構造が複雑なので、`Sparkle`の既存エントリを一字一句参考にしつつ慎重に行う。うまくいかない場合はXcode GUIで一度追加してdiffを確認する手も検討する
+- **pbxproj手編集**: ID重複に注意（24桁hexを新規採番）。build.nuの成否で即検出。2026-08-08時点でpbxprojはリネーム・アイコン差し替え・TEST_HOST修正等で何度も手編集済みなので、既存の「変更前1行が唯一であることをassertしてから置換する」スクリプト方式を踏襲する。SPMパッケージ参照（`XCRemoteSwiftPackageReference`/`XCSwiftPackageProductDependency`）の追加も`Sparkle`の既存エントリを雛形にすれば同じ方式で問題なく追加できた（2026-08-10実施）
+- **（解決済み）`xcodebuild -target`は推移的SPM依存を解決できない**: `Textual`は`SwiftUIMath`/`ConcurrencyExtras`という2つの依存パッケージを持つ（`Sparkle`は依存ゼロの単独パッケージだったため今まで問題にならなかった）。Xcode 26の「Explicitly Built Modules」機構が推移的パッケージ依存を伴うビルド計画を`-target`単体指定では正しく組み立てられない既知の不具合（[Swift Forums](https://forums.swift.org/t/xcode-26-unable-to-find-module-dependency/80516)参照）に該当し、`unable to resolve module dependency`で失敗した。`-scheme`指定（ワークスペース全体の計画を使う）に切り替えると解決することを確認。この対応に伴い`src/build/GhosttyXcodebuild.zig`の`build`ステップを`-target Zashiki`から`-scheme Zashiki`に変更し（`xctest`ステップは元々`-scheme`だったのでスキーム名のみ変更）、共有スキームファイルを`Ghostty.xcscheme`→`Zashiki.xcscheme`にリネームした。**upstream本家は同じ`-target`方式のままなので、この変更はupstreamとの差分になる**（本家は依存ゼロのSparkleしか使っていないため今後も問題化しない見込み）
 - **Textualが0.x系**: 初タグから半年程度でAPIが安定していない可能性がある。`Package.resolved`でバージョンを固定し、更新時は差分を確認する
 - **デプロイターゲット引き上げの影響範囲**: macOS 13.0/13.1→15.0に上げると、それ未満のmacOSでは起動不可になる。個人利用前提のため許容（ユーザー確認済み、2026-08-10）
 - **画像ローダーのネットワーク制限**: `Textual`のデフォルト`AttachmentLoader`はリモートURLをfetchしうる実装。`file://`スキーム以外を拒否する独自実装が必須（未実装）。これを怠ると「外部通信なし」要件が破れる
