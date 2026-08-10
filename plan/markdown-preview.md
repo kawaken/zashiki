@@ -7,24 +7,30 @@
 要件:
 
 - ターミナルウィンドウ右側にMarkdownプレビューペインを表示（トグル可能）
-- CLIから `osascript` 経由でファイルを開ける（薄いシェルラッパー付き）
+- CLIから独自URLスキーム（`zashiki://`）経由でファイルを開ける（薄いシェルラッパー付き）
 - 表示中ファイルのライブ更新（Claude Codeの書き換えに追従、atomic save対応）
 - レンダリングはWKWebView + 同梱markdown-it/highlight.js（外部通信なし）
 
 調査で確認済みの根拠:
 
 - **前例**: Terminal Inspector（`macos/Sources/Ghostty/Surface View/InspectorView.swift` の `InspectableSurface`）が「if/elseで `SplitView` の片側に `NSViewRepresentable` を並べる」同型パターン。`SplitView<L,R>`（`macos/Sources/Features/Splits/SplitView.swift`）は汎用でドラッグディバイダ付き
-- AppleScriptコマンド追加は sdef + NSScriptCommandサブクラス1ファイルの定型（`macos/Sources/Features/AppleScript/ScriptInputTextCommand.swift` がテンプレート）。コマンドコード `GhstMdPv`/`GhstMdCl` は既存と非衝突（2026-08-08時点で再確認済み）
+- `AppDelegate.swift`（`macos/Sources/App/macOS/AppDelegate.swift`）には既に `func application(_ sender: NSApplication, openFile filename: String) -> Bool`（L448〜）というレガシーなファイルオープンの受け口がある。これを見本に、URLスキーム受け口として新しく `func application(_ application: NSApplication, open urls: [URL])` を追加する（後述）
 - `Sources/` はPBXFileSystemSynchronizedRootGroupなのでSwiftファイルは置くだけでターゲットに入る（Ghostty-iOSのmembershipExceptionsへの除外追記は必要、`project.pbxproj`のメカニズムは健在）
 - WebKitはimportのみで使用可（Frameworks追加不要）、App Sandbox無効
 
 ### 命名方針（2026-08-08のリネーム作業を踏まえて追記）
 
-アプリ名は Ghostty → **Zashiki** にリネーム済み（`dev.kawaken.zashiki`、Swiftモジュール名は`PRODUCT_MODULE_NAME`指定により内部的に`Ghostty`のまま維持）。今回の新規実装では以下の使い分けをする:
+アプリ名は Ghostty → **Zashiki** にリネーム済み（`dev.kawaken.zashiki`、Swiftモジュール名は`PRODUCT_MODULE_NAME`指定により内部的に`Ghostty`のまま維持）。今回の新規実装ではこのフォーク独自の新規機能名にはZashiki側の命名を使う（JSのレンダー関数名、CLIラッパーのファイル名・環境変数名）。`ghosttyRender` → `zashikiRender`、`scripts/ghostty-md-preview` → `scripts/zashiki-md-preview`、`GHOSTTY_APP` → `ZASHIKI_APP`。ビルド成果物は `Zashiki.app`（`Ghostty.app`ではない）。検証コマンド例もこれに合わせて更新済み
 
-- **既存のGhostty命名規則に合わせるべきもの**: AppleScriptコマンド実装クラス（`GhosttyScriptWindow`等の兄弟クラスと同じ命名規則に揃える。例: `GhosttyScriptMarkdownPreviewCommand`）。これは内部シンボルの一貫性の問題で、upstream競合最小化の対象でもある
-- **Zashiki向けに新しく命名すべきもの**: このフォーク独自の新規機能でupstreamに対応物が存在しないもの（JSのレンダー関数名、CLIラッパーのファイル名・環境変数名）。`ghosttyRender` → `zashikiRender`、`scripts/ghostty-md-preview` → `scripts/zashiki-md-preview`、`GHOSTTY_APP` → `ZASHIKI_APP`
-- ビルド成果物は `Zashiki.app`（`Ghostty.app`ではない）。検証コマンド例もこれに合わせて更新済み
+### トリガー方式の方針転換（2026-08-10）
+
+当初案（本家由来のAppleScriptサポートに `preview markdown`/`close markdown preview` コマンドを追加する）から方針転換。理由:
+
+- 本家のAppleScript連携機構（`macos/Sources/Features/AppleScript/`）自体を将来的に丸ごと削除したいと考えており、新機能をその上に積み増したくない（AppleScript削除自体は別タスクとして`plan/remove-applescript.md`に切り出す想定・現時点では未着手）
+- CLIから直接操作できれば十分で、`osascript`を経由する必然性がない
+- ウォッチ機能（開いているファイルの監視・ライブ更新）は従来通り維持する。トリガー方式の変更が影響するのは「外部から開かせる入口」だけ
+
+代わりに、独自URLスキーム `zashiki://` をCFBundleURLTypesに登録し、`open "zashiki://..."` から起動・操作できるようにする。
 
 ## アーキテクチャ
 
@@ -72,15 +78,17 @@ MarkdownPreviewFileWatcher (DispatchSourceFileSystemObject)
 | `macos/Sources/Features/Terminal/TerminalView.swift`           | `TerminalViewModel` に `var markdownPreview: MarkdownPreviewModel { get }` 追加。`.ready` の既存ZStackを `MarkdownPreviewSplit` で包む（開き2行+閉じ1行、`.frame` 修飾子は外側へ移動）                                                                                                                                                |
 | `macos/Sources/Features/Terminal/BaseTerminalController.swift` | `let markdownPreview = MarkdownPreviewModel()` + `@IBAction func toggleMarkdownPreview(_:)`（非表示化時 `Ghostty.moveFocus(to: focusedSurface)`）                                                                                                                                                                                     |
 | `macos/Sources/App/macOS/MainMenu.xib`                         | Viewメニュー（Command Palette項目の後）に「Toggle Markdown Preview」Cmd+Shift+M、`target="-1"`（First Responder）で `toggleMarkdownPreview:`                                                                                                                                                                                          |
-| `macos/Ghostty.sdef`                                           | commands末尾（`send mouse scroll` の後、Standard Suiteの前）に `preview markdown`（code=`GhstMdPv`、direct-parameter=パス、optional `in` terminal パラメータ code=`GMdT`）と `close markdown preview`（code=`GhstMdCl`、`GMcT`）を追加                                                                                                |
+| `macos/Ghostty-Info.plist`                                     | `CFBundleURLTypes` を新規追加。`CFBundleURLSchemes = ["zashiki"]`、`CFBundleURLName = "dev.kawaken.zashiki"`、`CFBundleTypeRole = Viewer`。既存の`UTExportedTypeDeclarations`と同じ場所・書式に倣う                                                                                                                                   |
+| `macos/Sources/App/macOS/AppDelegate.swift`                    | `func application(_ application: NSApplication, open urls: [URL])` を新規追加（既存の`application(_:openFile:)`の直後が自然）。`zashiki://markdown-preview/open?path=...`をパース → パス検証 → frontmost `TerminalController`解決 → `controller.markdownPreview.open(url:)`。未対応ホスト/不正パスはログのみで無視                    |
 | `macos/Ghostty.xcodeproj/project.pbxproj`                      | ①`MarkdownPreviewWeb` のfolder reference（PBXFileReference `lastKnownFileType = folder` + PBXBuildFile + Resources group children + Zashiki(旧Ghostty)ターゲットのPBXResourcesBuildPhase の4箇所。前例はかつての`Ghostty.icon`参照、現在は削除済みなので新規に倣う）②Ghostty-iOSの `membershipExceptions` に新規Swift 6ファイルを追記 |
 
-### 新規: AppleScriptコマンドとCLIラッパー
+### 新規: URLスキームCLIラッパー
 
-| ファイル                                                                       | 内容                                                                                                                                                                                                                                                                                                                                          |
-| ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `macos/Sources/Features/AppleScript/GhosttyScriptMarkdownPreviewCommand.swift` | `NSScriptCommand` サブクラス2つ（open/close）。既存の`GhosttyScriptXxxCommand`群と同じ命名規則。冒頭 `NSApp.validateScript(command:)` ガード → パス検証（`expandingTildeInPath` + 存在確認）→ terminal引数 or frontmost `TerminalController` 解決 → `controller.markdownPreview.open(url:)`。エラーは `scriptErrorNumber`/`scriptErrorString` |
-| `scripts/zashiki-md-preview`                                                   | `osascript - "$file" <<EOF` のargv渡し（クォート問題回避）。相対パスは絶対化。`ZASHIKI_APP` 環境変数でDebugビルドを指定可能                                                                                                                                                                                                                   |
+`zashiki://`のURL形式: `zashiki://markdown-preview/open?path=<パーセントエンコードした絶対パス>`
+
+| ファイル                     | 内容                                                                                                                                                                                                                                                                                                         |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `scripts/zashiki-md-preview` | 相対パスを絶対化 → パーセントエンコード → `ZASHIKI_APP`環境変数があれば `open -a "$ZASHIKI_APP" "zashiki://markdown-preview/open?path=$ENCODED"`（Debugビルドを名指しで起動、既定ハンドラの登録状況に依存しない）、なければ `open "zashiki://..."`（システム既定ハンドラ、通常は`/Applications`のRelease版） |
 
 ## 実装ステップ（段階的に動作確認）
 
@@ -90,11 +98,12 @@ MarkdownPreviewFileWatcher (DispatchSourceFileSystemObject)
    検証: トグルで空状態ペイン表示/非表示（Cmd+Shift+M含む）、Open File...でmd表示、ディバイダドラッグ、**トグル前後でシェルセッション生存**（`sleep 100` 継続・スクロールバック保持）、スプリット/タブ/フルスクリーンで崩れなし
 3. **ライブ更新（watcher）**
    検証: (a) `>>` 追記 (b) vimの`:w`（atomic save） (c) Claude Codeによる書き換え (d) `mv` でのrename上書き → 1秒以内に再描画・スクロール維持。(e) 削除→エラー表示→再作成で復帰
-4. **AppleScript + シェルラッパー**
-   検証（`macos/AGENTS.md`手順、アプリは絶対パス指定）:
-   `osascript -e 'tell application "<abs>/macos/build/Debug/Zashiki.app" to preview markdown "/tmp/test.md"'`
+4. **URLスキーム受け口 + シェルラッパー**
+   検証（アプリは絶対パス指定）:
+   `open -a <abs>/macos/build/Debug/Zashiki.app "zashiki://markdown-preview/open?path=/tmp/test.md"` でDebugビルドへ直接配送されること
    `ZASHIKI_APP=<abs>/macos/build/Debug/Zashiki.app scripts/zashiki-md-preview README.md`
-   エラーパス（存在しないファイル、ウィンドウなし、`macos-applescript` 無効）も確認
+   まず `application(_:open:)` が `CFBundleURLTypes` 登録だけでカスタムスキームに対して実際に呼ばれるか確認（呼ばれない場合は`applicationWillFinishLaunching`で`NSAppleEventManager`に`kInternetEventClass`/`kAEGetURL`の明示ハンドラを登録するフォールバックに切り替える。この点は未検証のため要注意）
+   エラーパス（存在しないファイル、ウィンドウなし、不正なpath）も確認
 5. **仕上げ**: `swiftlint lint --strict --fix` → フルビルド `zig build -Doptimize=ReleaseFast -Dxcframework-target=native` → `zig build test`（新規SwiftファイルがCIのlint/testに引っかからないか確認）→ LOCAL_PATCH.mdの手順で `/Applications` 配備 → Claude Codeにmdを書かせて実運用確認 → LOCAL_PATCH.md追記（変更ファイル表・使い方・動作確認手順・アセット出典・upstream競合注意）→ コミット
 
 ## 主要リスクと対処
@@ -104,6 +113,8 @@ MarkdownPreviewFileWatcher (DispatchSourceFileSystemObject)
 - **WKWebViewのローカル読込**: `loadFileURL(_:allowingReadAccessTo: URL(fileURLWithPath: "/"))` でmd内の画像参照を許容（Sandbox無効のローカル用途。JS側 `html: false`+ナビゲーション遮断で緩和、LOCAL_PATCH.mdにトレードオフ明記）。画像が出ん場合の第一容疑はここ
 - **configキーバインド連携は不可**（`syncMenuShortcut` はZigコアのアクション名前提）→ xibの静的Cmd+Shift+Mで代替。制約をLOCAL_PATCH.mdに明記
 - **ウィンドウサイズ**: デフォルト非表示なので初期サイズ算出に影響なし。表示時はウィンドウ幅維持でターミナルが縮む（Inspectorと同挙動）。自動拡幅はv2候補
+- **URLスキームの既定ハンドラ**: 同じ`dev.kawaken.zashiki`系Bundle IDのDebug/Release両方を並行して使う場合、`zashiki://`スキームの既定ハンドラは片方にしかならない（LSHandlerRankの仕様）。`open -a`で明示的にアプリを指定すれば既定ハンドラに関係なく届くため、`scripts/zashiki-md-preview`は`ZASHIKI_APP`未指定時のみ既定ハンドラ（`open`のみ）に頼る設計とする
+- **`application(_:open:)`がカスタムURLスキームに対して実際に発火するかは未検証**: ファイルオープン（Documentタイプ）での実績はあるが、`CFBundleURLTypes`経由のGetURL Apple Eventで同じデリゲートメソッドが呼ばれるかはStep 4で確認するまで確定情報ではない。発火しない場合は`NSAppleEventManager`への明示ハンドラ登録に切り替える
 - **CI**: 新規Swiftファイルは`zig build test`（`GhosttyTests`）と`swiftlint lint --strict`の対象になる。WKWebViewを使うUIコードはユニットテスト対象外にしてよいが、`MarkdownPreviewFileWatcher`のデバウンスロジック等ロジック部分は簡単な単体テストを足す余地がある（必須ではない）
 
 ## 検証（全体）
