@@ -42,18 +42,10 @@ pub const Clipboard = enum(Backing) {
 
     // Our backing isn't is as small as we can in Zig, but a full
     // C int if we're binding to C APIs.
-    const Backing = switch (build_config.app_runtime) {
-        .gtk => c_int,
-        else => u2,
-    };
+    const Backing = u2;
 
     /// Make this a valid gobject if we're in a GTK environment.
     pub const getGObjectType = switch (build_config.app_runtime) {
-        .gtk => @import("gobject").ext.defineEnum(
-            Clipboard,
-            .{ .name = "GhosttyApprtClipboard" },
-        ),
-
         .none => void,
     };
 };
@@ -83,11 +75,6 @@ pub const ClipboardRequest = union(ClipboardRequestType) {
 
     /// Make this a valid gobject if we're in a GTK environment.
     pub const getGObjectType = switch (build_config.app_runtime) {
-        .gtk => @import("gobject").ext.defineBoxed(
-            ClipboardRequest,
-            .{ .name = "GhosttyClipboardRequest" },
-        ),
-
         .none => void,
     };
 };

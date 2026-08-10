@@ -13,8 +13,6 @@ const build_config = @import("build_config.zig");
 const structs = @import("apprt/structs.zig");
 
 pub const action = @import("apprt/action.zig");
-pub const ipc = @import("apprt/ipc.zig");
-pub const gtk = @import("apprt/gtk.zig");
 pub const none = @import("apprt/none.zig");
 pub const browser = @import("apprt/browser.zig");
 pub const embedded = @import("apprt/embedded.zig");
@@ -42,7 +40,6 @@ pub const SurfaceSize = structs.SurfaceSize;
 pub const runtime = switch (build_config.artifact) {
     .exe => switch (build_config.app_runtime) {
         .none => none,
-        .gtk => gtk,
     },
     .lib => embedded,
     .wasm_module => browser,

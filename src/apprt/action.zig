@@ -189,9 +189,6 @@ pub const Action = union(Key) {
     /// Control whether the inspector is shown or hidden.
     inspector: Inspector,
 
-    /// Show the GTK inspector.
-    show_gtk_inspector,
-
     /// The inspector for the given target has changes and should be
     /// rendered at the next opportunity.
     render_inspector,
@@ -379,7 +376,6 @@ pub const Action = union(Key) {
         scrollbar,
         render,
         inspector,
-        show_gtk_inspector,
         render_inspector,
         desktop_notification,
         set_title,
@@ -679,11 +675,6 @@ pub const InitialSize = extern struct {
 
     /// Make this a valid gobject if we're in a GTK environment.
     pub const getGObjectType = switch (build_config.app_runtime) {
-        .gtk => @import("gobject").ext.defineBoxed(
-            InitialSize,
-            .{ .name = "GhosttyApprtInitialSize" },
-        ),
-
         .none => void,
     };
 };

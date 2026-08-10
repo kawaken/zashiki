@@ -129,45 +129,12 @@ fn glDebugMessageCallback(
     });
 }
 
-/// Prepares the provided GL context, loading it with glad.
-fn prepareContext(getProcAddress: anytype) !void {
-    const version = try gl.glad.load(getProcAddress);
-    const major = gl.glad.versionMajor(@intCast(version));
-    const minor = gl.glad.versionMinor(@intCast(version));
-    errdefer gl.glad.unload();
-    log.info("loaded OpenGL {}.{}", .{ major, minor });
-
-    // Need to check version before trying to enable it
-    if (major < MIN_VERSION_MAJOR or
-        (major == MIN_VERSION_MAJOR and minor < MIN_VERSION_MINOR))
-    {
-        log.warn(
-            "OpenGL version is too old. Ghostty requires OpenGL {d}.{d}",
-            .{ MIN_VERSION_MAJOR, MIN_VERSION_MINOR },
-        );
-        return error.OpenGLOutdated;
-    }
-
-    // Enable debug output for the context.
-    try gl.enable(gl.c.GL_DEBUG_OUTPUT);
-
-    // Register our debug message callback with the OpenGL context.
-    gl.glad.context.DebugMessageCallback.?(glDebugMessageCallback, null);
-
-    // Enable SRGB framebuffer for linear blending support.
-    try gl.enable(gl.c.GL_FRAMEBUFFER_SRGB);
-}
-
 /// This is called early right after surface creation.
 pub fn surfaceInit(surface: *apprt.Surface) !void {
     _ = surface;
 
     switch (apprt.runtime) {
         else => @compileError("unsupported app runtime for OpenGL"),
-
-        // GTK uses global OpenGL context so we load from null.
-        apprt.gtk,
-        => try prepareContext(null),
 
         apprt.embedded => {
             // TODO(mitchellh): this does nothing today to allow libghostty
@@ -201,13 +168,6 @@ pub fn threadEnter(self: *const OpenGL, surface: *apprt.Surface) !void {
     switch (apprt.runtime) {
         else => @compileError("unsupported app runtime for OpenGL"),
 
-        apprt.gtk => {
-            // GTK doesn't support threaded OpenGL operations as far as I can
-            // tell, so we use the renderer thread to setup all the state
-            // but then do the actual draws and texture syncs and all that
-            // on the main thread. As such, we don't do anything here.
-        },
-
         apprt.embedded => {
             // TODO(mitchellh): this does nothing today to allow libghostty
             // to compile for OpenGL targets but libghostty is strictly
@@ -223,29 +183,9 @@ pub fn threadExit(self: *const OpenGL) void {
     switch (apprt.runtime) {
         else => @compileError("unsupported app runtime for OpenGL"),
 
-        apprt.gtk => {
-            // We don't need to do any unloading for GTK because we may
-            // be sharing the global bindings with other windows.
-        },
-
         apprt.embedded => {
             // TODO: see threadEnter
         },
-    }
-}
-
-pub fn displayRealized(self: *const OpenGL) void {
-    _ = self;
-
-    switch (apprt.runtime) {
-        apprt.gtk => prepareContext(null) catch |err| {
-            log.warn(
-                "Error preparing GL context in displayRealized, err={}",
-                .{err},
-            );
-        },
-
-        else => @compileError("only GTK should be calling displayRealized"),
     }
 }
 

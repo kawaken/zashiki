@@ -3,7 +3,6 @@ const GhosttyI18n = @This();
 const std = @import("std");
 const builtin = @import("builtin");
 const Config = @import("Config.zig");
-const gresource = @import("../apprt/gtk/build/gresource.zig");
 const locales = @import("../os/i18n_locales.zig").locales;
 
 const domain = "com.mitchellh.ghostty";
@@ -76,77 +75,9 @@ fn createUpdateStep(b: *std.Build) !*std.Build.Step {
     // Not cacheable due to the gresource files
     xgettext.has_side_effects = true;
 
-    inline for (gresource.blueprints) |blp| {
-        const path = std.fmt.comptimePrint(
-            "src/apprt/gtk/ui/{[major]}.{[minor]}/{[name]s}.blp",
-            blp,
-        );
-        // The arguments to xgettext must be the relative path in the build root
-        // or the resulting files will contain the absolute path. This will cause
-        // a lot of churn because not everyone has the Ghostty code checked out in
-        // exactly the same location.
-        xgettext.addArg(path);
-        // Mark the file as an input so that the Zig build system caching will work.
-        xgettext.addFileInput(b.path(path));
-    }
-
-    {
-        // Iterate over all of the files underneath `src/apprt/gtk`. We store
-        // them in an array so that they can be sorted into a determininistic
-        // order. That will minimize code churn as directory walking is not
-        // guaranteed to happen in any particular order.
-
-        var gtk_files: std.ArrayListUnmanaged([]const u8) = .empty;
-        defer {
-            for (gtk_files.items) |item| b.allocator.free(item);
-            gtk_files.deinit(b.allocator);
-        }
-
-        var gtk_dir = try b.build_root.handle.openDir(
-            b.graph.io,
-            "src/apprt/gtk",
-            .{ .iterate = true },
-        );
-        defer gtk_dir.close(b.graph.io);
-
-        var walk = try gtk_dir.walk(b.allocator);
-        defer walk.deinit();
-        while (try walk.next(b.graph.io)) |src| {
-            switch (src.kind) {
-                .file => if (!std.mem.endsWith(
-                    u8,
-                    src.basename,
-                    ".zig",
-                )) continue,
-
-                else => continue,
-            }
-
-            try gtk_files.append(b.allocator, try b.allocator.dupe(u8, src.path));
-        }
-
-        std.mem.sort(
-            []const u8,
-            gtk_files.items,
-            {},
-            struct {
-                fn lt(_: void, lhs: []const u8, rhs: []const u8) bool {
-                    return std.mem.order(u8, lhs, rhs) == .lt;
-                }
-            }.lt,
-        );
-
-        for (gtk_files.items) |item| {
-            const path = b.pathJoin(&.{ "src/apprt/gtk", item });
-            // The arguments to xgettext must be the relative path in the build root
-            // or the resulting files will contain the absolute path. This will
-            // cause a lot of churn because not everyone has the Ghostty code
-            // checked out in exactly the same location.
-            xgettext.addArg(path);
-            // Mark the file as an input so that the Zig build system caching will work.
-            xgettext.addFileInput(b.path(path));
-        }
-    }
+    // NOTE: This used to also extract translatable strings from the GTK
+    // apprt (blueprint UI files and src/apprt/gtk/**/*.zig), but that
+    // apprt has been removed from this fork (no Linux/GTK build target).
 
     // Add support for localizing our `nautilus` integration
     const xgettext_py = b.addSystemCommand(&.{

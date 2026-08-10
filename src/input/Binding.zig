@@ -673,11 +673,6 @@ pub const Action = union(enum) {
     /// Valid arguments: `toggle`, `show`, `hide`.
     inspector: InspectorMode,
 
-    /// Show the GTK inspector.
-    ///
-    /// Has no effect on macOS.
-    show_gtk_inspector,
-
     /// Show the on-screen keyboard if one is present.
     ///
     /// Only implemented on Linux (GTK). On GNOME, the "Screen Keyboard"
@@ -974,11 +969,6 @@ pub const Action = union(enum) {
 
     /// Make this a valid gobject if we're in a GTK environment.
     pub const getGObjectType = switch (build_config.app_runtime) {
-        .gtk => @import("gobject").ext.defineBoxed(
-            Action,
-            .{ .name = "GhosttyBindingAction" },
-        ),
-
         .none => void,
     };
 
@@ -1339,7 +1329,6 @@ pub const Action = union(enum) {
             .toggle_quick_terminal,
             .toggle_visibility,
             .check_for_updates,
-            .show_gtk_inspector,
             => .app,
 
             // These are app but can be special-cased in a surface context.
