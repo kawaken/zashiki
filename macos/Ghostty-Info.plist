@@ -53,8 +53,6 @@
 	</dict>
 	<key>MDItemKeywords</key>
 	<string>Terminal</string>
-	<key>NSAppleScriptEnabled</key>
-	<true/>
 	<key>NSAutoFillRequiresTextContentTypeForOneTimeCodeOnMac</key>
 	<true/>
 	<key>NSDockTilePlugIn</key>
@@ -102,8 +100,6 @@
 			</array>
 		</dict>
 	</array>
-	<key>OSAScriptingDefinition</key>
-	<string>Ghostty.sdef</string>
 	<key>SUEnableAutomaticChecks</key>
 	<false/>
 	<key>SUPublicEDKey</key>
