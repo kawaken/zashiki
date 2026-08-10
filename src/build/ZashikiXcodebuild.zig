@@ -1,4 +1,4 @@
-const Ghostty = @This();
+const Zashiki = @This();
 
 const std = @import("std");
 const builtin = @import("builtin");
@@ -25,7 +25,7 @@ pub fn init(
     b: *std.Build,
     config: *const Config,
     deps: Deps,
-) !Ghostty {
+) !Zashiki {
     const xc_config = switch (config.optimize) {
         .Debug => "Debug",
         .ReleaseSafe,
@@ -51,7 +51,7 @@ pub fn init(
     const env = b.graph.environ_map;
     const app_path = b.fmt("macos/build/{s}/Zashiki.app", .{xc_config});
 
-    // Our step to build the Ghostty macOS app.
+    // Our step to build the Zashiki macOS app.
     const build = build: {
         // External environment variables can mess up xcodebuild, so
         // we create a new empty environment.
@@ -65,10 +65,22 @@ pub fn init(
         step.environ_map = env_map;
         step.addArgs(&.{
             "xcodebuild",
-            "-target",
+            "-scheme",
             "Zashiki",
             "-configuration",
             xc_config,
+            // Force build products into a fixed location (matching
+            // `app_path` below) instead of relying on whatever Xcode's
+            // per-machine build location preference happens to be
+            // (DerivedData vs. legacy project-relative). Without this,
+            // the "copy app bundle" step below can silently copy stale
+            // or empty output on machines/CI runners that default to
+            // DerivedData. Must be an absolute path: a relative SYMROOT
+            // breaks Xcode's module search path computation for SPM
+            // packages that themselves depend on other SPM packages
+            // (e.g. Textual -> SwiftUIMath/ConcurrencyExtras), causing
+            // "unable to resolve module dependency" errors.
+            b.fmt("SYMROOT={s}", .{b.pathFromRoot("macos/build")}),
         });
 
         // If we have a specific architecture, we need to pass it
@@ -103,9 +115,13 @@ pub fn init(
             "xcodebuild",
             "test",
             "-scheme",
-            "Ghostty",
+            "Zashiki",
             "-skip-testing",
             "GhosttyUITests",
+            // See the comment on the equivalent flag in the `build` step
+            // above: keeps output location deterministic across machines.
+            // Must be absolute for the same reason noted there.
+            b.fmt("SYMROOT={s}", .{b.pathFromRoot("macos/build")}),
         });
         if (xc_arch) |arch| step.addArgs(&.{ "-arch", arch });
 
@@ -124,7 +140,7 @@ pub fn init(
         break :xctest step;
     };
 
-    // Our step to open the resulting Ghostty app.
+    // Our step to open the resulting Zashiki app.
     const open = open: {
         const disable_save_state = RunStep.create(b, "disable save state");
         disable_save_state.has_side_effects = true;
@@ -139,7 +155,7 @@ pub fn init(
         disable_save_state.expectExitCode(0);
         disable_save_state.step.dependOn(&build.step);
 
-        const open = RunStep.create(b, "run Ghostty app");
+        const open = RunStep.create(b, "run Zashiki app");
         open.has_side_effects = true;
         open.cwd = b.path("");
         open.addArgs(&.{b.fmt(
@@ -185,18 +201,18 @@ pub fn init(
     };
 }
 
-pub fn install(self: *const Ghostty) void {
+pub fn install(self: *const Zashiki) void {
     const b = self.copy.step.owner;
     b.getInstallStep().dependOn(&self.copy.step);
 }
 
-pub fn installXcframework(self: *const Ghostty) void {
+pub fn installXcframework(self: *const Zashiki) void {
     const b = self.build.step.owner;
     b.getInstallStep().dependOn(&self.build.step);
 }
 
 pub fn addTestStepDependencies(
-    self: *const Ghostty,
+    self: *const Zashiki,
     other_step: *std.Build.Step,
 ) void {
     other_step.dependOn(&self.xctest.step);
