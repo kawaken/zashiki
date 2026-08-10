@@ -52,7 +52,7 @@
 
 **この転換に伴う波及的な決定**:
 
-- **macOSデプロイターゲットをmacOS 15.0に引き上げる**（現状はZashiki関連ターゲットが13.0/13.1、一部ターゲット--おそらくWidget/AppIntents系--は既に15.5）。ユーザー確認済み（2026-08-10「基本新しいので良いよ。OSX13とか古すぎるやろ」）。CIランナーは既に`macos-15`なので追加対応不要
+- **macOSデプロイターゲットをmacOS 15.0（Sequoia）に引き上げる**（現状はZashiki関連ターゲットが13.0/13.1、一部ターゲット--おそらくWidget/AppIntents系--は既に15.5）。ユーザー確認済み（2026-08-10）。フロア決定の根拠: 2026-08-10時点の現行macOSは**26 Tahoe**（26.6、2026-07-27リリース）。WWDC 2025でOSバージョン番号がリリース年基準に統一され、Sequoia(15)の次がTahoe(26)になった（16〜25は欠番、iOS/iPadOS等も同時に統一）ため、実際の系譜は 13 Ventura → 14 Sonoma → 15 Sequoia → 26 Tahoe → 27 Golden Gate(2026年9月予定)。ユーザーの「直近2バージョンくらいで十分」という方針のうち、**現行の1つ前であるmacOS 15 Sequoiaをフロアとすることで確定**（Textualの要求macOS 15+とも一致）。CIランナーは既に`macos-15`なので追加対応不要
 - 画像読み込み（`AttachmentLoader`）はデフォルトでリモートURLをfetchしうる実装（`URLAttachmentLoader` → `ImageLoader.shared.image(for:)`）なので、**`file://`スキームのみ許可する独自`AttachmentLoader`を実装する**必要がある（「外部通信なし」要件を満たすため。未実装、要検証）
 - markdown-it/highlight.js/github-markdown-cssのvendoring（`macos/MarkdownPreviewWeb/`）は不要になったため削除済み
 
