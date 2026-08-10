@@ -51,6 +51,9 @@ class BaseTerminalController: NSWindowController,
     /// Set if the terminal view should show the update overlay.
     @Published var updateOverlayIsVisible: Bool = false
 
+    /// The state for this window's Markdown preview pane.
+    let markdownPreview = MarkdownPreviewModel()
+
     /// True when any surface in this controller currently has an active bell.
     @Published private(set) var bell: Bool = false
 
@@ -1445,6 +1448,16 @@ class BaseTerminalController: NSWindowController,
             // until one of the return `true` so the paste action is consumed by the surface
             // instead of the first responder (command palette).
             _ = focusedSurface?.resignFirstResponder()
+        }
+    }
+
+    @IBAction func toggleMarkdownPreview(_ sender: Any?) {
+        markdownPreview.toggle()
+        if !markdownPreview.isVisible, let focusedSurface {
+            // Hiding the pane can leave focus in a weird spot (the pane's
+            // own controls, if it had any). Send focus back to the
+            // terminal, mirroring how the inspector handles this.
+            Ghostty.moveFocus(to: focusedSurface)
         }
     }
 

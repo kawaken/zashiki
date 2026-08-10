@@ -121,10 +121,11 @@ MarkdownPreviewFileWatcher (DispatchSourceFileSystemObject)
 ## 実装ステップ（段階的に動作確認）
 
 1. **SPMパッケージ追加 + デプロイターゲット引き上げ + 試験表示**（✅完了、2026-08-10）
-   `Textual`をpbxprojに追加、Zashiki関連ターゲットのデプロイターゲットをmacOS 15.0に引き上げ。`macos/Sources/Features/Markdown Preview/MarkdownPreviewSmokeTestView.swift`（一時ファイル、後で削除）に`StructuredText(markdown:)`でGFMテーブル・コードブロックを表示するテストビューを実装
-   検証: `zig build`（フルアプリビルド）でBUILD SUCCEEDED、`Zashiki.app/Contents/Resources/`に`textual_Textual.bundle`/`swiftui-math_SwiftUIMath.bundle`が同梱されることを確認済み。`zig build test -Demit-macos-app=false`（CIと同一コマンド）も実機確認済み（3095/3111件成功・16件スキップ・失敗0件）。**画面上でのレンダリング確認（テーブル・ハイライト・ダークモード）はまだ未実施**（テストビューをまだどこにも表示していないため）。Step 2で実際のペインに組み込んだ際に併せて確認する
-2. **Model + ペインUI + TerminalView統合 + メニュー**（watcher以外）
-   検証: トグルで空状態ペイン表示/非表示（Cmd+Shift+M含む）、Open File...でmd表示、ディバイダドラッグ、**トグル前後でシェルセッション生存**（`sleep 100` 継続・スクロールバック保持）、スプリット/タブ/フルスクリーンで崩れなし。リンククリックが`NSWorkspace`に委譲されること、スクロール位置維持の挙動を確認
+   `Textual`をpbxprojに追加、Zashiki関連ターゲットのデプロイターゲットをmacOS 15.0に引き上げ。検証用の一時ビュー（`MarkdownPreviewSmokeTestView.swift`）で`StructuredText(markdown:)`のコンパイル・リンクを確認後、Step 2実装時に削除済み
+   検証: `zig build`（フルアプリビルド）でBUILD SUCCEEDED、`Zashiki.app/Contents/Resources/`に`textual_Textual.bundle`/`swiftui-math_SwiftUIMath.bundle`が同梱されることを確認済み。`zig build test -Demit-macos-app=false`（CIと同一コマンド）も実機確認済み（3095/3111件成功・16件スキップ・失敗0件）
+2. **Model + ペインUI + TerminalView統合 + メニュー**（watcher以外、✅コード実装完了、2026-08-11）
+   `MarkdownPreviewModel`/`MarkdownPreviewSplit`/`MarkdownPreviewPane`/`MarkdownPreviewImageLoader`の4ファイルを実装。`TerminalViewModel`に`markdownPreview`追加、`BaseTerminalController`に`markdownPreview`プロパティと`toggleMarkdownPreview(_:)`、`MainMenu.xib`に「Toggle Markdown Preview」（Cmd+Shift+M）を追加
+   検証: `zig build`でBUILD SUCCEEDED（400/400ステップ）、コンパイルエラー・SwiftLint警告なし。**画面上での動作確認（トグル・Open File...・ディバイダドラッグ・シェルセッション生存・スクロール位置維持・リンク委譲）は未実施**——この開発環境（サンドボックス）にはGUI表示アクセスがなく（`screencapture`が"could not create image from display"で失敗）、アプリ自体は正常起動・終了できることは確認したが画面は見れない。ユーザー自身の実機での確認が必要
 3. **ライブ更新（watcher）**
    検証: (a) `>>` 追記 (b) vimの`:w`（atomic save） (c) Claude Codeによる書き換え (d) `mv` でのrename上書き → 1秒以内に再描画・スクロール維持。(e) 削除→エラー表示→再作成で復帰
 4. **URLスキーム受け口 + シェルラッパー**
