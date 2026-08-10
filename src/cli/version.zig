@@ -11,6 +11,8 @@ pub const Options = struct {};
 /// The `version` command is used to display information about Ghostty. Recognized as
 /// either `+version` or `--version`.
 pub fn run(alloc: Allocator) !u8 {
+    _ = alloc;
+
     var buffer: [1024]u8 = undefined;
     const stdout_file: std.Io.File = .stdout();
     var stdout_writer = stdout_file.writer(global.io(), &buffer);
