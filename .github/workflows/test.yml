@@ -68,6 +68,17 @@ jobs:
       - name: zig build test
         run: zig build test -Demit-macos-app=false
 
+      # 一時的な調査用ステップ。zig build test内でxcodebuild testが
+      # "failed command"と表示されるのにジョブ全体はsuccessになる件を
+      # 調べるため、zigのラッパーを介さず直接叩いて生の出力を見る。
+      # 原因が分かったら削除する。
+      - name: (debug) xcodebuild test directly
+        if: always()
+        continue-on-error: true
+        run: |
+          cd macos
+          xcodebuild test -scheme Ghostty -skip-testing GhosttyUITests -arch arm64
+
   build:
     name: zig build (macOS app)
     runs-on: macos-15
