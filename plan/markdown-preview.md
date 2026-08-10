@@ -37,8 +37,9 @@
 Swiftモジュール名（`PRODUCT_MODULE_NAME = Ghostty`）等の**コード内部の表記**はライブラリ利用に近いものとして許容する一方、**ビルドコマンド・スキーム名などビルド/エコシステム面での`Ghostty`表記は避ける**方針とした。この方針に基づき、Step 1の作業中に見つかった以下の対応を実施済み:
 
 - 共有Xcodeスキームファイル `Ghostty.xcscheme` → `Zashiki.xcscheme` にリネーム（スキーム内部の`BlueprintName`は元々`Zashiki`を指していたが、ファイル名＝`xcodebuild -scheme`で指定する名前だけが古いままだった）
-- `macos/build.nu`のデフォルト`--scheme`値を`"Ghostty"` → `"Zashiki"`に変更
-- `macos/AGENTS.md`のビルド手順・出力パス例を`Ghostty.app` → `Zashiki.app`に更新
+- macOSアプリ専用のビルドロジックファイル `src/build/GhosttyXcodebuild.zig` → `src/build/ZashikiXcodebuild.zig` にリネーム（`build.zig`・`src/build/main.zig`の参照も追従。`GhosttyDocs.zig`等クロスプラットフォーム共通のビルドファイル群は対象外）
+- 冗長だった`macos/build.nu`（nushell依存、`zig build`と並行するmacOS専用ビルド経路）を削除し、`zig build`一本に統一（詳細は下記リスク欄）
+- `macos/AGENTS.md`のビルド手順・出力パス例を`Ghostty.app` → `Zashiki.app`に更新、`zig build`ベースの手順に書き換え
 
 ### レンダリング方式の方針転換（2026-08-10）
 
@@ -136,8 +137,9 @@ MarkdownPreviewFileWatcher (DispatchSourceFileSystemObject)
 
 ## 主要リスクと対処
 
-- **pbxproj手編集**: ID重複に注意（24桁hexを新規採番）。build.nuの成否で即検出。2026-08-08時点でpbxprojはリネーム・アイコン差し替え・TEST_HOST修正等で何度も手編集済みなので、既存の「変更前1行が唯一であることをassertしてから置換する」スクリプト方式を踏襲する。SPMパッケージ参照（`XCRemoteSwiftPackageReference`/`XCSwiftPackageProductDependency`）の追加も`Sparkle`の既存エントリを雛形にすれば同じ方式で問題なく追加できた（2026-08-10実施）
-- **（解決済み）`xcodebuild -target`は推移的SPM依存を解決できない**: `Textual`は`SwiftUIMath`/`ConcurrencyExtras`という2つの依存パッケージを持つ（`Sparkle`は依存ゼロの単独パッケージだったため今まで問題にならなかった）。Xcode 26の「Explicitly Built Modules」機構が推移的パッケージ依存を伴うビルド計画を`-target`単体指定では正しく組み立てられない既知の不具合（[Swift Forums](https://forums.swift.org/t/xcode-26-unable-to-find-module-dependency/80516)参照）に該当し、`unable to resolve module dependency`で失敗した。`-scheme`指定（ワークスペース全体の計画を使う）に切り替えると解決することを確認。この対応に伴い`src/build/GhosttyXcodebuild.zig`の`build`ステップを`-target Zashiki`から`-scheme Zashiki`に変更し（`xctest`ステップは元々`-scheme`だったのでスキーム名のみ変更）、共有スキームファイルを`Ghostty.xcscheme`→`Zashiki.xcscheme`にリネームした。**upstream本家は同じ`-target`方式のままなので、この変更はupstreamとの差分になる**（本家は依存ゼロのSparkleしか使っていないため今後も問題化しない見込み）
+- **pbxproj手編集**: ID重複に注意（24桁hexを新規採番）。`zig build`の成否で即検出。2026-08-08時点でpbxprojはリネーム・アイコン差し替え・TEST_HOST修正等で何度も手編集済みなので、既存の「変更前1行が唯一であることをassertしてから置換する」スクリプト方式を踏襲する。SPMパッケージ参照（`XCRemoteSwiftPackageReference`/`XCSwiftPackageProductDependency`）の追加も`Sparkle`の既存エントリを雛形にすれば同じ方式で問題なく追加できた（2026-08-10実施）
+- **（解決済み）`xcodebuild -target`は推移的SPM依存を解決できない**: `Textual`は`SwiftUIMath`/`ConcurrencyExtras`という2つの依存パッケージを持つ（`Sparkle`は依存ゼロの単独パッケージだったため今まで問題にならなかった）。Xcode 26の「Explicitly Built Modules」機構が推移的パッケージ依存を伴うビルド計画を`-target`単体指定では正しく組み立てられない既知の不具合（[Swift Forums](https://forums.swift.org/t/xcode-26-unable-to-find-module-dependency/80516)参照）に該当し、`unable to resolve module dependency`で失敗した。`-scheme`指定（ワークスペース全体の計画を使う）に切り替えると解決することを確認。**upstream本家は同じ`-target`方式のままなので、この変更はupstreamとの差分になる**（本家は依存ゼロのSparkleしか使っていないため今後も問題化しない見込み）
+- **（解決済み）ビルドシステムの二重化とSYMROOT問題（2026-08-10）**: `zig build`（ルート`CLAUDE.md`が案内する本来のビルド方法）とは別に、macOS専用の`macos/build.nu`（要nushell）がビルド出力先を明示指定するためだけに存在していた。`zig build`側は出力先（`SYMROOT`）を指定しておらず、各マシンのXcode設定（DerivedData/レガシーどちらがデフォルトか）に依存する隠れた環境差があった。素の環境やCIランナーではDerivedData側に倒れ、`zig build`の「アプリをコピーする」ステップが空振りする潜在バグがあった。対応として`src/build/GhosttyXcodebuild.zig`を`src/build/ZashikiXcodebuild.zig`にリネームした上で、`build`/`xctest`両ステップに絶対パスの`SYMROOT`（`b.pathFromRoot("macos/build")`）を明示指定し、`macos/build.nu`を削除して`zig build`一本に統一した。**相対パスのSYMROOTだとSPMパッケージのモジュール解決が壊れる（`-target`問題と同種の症状が再発する）ことが分かったため、必ず絶対パスで指定する**必要がある。`zig build`（フルアプリビルド）・`zig build test -Demit-macos-app=false`（CIと同一コマンド、xcodebuild test含む）の両方で実機確認済み（後者は3095/3111件成功・16件スキップ・失敗0件）
 - **Textualが0.x系**: 初タグから半年程度でAPIが安定していない可能性がある。`Package.resolved`でバージョンを固定し、更新時は差分を確認する
 - **デプロイターゲット引き上げの影響範囲**: macOS 13.0/13.1→15.0に上げると、それ未満のmacOSでは起動不可になる。個人利用前提のため許容（ユーザー確認済み、2026-08-10）
 - **画像ローダーのネットワーク制限**: `Textual`のデフォルト`AttachmentLoader`はリモートURLをfetchしうる実装。`file://`スキーム以外を拒否する独自実装が必須（未実装）。これを怠ると「外部通信なし」要件が破れる
