@@ -122,7 +122,7 @@ MarkdownPreviewFileWatcher (DispatchSourceFileSystemObject)
 
 1. **SPMパッケージ追加 + デプロイターゲット引き上げ + 試験表示**（✅完了、2026-08-10）
    `Textual`をpbxprojに追加、Zashiki関連ターゲットのデプロイターゲットをmacOS 15.0に引き上げ。`macos/Sources/Features/Markdown Preview/MarkdownPreviewSmokeTestView.swift`（一時ファイル、後で削除）に`StructuredText(markdown:)`でGFMテーブル・コードブロックを表示するテストビューを実装
-   検証: `macos/build.nu --scheme Zashiki --configuration Debug` 相当のビルドが成功し、`Zashiki.app/Contents/Resources/`に`textual_Textual.bundle`/`swiftui-math_SwiftUIMath.bundle`が同梱されることを確認済み。**画面上でのレンダリング確認（テーブル・ハイライト・ダークモード）はまだ未実施**（テストビューをまだどこにも表示していないため）。Step 2で実際のペインに組み込んだ際に併せて確認する
+   検証: `zig build`（フルアプリビルド）でBUILD SUCCEEDED、`Zashiki.app/Contents/Resources/`に`textual_Textual.bundle`/`swiftui-math_SwiftUIMath.bundle`が同梱されることを確認済み。`zig build test -Demit-macos-app=false`（CIと同一コマンド）も実機確認済み（3095/3111件成功・16件スキップ・失敗0件）。**画面上でのレンダリング確認（テーブル・ハイライト・ダークモード）はまだ未実施**（テストビューをまだどこにも表示していないため）。Step 2で実際のペインに組み込んだ際に併せて確認する
 2. **Model + ペインUI + TerminalView統合 + メニュー**（watcher以外）
    検証: トグルで空状態ペイン表示/非表示（Cmd+Shift+M含む）、Open File...でmd表示、ディバイダドラッグ、**トグル前後でシェルセッション生存**（`sleep 100` 継続・スクロールバック保持）、スプリット/タブ/フルスクリーンで崩れなし。リンククリックが`NSWorkspace`に委譲されること、スクロール位置維持の挙動を確認
 3. **ライブ更新（watcher）**
