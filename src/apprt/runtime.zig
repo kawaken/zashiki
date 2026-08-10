@@ -7,20 +7,13 @@ pub const Runtime = enum {
     /// This is only useful if you're only interested in the lib only (macOS).
     none,
 
-    /// GTK4. Rich windowed application. This uses a full GObject-based
-    /// approach to building the application.
-    gtk,
-
     pub fn default(target: std.Target) Runtime {
-        return switch (target.os.tag) {
-            // The Linux and FreeBSD default is GTK because it is a full
-            // featured application.
-            .linux, .freebsd => .gtk,
-            // Otherwise, we do NONE so we don't create an exe and we create
-            // libghostty. On macOS, Xcode is used to build the app that links
-            // to libghostty.
-            else => .none,
-        };
+        _ = target;
+
+        // We only support the "none" runtime (macOS, where Xcode builds the
+        // app that links to libghostty). This fork does not build a
+        // standalone Linux/FreeBSD GUI application.
+        return .none;
     }
 };
 

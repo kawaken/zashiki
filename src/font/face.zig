@@ -59,11 +59,6 @@ pub const DesiredSize = struct {
 
     /// Make this a valid gobject if we're in a GTK environment.
     pub const getGObjectType = switch (build_config.app_runtime) {
-        .gtk => @import("gobject").ext.defineBoxed(
-            DesiredSize,
-            .{ .name = "GhosttyFontDesiredSize" },
-        ),
-
         .none => void,
     };
 };

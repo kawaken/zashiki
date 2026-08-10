@@ -2,7 +2,6 @@
 //! and spaghetti, so this package extracts the build logic into smaller,
 //! more manageable pieces.
 
-pub const gtk = @import("gtk.zig");
 pub const Config = @import("Config.zig");
 pub const GitVersion = @import("GitVersion.zig");
 

@@ -4710,18 +4710,6 @@ pub fn finalize(self: *Config) !void {
     // Apprt-specific defaults
     switch (build_config.app_runtime) {
         .none => {},
-        .gtk => {
-            switch (self.@"gtk-single-instance") {
-                .true, .false => {},
-
-                // For detection, we assume single instance unless we're
-                // in a CLI environment, then we disable single instance.
-                .detect => self.@"gtk-single-instance" = if (probable_cli)
-                    .false
-                else
-                    .true,
-            }
-        },
     }
 
     // Default our click interval
@@ -9095,11 +9083,6 @@ pub const GtkTitlebarStyle = enum(c_int) {
     tabs,
 
     pub const getGObjectType = switch (build_config.app_runtime) {
-        .gtk => @import("gobject").ext.defineEnum(
-            GtkTitlebarStyle,
-            .{ .name = "GhosttyGtkTitlebarStyle" },
-        ),
-
         .none => void,
     };
 };
@@ -9810,11 +9793,6 @@ pub const WindowDecoration = enum(c_int) {
 
     /// Make this a valid gobject if we're in a GTK environment.
     pub const getGObjectType = switch (build_config.app_runtime) {
-        .gtk => @import("gobject").ext.defineEnum(
-            WindowDecoration,
-            .{ .name = "GhosttyConfigWindowDecoration" },
-        ),
-
         .none => void,
     };
 
