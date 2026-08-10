@@ -225,8 +225,8 @@ pub fn build(b: *std.Build) !void {
             if (i18n) |v| v.install();
         }
 
-        // Ghostty macOS app
-        const macos_app = try buildpkg.GhosttyXcodebuild.init(
+        // Zashiki macOS app
+        const macos_app = try buildpkg.ZashikiXcodebuild.init(
             b,
             &config,
             .{
@@ -273,7 +273,7 @@ pub fn build(b: *std.Build) !void {
                 &deps,
                 .native,
             );
-            const macos_app_native_only = try buildpkg.GhosttyXcodebuild.init(
+            const macos_app_native_only = try buildpkg.ZashikiXcodebuild.init(
                 b,
                 &config,
                 .{
