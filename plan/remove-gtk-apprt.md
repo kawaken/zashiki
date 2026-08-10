@@ -29,6 +29,28 @@
 この環境には`zig`コンパイラが無いためローカルでのビルド検証はできておらず、
 最終確認はCIに委ねている。
 
+## 追記: 設定/キーバインド/CLI APIのGTK専用サーフェスも削除
+
+上記の実装完了後、「クロスプラットフォーム互換性のためのno-opとして残した」
+GTK名の設定・キーバインドAPIについても、本フォークが個人用・macOS専用で
+クロスプラットフォームを目指すものではないという方針のもと、追加で削除した:
+
+- `class`/`x11-instance-name`/`gtk-*`（`gtk-single-instance`、
+  `gtk-titlebar`、`gtk-tabs-location`、`gtk-titlebar-hide-when-maximized`、
+  `gtk-toolbar-style`、`gtk-titlebar-style`、`gtk-wide-tabs`、
+  `gtk-horizontal-tab-scroll`、`gtk-custom-css`、`gtk-opengl-debug`、
+  `gtk-quick-terminal-layer`、`gtk-quick-terminal-namespace`）の
+  設定フィールドと、対応する型（`GtkSingleInstance`等）・compat
+  リネームエントリ・関連テストを`Config.zig`から削除
+- キーバインドアクション`show_gtk_inspector`を`apprt/action.zig`・
+  `input/Binding.zig`・`App.zig`・`input/command.zig`・
+  `macos/Sources/Ghostty/Ghostty.Command.swift`・`include/ghostty.h`から削除
+- `+new-window`/`+toggle-quick-terminal`CLIサブコマンド
+  （GTKのD-Bus IPCでしか実装されておらず、macOS(embedded)/`none`
+  ランタイムでは常にfalseを返すだけで、このフォークでは常に失敗していた）
+  を`src/cli/`、`apprt/ipc.zig`一式、`include/ghostty.h`の
+  `ghostty_ipc_*`型ごと削除
+
 ## 目的
 
 `src/apprt/gtk/`（Linux/FreeBSD向けGTKアプリランタイム、約1.1MB）を含む、

@@ -70,14 +70,6 @@ pub const compatibility = std.StaticStringMap(
     // to set a radius).
     .{ "background-blur-radius", cli.compatibilityRenamed(Config, "background-blur") },
 
-    // Ghostty 1.2 renamed all our adw options to gtk because we now have
-    // a hard dependency on libadwaita.
-    .{ "adw-toolbar-style", cli.compatibilityRenamed(Config, "gtk-toolbar-style") },
-
-    // Ghostty 1.2 removed the `hidden` value from `gtk-tabs-location` and
-    // moved it to `window-show-tab-bar`.
-    .{ "gtk-tabs-location", compatGtkTabsLocation },
-
     // Ghostty 1.2 lets you set `cell-foreground` and `cell-background`
     // to match the cell foreground and background colors, respectively.
     // This can be used with `cursor-color` and `cursor-text` to recreate
@@ -88,10 +80,6 @@ pub const compatibility = std.StaticStringMap(
     // Ghostty 1.2 merged `bold-is-bright` into the new `bold-color`
     // by setting the value to "bright".
     .{ "bold-is-bright", compatBoldIsBright },
-
-    // Ghostty 1.2 removed the "desktop" option and renamed it to "detect".
-    // The semantics also changed slightly but this is the correct mapping.
-    .{ "gtk-single-instance", compatGtkSingleInstance },
 
     // Ghostty 1.3 rename the "window" option to "new-window".
     // See: https://github.com/ghostty-org/ghostty/pull/9764
@@ -1172,9 +1160,6 @@ command: ?Command = null,
 ///     be shell-expanded by the upstream (e.g. the shell used to type in
 ///     the `ghostty -e` command).
 ///
-///   * `gtk-single-instance=false` - This ensures that a new instance is
-///     launched and the CLI args are respected.
-///
 ///   * `quit-after-last-window-closed=true` - This ensures that the Ghostty
 ///     process will exit when the command exits. Additionally, the
 ///     `quit-after-last-window-closed-delay` is unset.
@@ -1527,36 +1512,6 @@ fullscreen: Fullscreen = .false,
 /// be set. This latter case may require you to restart programs such as Neovim
 /// to get the new title.
 title: ?[:0]const u8 = null,
-
-/// The setting that will change the application class value.
-///
-/// This controls the class field of the `WM_CLASS` X11 property (when running
-/// under X11), the Wayland application ID (when running under Wayland), and the
-/// bus name that Ghostty uses to connect to DBus.
-///
-/// Note that changing this value between invocations will create new, separate
-/// instances, of Ghostty when running with `gtk-single-instance=true`. See that
-/// option for more details.
-///
-/// Changing this value may break launching Ghostty from `.desktop` files, via
-/// DBus activation, or systemd user services as the system is expecting Ghostty
-/// to connect to DBus using the default `class` when it is launched.
-///
-/// The class name must follow the requirements defined [in the GTK
-/// documentation](https://docs.gtk.org/gio/type_func.Application.id_is_valid.html).
-///
-/// The default is `com.mitchellh.ghostty`.
-///
-/// This only affects GTK builds.
-class: ?[:0]const u8 = null,
-
-/// This controls the instance name field of the `WM_CLASS` X11 property when
-/// running under X11. It has no effect otherwise.
-///
-/// The default is `ghostty`.
-///
-/// This only affects GTK builds.
-@"x11-instance-name": ?[:0]const u8 = null,
 
 /// The directory to change to after starting the command.
 ///
@@ -2691,44 +2646,6 @@ keybind: Keybinds = .{},
 /// Available since: 1.2.0
 @"quick-terminal-size": QuickTerminalSize = .{},
 
-/// The layer of the quick terminal window. The higher the layer,
-/// the more windows the quick terminal may conceal.
-///
-/// Valid values are:
-///
-///  * `overlay`
-///
-///    The quick terminal appears in front of all windows.
-///
-///  * `top` (default)
-///
-///    The quick terminal appears in front of normal windows but behind
-///    fullscreen overlays like lock screens.
-///
-///  * `bottom`
-///
-///    The quick terminal appears behind normal windows but in front of
-///    wallpapers and other windows in the background layer.
-///
-///  * `background`
-///
-///    The quick terminal appears behind all windows.
-///
-/// GTK Wayland only.
-///
-/// Available since: 1.2.0
-@"gtk-quick-terminal-layer": QuickTerminalLayer = .top,
-/// The namespace for the quick terminal window.
-///
-/// This is an identifier that is used by the Wayland compositor and/or
-/// scripts to determine the type of layer surfaces and to possibly apply
-/// unique effects.
-///
-/// GTK Wayland only.
-///
-/// Available since: 1.2.0
-@"gtk-quick-terminal-namespace": [:0]const u8 = "ghostty-quick-terminal",
-
 /// The screen where the quick terminal should show up.
 ///
 /// Valid values are:
@@ -3546,8 +3463,8 @@ keybind: Keybinds = .{},
 ///
 /// This will cause startup times to be slower (a hundred milliseconds or so),
 /// so the default value is "single-instance." In single-instance mode, only
-/// one instance of Ghostty is running (see gtk-single-instance) so the startup
-/// time is a one-time cost. Additionally, single instance Ghostty is much
+/// one instance of Ghostty is running so the startup time is a one-time
+/// cost. Additionally, single instance Ghostty is much
 /// more likely to have many windows, tabs, etc. so cgroup isolation is a
 /// big benefit.
 ///
@@ -3563,7 +3480,7 @@ keybind: Keybinds = .{},
 ///   * `never` - Never use cgroups.
 ///   * `always` - Always use cgroups.
 ///   * `single-instance` - Enable cgroups only for Ghostty instances launched
-///     as single-instance applications (see gtk-single-instance).
+///     as single-instance applications.
 @"linux-cgroup": LinuxCgroup = if (builtin.os.tag == .linux)
     .@"single-instance"
 else
@@ -3609,128 +3526,6 @@ else
 /// Changing this value and reloading the config will not affect existing
 /// surfaces.
 @"linux-cgroup-hard-fail": bool = false,
-
-/// Enable or disable GTK's OpenGL debugging logs. The default is `true` for
-/// debug builds, `false` for all others.
-///
-/// Available since: 1.1.0
-@"gtk-opengl-debug": bool = builtin.mode == .Debug,
-
-/// If `true`, the Ghostty GTK application will run in single-instance mode:
-/// each new `ghostty` process launched will result in a new window if there is
-/// already a running process.
-///
-/// If `false`, each new ghostty process will launch a separate application.
-///
-/// If `detect`, Ghostty will assume true (single instance) unless one of
-/// the following scenarios is found:
-///
-/// 1. TERM_PROGRAM environment variable is a non-empty value. In this
-/// case, we assume Ghostty is being launched from a graphical terminal
-/// session and you want a dedicated instance.
-///
-/// 2. Any CLI arguments exist. In this case, we assume you are passing
-/// custom Ghostty configuration. Single instance mode inherits the
-/// configuration from when it was launched, so we must disable single
-/// instance to load the new configuration.
-///
-/// If either of these scenarios is producing a false positive, you can
-/// set this configuration explicitly to the behavior you want.
-///
-/// The pre-1.2 option `desktop` has been deprecated. Please replace
-/// this with `detect`.
-///
-/// The default value is `detect`.
-///
-/// Note that debug builds of Ghostty have a separate single-instance ID
-/// so you can test single instance without conflicting with release builds.
-@"gtk-single-instance": GtkSingleInstance = .default,
-
-/// When enabled, the full GTK titlebar is displayed instead of your window
-/// manager's simple titlebar. The behavior of this option will vary with your
-/// window manager.
-///
-/// This option does nothing when `window-decoration` is none or when running
-/// under macOS.
-@"gtk-titlebar": bool = true,
-
-/// Determines the side of the screen that the GTK tab bar will stick to.
-/// Top, bottom, and hidden are supported. The default is top.
-///
-/// When `hidden` is set, a tab button displaying the number of tabs will appear
-/// in the title bar. It has the ability to open a tab overview for displaying
-/// tabs. Alternatively, you can use the `toggle_tab_overview` action in a
-/// keybind if your window doesn't have a title bar, or you can switch tabs
-/// with keybinds.
-@"gtk-tabs-location": GtkTabsLocation = .top,
-
-/// If this is `true`, the titlebar will be hidden when the window is maximized,
-/// and shown when the titlebar is unmaximized. GTK only.
-///
-/// Available since: 1.1.0
-@"gtk-titlebar-hide-when-maximized": bool = false,
-
-/// Determines the appearance of the top and bottom bars tab bar.
-///
-/// Valid values are:
-///
-///  * `flat` - Top and bottom bars are flat with the terminal window.
-///  * `raised` - Top and bottom bars cast a shadow on the terminal area.
-///  * `raised-border` - Similar to `raised` but the shadow is replaced with a
-///    more subtle border.
-@"gtk-toolbar-style": GtkToolbarStyle = .raised,
-
-/// The style of the GTK titlebar. Available values are `native` and `tabs`.
-///
-/// The `native` titlebar style is a traditional titlebar with a title, a few
-/// buttons and window controls. A separate tab bar will show up below the
-/// titlebar if you have multiple tabs open in the window.
-///
-/// The `tabs` titlebar merges the tab bar and the traditional titlebar.
-/// This frees up vertical space on your screen if you use multiple tabs. One
-/// limitation of the `tabs` titlebar is that you cannot drag the titlebar
-/// by the titles any longer (as they are tab titles now). Other areas of the
-/// `tabs` title bar can be used to drag the window around.
-///
-/// The default style is `native`.
-@"gtk-titlebar-style": GtkTitlebarStyle = .native,
-
-/// If `true` (default), then the Ghostty GTK tabs will be "wide." Wide tabs
-/// are the new typical Gnome style where tabs fill their available space.
-/// If you set this to `false` then tabs will only take up space they need,
-/// which is the old style.
-@"gtk-wide-tabs": bool = true,
-
-/// If `true` (default), then two-finger horizontal scrolling on a touchpad
-/// will switch between tabs. Scrolling left goes to the next tab and
-/// scrolling right goes to the previous tab. Set this to `false` to
-/// disable this behavior.
-///
-/// Available since 1.4.0.
-@"gtk-horizontal-tab-scroll": bool = true,
-
-/// Custom CSS files to be loaded.
-///
-/// GTK CSS documentation can be found at the following links:
-///
-///   * https://docs.gtk.org/gtk4/css-overview.html - An overview of GTK CSS.
-///   * https://docs.gtk.org/gtk4/css-properties.html - A comprehensive list
-///     of supported CSS properties.
-///
-/// Launch Ghostty with `env GTK_DEBUG=interactive ghostty` to tweak Ghostty's
-/// CSS in real time using the GTK Inspector. Errors in your CSS files would
-/// also be reported in the terminal you started Ghostty from. See
-/// https://developer.gnome.org/documentation/tools/inspector.html for more
-/// information about the GTK Inspector.
-///
-/// This configuration can be repeated multiple times to load multiple files.
-/// Prepend a ? character to the file path to suppress errors if the file does
-/// not exist. If you want to include a file that begins with a literal ?
-/// character, surround the file path in double quotes (").
-/// The file size limit for a single stylesheet is 5MiB.
-///
-/// Available since: 1.1.0
-@"gtk-custom-css": RepeatablePath = .{},
 
 /// If `true` (default), applications running in the terminal can show desktop
 /// notifications using certain escape sequences such as OSC 9 or OSC 777.
@@ -4802,7 +4597,6 @@ pub fn parseManuallyHook(
 
         // See "command" docs for the implied configurations and why.
         self.@"initial-command" = .{ .direct = command.items };
-        self.@"gtk-single-instance" = .false;
         self.@"quit-after-last-window-closed" = true;
         self.@"quit-after-last-window-closed-delay" = null;
         if (self.@"shell-integration" != .none) {
@@ -4821,40 +4615,6 @@ pub fn parseManuallyHook(
 
     // If we didn't find a special case, continue parsing normally
     return true;
-}
-
-fn compatGtkTabsLocation(
-    self: *Config,
-    alloc: Allocator,
-    key: []const u8,
-    value: ?[]const u8,
-) bool {
-    _ = alloc;
-    assert(std.mem.eql(u8, key, "gtk-tabs-location"));
-
-    if (std.mem.eql(u8, value orelse "", "hidden")) {
-        self.@"window-show-tab-bar" = .never;
-        return true;
-    }
-
-    return false;
-}
-
-fn compatGtkSingleInstance(
-    self: *Config,
-    alloc: Allocator,
-    key: []const u8,
-    value: ?[]const u8,
-) bool {
-    _ = alloc;
-    assert(std.mem.eql(u8, key, "gtk-single-instance"));
-
-    if (std.mem.eql(u8, value orelse "", "desktop")) {
-        self.@"gtk-single-instance" = .detect;
-        return true;
-    }
-
-    return false;
 }
 
 fn compatCursorInvertFgBg(
@@ -9055,38 +8815,6 @@ pub const MacShortcuts = enum {
     ask,
 };
 
-/// See gtk-single-instance
-pub const GtkSingleInstance = enum {
-    false,
-    true,
-    detect,
-
-    pub const default: GtkSingleInstance = .detect;
-};
-
-/// See gtk-tabs-location
-pub const GtkTabsLocation = enum {
-    top,
-    bottom,
-};
-
-/// See gtk-toolbar-style
-pub const GtkToolbarStyle = enum {
-    flat,
-    raised,
-    @"raised-border",
-};
-
-/// See gtk-titlebar-style
-pub const GtkTitlebarStyle = enum(c_int) {
-    native,
-    tabs,
-
-    pub const getGObjectType = switch (build_config.app_runtime) {
-        .none => void,
-    };
-};
-
 /// See app-notifications
 pub const AppNotifications = packed struct {
     @"clipboard-copy": bool = true,
@@ -9270,14 +8998,6 @@ pub const QuickTerminalPosition = enum {
     left,
     right,
     center,
-};
-
-/// See quick-terminal-layer
-pub const QuickTerminalLayer = enum {
-    overlay,
-    top,
-    bottom,
-    background,
 };
 
 /// See quick-terminal-size
@@ -10915,27 +10635,6 @@ test "compatibility: scrollback-limit renamed to bytes" {
         std.math.maxInt(usize),
         cfg.@"scrollback-limit-bytes".value,
     );
-}
-
-test "compatibility: gtk-single-instance desktop" {
-    const testing = std.testing;
-    const alloc = testing.allocator;
-
-    {
-        var cfg = try Config.default(alloc);
-        defer cfg.deinit();
-        var it: TestIterator = .{ .data = &.{
-            "--gtk-single-instance=desktop",
-        } };
-        try cfg.loadIter(alloc, &it);
-
-        // We need to test this BEFORE finalize, because finalize will
-        // convert our detect to a real value.
-        try testing.expectEqual(
-            GtkSingleInstance.detect,
-            cfg.@"gtk-single-instance",
-        );
-    }
 }
 
 test "compatibility: removed cursor-invert-fg-bg" {

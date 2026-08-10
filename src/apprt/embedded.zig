@@ -7,7 +7,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const assert = @import("../quirks.zig").inlineAssert;
-const Allocator = std.mem.Allocator;
 const objc = @import("objc");
 const apprt = @import("../apprt.zig");
 const font = @import("../font/main.zig");
@@ -320,24 +319,6 @@ pub const App = struct {
             },
 
             else => {},
-        }
-    }
-
-    /// Send the given IPC to a running Ghostty. Returns `true` if the action was
-    /// able to be performed, `false` otherwise.
-    ///
-    /// Note that this is a static function. Since this is called from a CLI app (or
-    /// some other process that is not Ghostty) there is no full-featured apprt App
-    /// to use.
-    pub fn performIpc(
-        _: Allocator,
-        _: apprt.ipc.Target,
-        comptime action: apprt.ipc.Action.Key,
-        _: apprt.ipc.Action.Value(action),
-    ) (Allocator.Error || apprt.ipc.Errors)!bool {
-        switch (action) {
-            .new_window => return false,
-            .toggle_quick_terminal => return false,
         }
     }
 };
