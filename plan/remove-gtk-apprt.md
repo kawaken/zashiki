@@ -97,21 +97,21 @@ enum網羅性チェックはcomptime pruningとは無関係に常に行われる
 
 現時点で`src/apprt/gtk/`の外から`.gtk`を参照している箇所は14ファイル:
 
-| ファイル | 内容 |
-| --- | --- |
-| `src/apprt.zig:45` | `runtime`の解決switch |
-| `src/apprt/runtime.zig:18` | `Runtime.default()` |
-| `src/apprt/surface.zig:123` | GObject型定義(`gobject.ext.defineBoxed`) |
-| `src/apprt/structs.zig:46,52,86` | GObject型定義(`gobject.ext.defineEnum/defineBoxed`) |
-| `src/apprt/action.zig:682` | 同上 |
-| `src/config/Config.zig:4713,9098,9813` | 同上 + GTKドキュメントへの外部リンク(コメント、実害なし) |
-| `src/renderer/OpenGL.zig:169,204,226,241` | GTK向けGLコンテキスト処理 |
-| `src/terminal/mouse.zig:85` | GObject型定義 |
-| `src/font/face.zig:62` | 同上 |
-| `src/input/Binding.zig:977` | 同上 |
-| `src/datastruct/split_tree.zig:1316` | 同上 |
-| `src/cli/version.zig:49` | `+version`出力にGTKバージョン情報を含めるかの分岐 |
-| `src/build/SharedDeps.zig:692` | ビルド時のGTK依存リンク |
+| ファイル                                  | 内容                                                     |
+| ----------------------------------------- | -------------------------------------------------------- |
+| `src/apprt.zig:45`                        | `runtime`の解決switch                                    |
+| `src/apprt/runtime.zig:18`                | `Runtime.default()`                                      |
+| `src/apprt/surface.zig:123`               | GObject型定義(`gobject.ext.defineBoxed`)                 |
+| `src/apprt/structs.zig:46,52,86`          | GObject型定義(`gobject.ext.defineEnum/defineBoxed`)      |
+| `src/apprt/action.zig:682`                | 同上                                                     |
+| `src/config/Config.zig:4713,9098,9813`    | 同上 + GTKドキュメントへの外部リンク(コメント、実害なし) |
+| `src/renderer/OpenGL.zig:169,204,226,241` | GTK向けGLコンテキスト処理                                |
+| `src/terminal/mouse.zig:85`               | GObject型定義                                            |
+| `src/font/face.zig:62`                    | 同上                                                     |
+| `src/input/Binding.zig:977`               | 同上                                                     |
+| `src/datastruct/split_tree.zig:1316`      | 同上                                                     |
+| `src/cli/version.zig:49`                  | `+version`出力にGTKバージョン情報を含めるかの分岐        |
+| `src/build/SharedDeps.zig:692`            | ビルド時のGTK依存リンク                                  |
 
 `src/config/Config.zig`の2箇所(1546, 3717行)はGTKドキュメントへの
 コメント内リンクなので実質ノイズ、消さなくても実害はない。
