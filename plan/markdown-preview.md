@@ -5,7 +5,7 @@
 - **作業ブランチ**: `markdown-preview`（`kawaken/zashiki`、`main`から派生）
 - **PR**: [#12](https://github.com/kawaken/zashiki/pull/12)（`main`向け、未マージ）
 - 別環境でこの続きをやる場合は、まず`git fetch origin` → `git checkout markdown-preview`（無ければ`git checkout -b markdown-preview origin/markdown-preview`）でこのブランチの内容を取得すること。`main`のままだとStep 1・2の実装が一切乗っていない
-- 現在地: Step 1・2・3はコード実装完了・`zig build`/`zig build test`成功確認済みだが、**画面上の動作確認は未実施**（作業した開発環境にGUI表示アクセスがない、`screencapture`失敗を確認済み）。次はStep 4（URLスキーム受け口）だが、着手前にStep 1〜3の実機確認（`zig build`してCmd+Shift+M・ファイル書き換えのライブ反映等を試す）をおすすめする
+- 現在地: Step 1〜4はコード実装完了・`zig build`/`zig build test`成功確認済み。Step 4は`log show`を使ったCLIレベルの動作確認まで実施し、`application(_:open:)`が実際に発火することを確認・「ウィンドウが無い状態でURLが失われる」問題も発見して対応済みだが、**画面上の動作確認（プレビューペイン自体の表示・ライブ更新の目視）は未実施**（作業した開発環境にGUI表示アクセスがない、`screencapture`失敗、`osascript`のSystem Events経由確認もAccessibility権限なしで失敗を確認済み）。次はStep 5（仕上げ）だが、着手前にStep 1〜4の実機確認（`zig build`してCmd+Shift+M・ファイル書き換えのライブ反映・`scripts/zashiki-md-preview`でのURL起動等を試す）を強くおすすめする
 
 ## Context
 
@@ -113,8 +113,8 @@ MarkdownPreviewFileWatcher (DispatchSourceFileSystemObject)          ← ✅実�
 | `macos/Sources/Features/Terminal/TerminalView.swift`           | ✅ `TerminalViewModel` に `var markdownPreview: MarkdownPreviewModel { get }` 追加。`.ready` の既存ZStackを `MarkdownPreviewSplit` で包み、`.frame(maxWidth: .greatestFiniteMagnitude, maxHeight: .greatestFiniteMagnitude)` は `MarkdownPreviewSplit` 側に移動                                                                      |
 | `macos/Sources/Features/Terminal/BaseTerminalController.swift` | ✅ `let markdownPreview = MarkdownPreviewModel()` + `@IBAction func toggleMarkdownPreview(_:)`（非表示化時 `Ghostty.moveFocus(to: focusedSurface)`）                                                                                                                                                                                 |
 | `macos/Sources/App/macOS/MainMenu.xib`                         | ✅ Viewメニュー（Command Palette項目の後）に「Toggle Markdown Preview」Cmd+Shift+M、`target="-1"`（First Responder）で `toggleMarkdownPreview:`                                                                                                                                                                                      |
-| `macos/Ghostty-Info.plist`                                     | 未実装（Step 4）。`CFBundleURLTypes` を新規追加。`CFBundleURLSchemes = ["zashiki"]`、`CFBundleURLName = "dev.kawaken.zashiki"`、`CFBundleTypeRole = Viewer`。既存の`UTExportedTypeDeclarations`と同じ場所・書式に倣う                                                                                                                |
-| `macos/Sources/App/macOS/AppDelegate.swift`                    | 未実装（Step 4）。`func application(_ application: NSApplication, open urls: [URL])` を新規追加（既存の`application(_:openFile:)`の直後が自然）。`zashiki://markdown-preview/open?path=...`をパース → パス検証 → frontmost `TerminalController`解決 → `controller.markdownPreview.open(url:)`。未対応ホスト/不正パスはログのみで無視 |
+| `macos/Ghostty-Info.plist`                                     | ✅ `CFBundleURLTypes` を追加。`CFBundleURLSchemes = ["zashiki"]`、`CFBundleURLName = "dev.kawaken.zashiki"`、`CFBundleTypeRole = Viewer`                                                                                                                                                                                            |
+| `macos/Sources/App/macOS/AppDelegate.swift`                    | ✅ `func application(_ application: NSApplication, open urls: [URL])` を追加（`application(_:openFile:)`の直後）。`zashiki://markdown-preview/open?path=...`をパース → 絶対パス検証 → ファイル存在確認 → `TerminalController.preferredParent`解決 → `controller.markdownPreview.open(url:)`。未対応ホスト/不正パス/ウィンドウなしはログのみで無視     |
 | `macos/Ghostty.xcodeproj/project.pbxproj`                      | ✅ ①`Textual`のSPMリモートパッケージ参照（Step 1で追加済み）②Zashiki関連ターゲットの`MACOSX_DEPLOYMENT_TARGET`を13.0/13.1→15.0（Step 1で実施済み）③Ghostty-iOSの`membershipExceptions`にMarkdown Preview配下の新規Swift 4ファイルを追記（Step 2で実施済み）                                                                          |
 
 ### 新規: URLスキームCLIラッパー
@@ -123,7 +123,7 @@ MarkdownPreviewFileWatcher (DispatchSourceFileSystemObject)          ← ✅実�
 
 | ファイル                     | 内容                                                                                                                                                                                                                                                                                                         |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `scripts/zashiki-md-preview` | 相対パスを絶対化 → パーセントエンコード → `ZASHIKI_APP`環境変数があれば `open -a "$ZASHIKI_APP" "zashiki://markdown-preview/open?path=$ENCODED"`（Debugビルドを名指しで起動、既定ハンドラの登録状況に依存しない）、なければ `open "zashiki://..."`（システム既定ハンドラ、通常は`/Applications`のRelease版） |
+| `scripts/zashiki-md-preview` | ✅ `realpath`で相対パスを絶対化 → `jq -sRr @uri`でパーセントエンコード → `ZASHIKI_APP`環境変数があれば `open -a "$ZASHIKI_APP" "zashiki://markdown-preview/open?path=$ENCODED"`（Debugビルドを名指しで起動、既定ハンドラの登録状況に依存しない）、なければ `open "zashiki://..."`（システム既定ハンドラ、通常は`/Applications`のRelease版） |
 
 ## 実装ステップ（段階的に動作確認）
 
@@ -137,12 +137,14 @@ MarkdownPreviewFileWatcher (DispatchSourceFileSystemObject)          ← ✅実�
    `MarkdownPreviewFileWatcher`を実装し、`MarkdownPreviewModel.open(url:)`から起動するよう配線。
    検証: `zig build`（フルアプリビルド）でBUILD SUCCEEDED、`zig build test -Demit-macos-app=false`（CIと同一コマンド）も実機確認済み（221件成功・1件スキップ・失敗0件。1回目の実行はplan記載済みの既知フレーキーさでテストが空振りしたため2回目で確認）。コンパイルエラー・SwiftLint警告なし
    (a) `>>` 追記 (b) vimの`:w`（atomic save） (c) Claude Codeによる書き換え (d) `mv` でのrename上書き → 1秒以内に再描画・スクロール維持。(e) 削除→エラー表示→再作成で復帰 — **いずれも未実施**（Step 2と同じ理由でこの開発環境にはGUI表示アクセスがなく、`screencapture`も失敗する。ユーザー自身の実機での確認が必要）
-4. **URLスキーム受け口 + シェルラッパー**
-   検証（アプリは絶対パス指定）:
-   `open -a <abs>/macos/build/Debug/Zashiki.app "zashiki://markdown-preview/open?path=/tmp/test.md"` でDebugビルドへ直接配送されること
-   `ZASHIKI_APP=<abs>/macos/build/Debug/Zashiki.app scripts/zashiki-md-preview README.md`
-   まず `application(_:open:)` が `CFBundleURLTypes` 登録だけでカスタムスキームに対して実際に呼ばれるか確認（呼ばれない場合は`applicationWillFinishLaunching`で`NSAppleEventManager`に`kInternetEventClass`/`kAEGetURL`の明示ハンドラを登録するフォールバックに切り替える。この点は未検証のため要注意）
-   エラーパス（存在しないファイル、ウィンドウなし、不正なpath）も確認
+4. **URLスキーム受け口 + シェルラッパー**（✅コード実装完了、2026-08-11）
+   `AppDelegate.application(_:open:)`を追加（`zashiki://markdown-preview/open?path=...`をパース→絶対パス検証→ファイル存在確認→`TerminalController.preferredParent ?? TerminalController.newWindow(ghostty)`解決→`markdownPreview.open(url:)`、それ以外は`Self.logger.warning`でログのみ）。`Ghostty-Info.plist`に`CFBundleURLTypes`（スキーム`zashiki`）を追加。`scripts/zashiki-md-preview`を新規作成（`realpath`で絶対パス化、`jq -sRr @uri`でパーセントエンコード、`ZASHIKI_APP`があれば`open -a`、なければ`open`）
+   検証: `zig build`でBUILD SUCCEEDED。`ZASHIKI_APP=<abs>/macos/build/Debug/Zashiki.app scripts/zashiki-md-preview /tmp/test.md`を実行し、`log show --predicate 'subsystem == "dev.kawaken.zashiki.debug"'`で実際の配送を確認：
+   - ✅ **`application(_:open:)`は`CFBundleURLTypes`登録だけでカスタムスキームに対して実際に呼ばれることを確認**（リスク欄にあった未検証事項が解決。`NSAppleEventManager`への明示ハンドラ登録フォールバックは不要と判明）
+   - ✅ URLパース・ファイル存在確認までは正しく動作（存在しないパスや不正な形式は改めて個別に確認していないが、実装上ガードは入っている）
+   - ⚠️ **検証中に発見・対応済み**: アプリ未起動の状態から`open -a`で初回起動すると、`applicationDidFinishLaunching`でのウィンドウ作成が完了する前に`application(_:open:)`が呼ばれ、ウィンドウがまだ無く「no terminal window」ログでURLが失われる現象を確認。`application(_:openFile:)`と同じ「ウィンドウが無ければ新規作成」パターンに合わせて修正（`preferredParent ?? TerminalController.newWindow(ghostty)`）。修正後は同じ手順で「no terminal window」ログが出なくなることを確認したが、ウィンドウが実際にMarkdownプレビュー付きで開かれたかまではこの環境では確認できていない（下記の理由）。実機での再確認が必要
+   - ❓ **未確認（この開発環境固有の制約）**: プレビューペインが実際に開かれたか、既にウィンドウがある状態への配送（2回目の`open -a`実行）が届くかは確認できなかった。`screencapture`が失敗しGUIが見えず、`osascript`のSystem Events経由でのウィンドウ数取得も「補助アクセスは許可されません」（Accessibility権限なし）で失敗する。ログ上は成功パスで特にメッセージが出ない設計のため、ログからも成功/失敗を判別できなかった。ユーザーの実機での確認が必須
+   - エラーパス（存在しないファイル、不正なpath）の個別確認は未実施
 5. **仕上げ**: `swiftlint lint --strict --fix` → フルビルド `zig build -Doptimize=ReleaseFast -Dxcframework-target=native` → `zig build test`（新規SwiftファイルがCIのlint/testに引っかからないか確認）→ ビルドした`Zashiki.app`を`/Applications`に配備 → Claude Codeにmdを書かせて実運用確認 → 本plan文書に最終的な使い方・動作確認手順・依存ライブラリ出典・upstream競合注意・デプロイターゲット引き上げの記録を追記（変更ファイル表等は各Stepの実装時に随時更新済み）→ コミット
 
 ## 主要リスクと対処
@@ -158,7 +160,8 @@ MarkdownPreviewFileWatcher (DispatchSourceFileSystemObject)          ← ✅実�
 - **configキーバインド連携は不可**（`syncMenuShortcut` はZigコアのアクション名前提）→ xibの静的Cmd+Shift+Mで代替。制約は本plan文書に明記（このセクション）
 - **ウィンドウサイズ**: デフォルト非表示なので初期サイズ算出に影響なし。表示時はウィンドウ幅維持でターミナルが縮む（Inspectorと同挙動）。自動拡幅はv2候補
 - **URLスキームの既定ハンドラ**: 同じ`dev.kawaken.zashiki`系Bundle IDのDebug/Release両方を並行して使う場合、`zashiki://`スキームの既定ハンドラは片方にしかならない（LSHandlerRankの仕様）。`open -a`で明示的にアプリを指定すれば既定ハンドラに関係なく届くため、`scripts/zashiki-md-preview`は`ZASHIKI_APP`未指定時のみ既定ハンドラ（`open`のみ）に頼る設計とする
-- **`application(_:open:)`がカスタムURLスキームに対して実際に発火するかは未検証**: ファイルオープン（Documentタイプ）での実績はあるが、`CFBundleURLTypes`経由のGetURL Apple Eventで同じデリゲートメソッドが呼ばれるかはStep 4で確認するまで確定情報ではない。発火しない場合は`NSAppleEventManager`への明示ハンドラ登録に切り替える
+- **（解決済み）`application(_:open:)`はカスタムURLスキームに対して実際に発火することを確認済み（2026-08-11）**: `CFBundleURLTypes`経由のGetURL Apple Eventで同じデリゲートメソッドが呼ばれることを`ZASHIKI_APP=... scripts/zashiki-md-preview`＋`log show`で確認した。`NSAppleEventManager`への明示ハンドラ登録フォールバックは不要
+- **（対応済み・要実機確認）ウィンドウが1つもない状態での`open -a`配送**: 当初`TerminalController.preferredParent`が`nil`の場合（全ウィンドウを閉じた後、またはアプリ起動直後で`applicationDidFinishLaunching`のウィンドウ作成が終わる前にURLが届いた場合）はログのみでURLを取りこぼしていた。`application(_:openFile:)`と同じパターン（`preferredParent ?? TerminalController.newWindow(ghostty)`）で新規ウィンドウを作成するよう修正（2026-08-11）。実機での動作確認（特に起動直後のタイミング）は未実施。既存ウィンドウがある状態への配送も、この開発環境（GUI表示アクセスなし）では検証しきれなかったため、ユーザーの実機確認が必要
 - **CI**: 新規Swiftファイルは`zig build test`（`GhosttyTests`）と`swiftlint lint --strict`の対象になる。CIランナーは既に`macos-15`なのでデプロイターゲット引き上げによる追加対応は不要。`MarkdownPreviewFileWatcher`のデバウンスロジック等ロジック部分は簡単な単体テストを足す余地がある（必須ではない）
 
 ## 検証（全体）
