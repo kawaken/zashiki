@@ -67,7 +67,17 @@ jobs:
           version: ${{ steps.zig.outputs.version }}
 
       - name: Build Zashiki.app
-        run: zig build -Doptimize=ReleaseFast -Dxcframework-target=native
+        # -Dversion-stringを明示指定してgitタグ検出をバイパスする。
+        # 未指定だとzigのビルドはgitタグを検出し、build.zig.zonの
+        # .version(現状 "1.3.2-dev"、Xcode側のMARKETING_VERSIONとは
+        # 無関係にupstreamから引き継いだままの値)から導出した
+        # "vX.Y.Z"と完全一致しない限りpanicする実装になっており、
+        # "-rc.N"サフィックス付きタグ("tip"以外)は原理的に一致し得ないため
+        # 常に失敗する。タグ名の先頭の"v"を外した文字列をそのまま渡す。
+        run: |
+          VERSION="${{ steps.version.outputs.value }}"
+          zig build -Doptimize=ReleaseFast -Dxcframework-target=native \
+            "-Dversion-string=${VERSION#v}"
 
       - name: Zip Zashiki.app
         run: |
