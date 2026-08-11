@@ -5,9 +5,11 @@ import Foundation
 /// `markdownPreview` there) and is shared with the SwiftUI view tree via
 /// `TerminalViewModel`.
 ///
-/// This currently only supports an explicit `reload()`. Live-reload on
-/// file changes is added separately by `MarkdownPreviewFileWatcher`
-/// (not yet wired in — see plan/markdown-preview.md Step 3).
+/// Live-reload is driven by `MarkdownPreviewFileWatcher`: `open(url:)`
+/// starts watching the file, and further writes (including atomic-save
+/// editors that replace the file via `rename(2)`) trigger `reload()`
+/// automatically. Watching continues even while the pane is hidden, so
+/// showing it again reflects up-to-date content.
 class MarkdownPreviewModel: ObservableObject {
     /// Whether the preview pane is currently shown.
     @Published var isVisible: Bool = false
@@ -27,12 +29,18 @@ class MarkdownPreviewModel: ObservableObject {
     /// successful read.
     @Published private(set) var errorMessage: String?
 
-    /// Opens `url` in the preview pane: reads its contents and shows the
-    /// pane. Does not start watching `url` for changes.
+    private var watcher: MarkdownPreviewFileWatcher?
+
+    /// Opens `url` in the preview pane: reads its contents, shows the
+    /// pane, and starts watching `url` for changes. Replaces any
+    /// previously-watched file.
     func open(url: URL) {
         fileURL = url
         reload()
         isVisible = true
+        watcher = MarkdownPreviewFileWatcher(url: url) { [weak self] in
+            self?.reload()
+        }
     }
 
     /// Re-reads `fileURL` from disk and republishes `content`.
@@ -53,8 +61,8 @@ class MarkdownPreviewModel: ObservableObject {
         isVisible.toggle()
     }
 
-    /// Hides the pane without discarding the currently open file, so
-    /// reopening shows the same content.
+    /// Hides the pane without discarding the currently open file or
+    /// stopping the watcher, so reopening shows up-to-date content.
     func close() {
         isVisible = false
     }

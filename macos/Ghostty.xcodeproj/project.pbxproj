@@ -146,6 +146,7 @@
 				"Features/Custom App Icon/Extensions/Notification+AppIcon.swift",
 				"Features/Custom App Icon/Extensions/UserDefaults+AppIcon.swift",
 				"Features/Global Keybinds/GlobalEventTap.swift",
+				"Features/Markdown Preview/MarkdownPreviewFileWatcher.swift",
 				"Features/Markdown Preview/MarkdownPreviewImageLoader.swift",
 				"Features/Markdown Preview/MarkdownPreviewModel.swift",
 				"Features/Markdown Preview/MarkdownPreviewPane.swift",
