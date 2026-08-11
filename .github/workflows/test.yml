@@ -12,12 +12,20 @@ name: Test
 # pushはmainブランチのみを対象にする。feature branchへのpushは
 # pull_requestイベント経由でのみ実行し、同じコミットに対して
 # push/pull_requestの両方が発火して二重実行になるのを避ける。
+#
+# plan/配下(設計ドキュメントのみ)の変更ではビルド・テストへの影響が
+# ないため、paths-ignoreでCIをスキップする。plan/以外のファイルが
+# 1つでも変更に含まれていれば通常通り実行される。
 
 on:
   push:
     branches:
       - main
-  pull_request: {}
+    paths-ignore:
+      - "plan/**"
+  pull_request:
+    paths-ignore:
+      - "plan/**"
   workflow_dispatch: {}
 
 concurrency:
