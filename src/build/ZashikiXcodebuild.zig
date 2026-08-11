@@ -51,6 +51,35 @@ pub fn init(
     const env = b.graph.environ_map;
     const app_path = b.fmt("macos/build/{s}/Zashiki.app", .{xc_config});
 
+    // The macOS app's version (CFBundleShortVersionString) is derived
+    // from `config.version` — build.zig.zon plus git tag/branch
+    // detection — rather than being independently maintained as an
+    // Xcode MARKETING_VERSION setting. This keeps a single source of
+    // truth for the app's version instead of two numbers that can
+    // drift apart. See AboutView.swift's VersionConfig for how the
+    // macOS UI interprets each shape below.
+    const marketing_version = if (config.version.build) |build_metadata|
+        // Untagged/dev build: expose the raw short commit hash alone so
+        // the About panel recognizes it as a "tip" build.
+        build_metadata
+    else if (config.version.pre) |pre|
+        // Tagged pre-release (e.g. "v0.1.0-rc.1"): not a "stable"
+        // format, so it renders as plain text in the About panel.
+        b.fmt("{d}.{d}.{d}-{s}", .{
+            config.version.major,
+            config.version.minor,
+            config.version.patch,
+            pre,
+        })
+    else
+        // Tagged stable release.
+        b.fmt("{d}.{d}.{d}", .{
+            config.version.major,
+            config.version.minor,
+            config.version.patch,
+        });
+    const marketing_version_arg = b.fmt("MARKETING_VERSION={s}", .{marketing_version});
+
     // Our step to build the Zashiki macOS app.
     const build = build: {
         // External environment variables can mess up xcodebuild, so
@@ -81,6 +110,7 @@ pub fn init(
             // (e.g. Textual -> SwiftUIMath/ConcurrencyExtras), causing
             // "unable to resolve module dependency" errors.
             b.fmt("SYMROOT={s}", .{b.pathFromRoot("macos/build")}),
+            marketing_version_arg,
         });
 
         // If we have a specific architecture, we need to pass it
@@ -122,6 +152,7 @@ pub fn init(
             // above: keeps output location deterministic across machines.
             // Must be absolute for the same reason noted there.
             b.fmt("SYMROOT={s}", .{b.pathFromRoot("macos/build")}),
+            marketing_version_arg,
         });
         if (xc_arch) |arch| step.addArgs(&.{ "-arch", arch });
 

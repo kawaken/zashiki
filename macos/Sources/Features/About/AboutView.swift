@@ -33,8 +33,8 @@ struct AboutView: View {
         var url: URL? {
             switch self {
             case .stable(let version):
-                let slug = version.replacingOccurrences(of: ".", with: "-")
-                return URL(string: "https://ghostty.org/docs/install/release-notes/\(slug)")
+                // This fork's own release, not upstream Ghostty's.
+                return URL(string: "https://github.com/kawaken/zashiki/releases/tag/v\(version)")
             default:
                 return nil
             }

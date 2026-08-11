@@ -246,24 +246,21 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
             else => return err,
         };
         if (vsn.tag) |tag| {
-            // Tip releases behave just like any other pre-release so we skip.
-            if (!std.mem.eql(u8, tag, "tip")) {
-                const expected = b.fmt("v{d}.{d}.{d}", .{
-                    app_version.major,
-                    app_version.minor,
-                    app_version.patch,
-                });
-
-                if (!std.mem.eql(u8, tag, expected)) {
-                    @panic("tagged releases must be in vX.Y.Z format matching build.zig");
-                }
-
-                break :version .{
-                    .major = app_version.major,
-                    .minor = app_version.minor,
-                    .patch = app_version.patch,
-                };
+            // A commit tagged with a release version is the release
+            // itself: the tag is the single source of truth for that
+            // build's version, not build.zig.zon (which only supplies
+            // the baseline for untagged/dev builds below). This lets us
+            // tag pre-releases (e.g. "v0.1.0-rc.1") directly without
+            // needing an exact major.minor.patch match against
+            // build.zig.zon, and without ever having two independently
+            // maintained version numbers (this and Xcode's
+            // MARKETING_VERSION, which is overridden from this value at
+            // build time — see ZashikiXcodebuild.zig).
+            if (tag.len == 0 or tag[0] != 'v') {
+                @panic("release tags must start with 'v' (e.g. v0.1.0, v0.1.0-rc.1)");
             }
+            break :version std.SemanticVersion.parse(tag[1..]) catch
+                @panic("release tags must be a valid semantic version after the leading 'v' (e.g. v0.1.0, v0.1.0-rc.1)");
         }
 
         break :version .{
