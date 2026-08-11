@@ -5,7 +5,7 @@
 - **作業ブランチ**: `markdown-preview`（`kawaken/zashiki`、`main`から派生）
 - **PR**: [#12](https://github.com/kawaken/zashiki/pull/12)（`main`向け、未マージ）
 - 別環境でこの続きをやる場合は、まず`git fetch origin` → `git checkout markdown-preview`（無ければ`git checkout -b markdown-preview origin/markdown-preview`）でこのブランチの内容を取得すること。`main`のままだとStep 1・2の実装が一切乗っていない
-- 現在地: Step 1〜4はコード実装完了・`zig build`/`zig build test`成功確認済み。Step 4は`log show`を使ったCLIレベルの動作確認まで実施し、`application(_:open:)`が実際に発火することを確認・「ウィンドウが無い状態でURLが失われる」問題も発見して対応済みだが、**画面上の動作確認（プレビューペイン自体の表示・ライブ更新の目視）は未実施**（作業した開発環境にGUI表示アクセスがない、`screencapture`失敗、`osascript`のSystem Events経由確認もAccessibility権限なしで失敗を確認済み）。次はStep 5（仕上げ）だが、着手前にStep 1〜4の実機確認（`zig build`してCmd+Shift+M・ファイル書き換えのライブ反映・`scripts/zashiki-md-preview`でのURL起動等を試す）を強くおすすめする
+- 現在地: Step 1〜5はコード側が完了・`zig build`（Debug/Release両方）・`zig build test`（221件成功・失敗0件）・`swiftlint lint --strict`（0 violations）を確認済み。PR #12のCIも全緑（Lint/zig build test）。Step 4は`log show`を使ったCLIレベルの動作確認まで実施し、`application(_:open:)`が実際に発火することを確認・「ウィンドウが無い状態でURLが失われる」問題も発見して対応済み。残っているのは**画面上の動作確認と`/Applications`への実配備・実運用確認のみ**（作業した開発環境にGUI表示アクセスがない、`screencapture`失敗、`osascript`のSystem Events経由確認もAccessibility権限なしで失敗を確認済み）。次は「検証（全体）」セクションの1〜3を実機で確認し、問題なければマージしてよい
 
 ## Context
 
@@ -145,7 +145,12 @@ MarkdownPreviewFileWatcher (DispatchSourceFileSystemObject)          ← ✅実�
    - ⚠️ **検証中に発見・対応済み**: アプリ未起動の状態から`open -a`で初回起動すると、`applicationDidFinishLaunching`でのウィンドウ作成が完了する前に`application(_:open:)`が呼ばれ、ウィンドウがまだ無く「no terminal window」ログでURLが失われる現象を確認。`application(_:openFile:)`と同じ「ウィンドウが無ければ新規作成」パターンに合わせて修正（`preferredParent ?? TerminalController.newWindow(ghostty)`）。修正後は同じ手順で「no terminal window」ログが出なくなることを確認したが、ウィンドウが実際にMarkdownプレビュー付きで開かれたかまではこの環境では確認できていない（下記の理由）。実機での再確認が必要
    - ❓ **未確認（この開発環境固有の制約）**: プレビューペインが実際に開かれたか、既にウィンドウがある状態への配送（2回目の`open -a`実行）が届くかは確認できなかった。`screencapture`が失敗しGUIが見えず、`osascript`のSystem Events経由でのウィンドウ数取得も「補助アクセスは許可されません」（Accessibility権限なし）で失敗する。ログ上は成功パスで特にメッセージが出ない設計のため、ログからも成功/失敗を判別できなかった。ユーザーの実機での確認が必須
    - エラーパス（存在しないファイル、不正なpath）の個別確認は未実施
-5. **仕上げ**: `swiftlint lint --strict --fix` → フルビルド `zig build -Doptimize=ReleaseFast -Dxcframework-target=native` → `zig build test`（新規SwiftファイルがCIのlint/testに引っかからないか確認）→ ビルドした`Zashiki.app`を`/Applications`に配備 → Claude Codeにmdを書かせて実運用確認 → 本plan文書に最終的な使い方・動作確認手順・依存ライブラリ出典・upstream競合注意・デプロイターゲット引き上げの記録を追記（変更ファイル表等は各Stepの実装時に随時更新済み）→ コミット
+5. **仕上げ**（コード側は✅完了、2026-08-11。実機配備・実運用確認はユーザー作業）
+   - ✅ `swiftlint lint --strict --fix`: 差分なし（`swiftlint --fix`は181ファイル全てに対して実行されたが、実際の変更は0件）、`swiftlint lint --strict`は0 violations
+   - ✅ フルビルド `zig build -Doptimize=ReleaseFast -Dxcframework-target=native`: BUILD SUCCEEDED。`zig-out/Zashiki.app`が`dev.kawaken.zashiki`（Debugの`.debug`サフィックスなし）・hardened runtime有効（`flags=0x10002(adhoc,runtime)`）で生成されることを確認
+   - ✅ `zig build test -Demit-macos-app=false`: 221件成功・1件スキップ・失敗0件（既知のフレーキーさで1回目は空振り、2回目で確認）
+   - ⬜ ビルドした`Zashiki.app`を`/Applications`に配備 → Claude Codeにmdを書かせて実運用確認 → コミット（**ユーザーの実機作業**。この環境にはGUI表示アクセスがない）
+   - 本plan文書への最終記録は各Stepの実装時に随時更新済み（変更ファイル表・使い方・検証結果・依存ライブラリ出典・upstream競合注意・デプロイターゲット引き上げの記録）
 
 ## 主要リスクと対処
 
@@ -171,4 +176,6 @@ Step 1〜4の各検証に加え、最終的に:
 1. `/Applications` 配備後、実際のClaude Codeセッションでmdを書かせながら `zashiki-md-preview` で開き、ライブ更新を確認
 2. システム外観のライト/ダーク切替でプレビューが追従
 3. upstream由来の既存機能（スプリット、タブ、Inspector、Command Palette）が無事なこと
-4. `zig build test` と `swiftlint lint --strict` がCI上でも通ること
+4. `zig build test` と `swiftlint lint --strict` がCI上でも通ること（✅ローカル・PR #12のCI両方で確認済み、2026-08-11）
+
+上記1〜3はいずれも画面上での確認が必要で、この開発環境（GUI表示アクセスなし）では実施できていない。ユーザーの実機作業が必要。
