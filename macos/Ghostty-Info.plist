@@ -42,6 +42,19 @@
 			</array>
 		</dict>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>CFBundleURLName</key>
+			<string>dev.kawaken.zashiki</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>zashiki</string>
+			</array>
+		</dict>
+	</array>
 	<key>GhosttyBuild</key>
 	<string></string>
 	<key>GhosttyCommit</key>

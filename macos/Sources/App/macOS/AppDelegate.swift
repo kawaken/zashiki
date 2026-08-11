@@ -520,6 +520,62 @@ class AppDelegate: NSObject,
         return true
     }
 
+    /// Handles `zashiki://` URLs delivered via `CFBundleURLTypes` (see
+    /// `Ghostty-Info.plist`), e.g. from `scripts/zashiki-md-preview` or a
+    /// plain `open "zashiki://..."`. This is this fork's own CLI entry
+    /// point, not a public API, so unrecognized input is just logged and
+    /// ignored rather than surfaced to the user.
+    ///
+    /// Recognized: `zashiki://markdown-preview/open?path=<percent-encoded
+    /// absolute path>`.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            handleZashikiURL(url)
+        }
+    }
+
+    private func handleZashikiURL(_ url: URL) {
+        guard url.scheme == "zashiki" else { return }
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            Self.logger.warning("zashiki URL: failed to parse \(url, privacy: .public)")
+            return
+        }
+
+        switch components.host {
+        case "markdown-preview":
+            handleMarkdownPreviewURL(components)
+
+        default:
+            Self.logger.warning("zashiki URL: unknown host \(components.host ?? "(nil)", privacy: .public)")
+        }
+    }
+
+    private func handleMarkdownPreviewURL(_ components: URLComponents) {
+        guard components.path == "/open" else {
+            Self.logger.warning("zashiki URL: unknown markdown-preview path \(components.path, privacy: .public)")
+            return
+        }
+        guard let path = components.queryItems?.first(where: { $0.name == "path" })?.value,
+              path.hasPrefix("/") else {
+            Self.logger.warning("zashiki URL: markdown-preview/open requires an absolute 'path' query item")
+            return
+        }
+
+        var isDirectory = ObjCBool(false)
+        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
+              !isDirectory.boolValue else {
+            Self.logger.warning("zashiki URL: markdown-preview file not found: \(path, privacy: .public)")
+            return
+        }
+
+        // Mirrors application(_:openFile:) below: if there's no window to
+        // attach to (e.g. all windows were closed, or we're still early
+        // in launch), open a new one rather than silently dropping the
+        // request.
+        let controller = TerminalController.preferredParent ?? TerminalController.newWindow(ghostty)
+        controller.markdownPreview.open(url: URL(fileURLWithPath: path))
+    }
+
     /// Setup signal handlers
     private func setupSignals() {
         // Register a signal handler for config reloading. It appears that all
