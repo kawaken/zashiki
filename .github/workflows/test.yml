@@ -13,9 +13,14 @@ name: Test
 # pull_requestイベント経由でのみ実行し、同じコミットに対して
 # push/pull_requestの両方が発火して二重実行になるのを避ける。
 #
-# plan/配下(設計ドキュメントのみ)の変更ではビルド・テストへの影響が
-# ないため、paths-ignoreでCIをスキップする。plan/以外のファイルが
-# 1つでも変更に含まれていれば通常通り実行される。
+# plan/配下(設計ドキュメントのみ)や.github/workflows配下(CI設定自体)の
+# 変更はビルド・テスト対象のコードに影響しないため、paths-ignoreで
+# CIをスキップする。それ以外のファイルが1つでも変更に含まれていれば
+# 通常通り実行される。
+# 注意: この仕組み上、test.yml自身の変更もスキップ対象になる
+# (このワークフローが変更後の自分自身の内容で実行されることはない)。
+# 記述ミスはActionsの構文チェックでは検出されるが、ロジックの誤りは
+# 次にコード変更を伴うpush/PRが来るまで気付けない可能性がある。
 
 on:
   push:
@@ -23,9 +28,11 @@ on:
       - main
     paths-ignore:
       - "plan/**"
+      - ".github/workflows/**"
   pull_request:
     paths-ignore:
       - "plan/**"
+      - ".github/workflows/**"
   workflow_dispatch: {}
 
 concurrency:
