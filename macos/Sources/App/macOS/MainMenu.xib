@@ -339,6 +339,12 @@
                                     <action selector="toggleCommandPalette:" target="-1" id="FcT-XD-gM1"/>
                                 </connections>
                             </menuItem>
+                            <menuItem title="Toggle Markdown Preview" keyEquivalent="m" id="a7Z-Qm-9wR">
+                                <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
+                                <connections>
+                                    <action selector="toggleMarkdownPreview:" target="-1" id="mVw-3D-hE2"/>
+                                </connections>
+                            </menuItem>
                             <menuItem title="Change Tab Title..." id="iac-lh-Cl7">
                                 <modifierMask key="keyEquivalentModifierMask"/>
                                 <connections>

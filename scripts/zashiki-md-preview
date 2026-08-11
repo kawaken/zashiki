@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+#
+# Opens a Markdown file in Zashiki's preview pane via its zashiki:// URL
+# scheme (see plan/markdown-preview.md, Step 4). Usage:
+#
+#   scripts/zashiki-md-preview <path/to/file.md>
+#
+# If $ZASHIKI_APP is set (e.g. to a Debug build's
+# macos/build/Debug/Zashiki.app), the URL is delivered directly to that
+# app bundle via `open -a`, regardless of which Zashiki install is
+# currently registered as the default zashiki:// handler. Otherwise this
+# falls back to the system's default handler for the scheme
+# (`open "zashiki://..."`), which is normally the Release build in
+# /Applications.
+
+set -euo pipefail
+
+if [[ $# -ne 1 ]]; then
+  echo "usage: $(basename "$0") <path/to/file.md>" >&2
+  exit 1
+fi
+
+path=$(realpath "$1")
+if [[ ! -f "$path" ]]; then
+  echo "error: file not found: $path" >&2
+  exit 1
+fi
+
+# Percent-encode the path (RFC 3986, via jq's @uri) so it's safe as a
+# query parameter value. This also encodes `/`, which is fine here: the
+# receiving end (AppDelegate.application(_:open:)) percent-decodes the
+# query item back to a normal path.
+encoded=$(printf '%s' "$path" | jq -sRr @uri)
+
+url="zashiki://markdown-preview/open?path=${encoded}"
+
+if [[ -n "${ZASHIKI_APP:-}" ]]; then
+  open -a "$ZASHIKI_APP" "$url"
+else
+  open "$url"
+fi
