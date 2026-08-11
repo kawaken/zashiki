@@ -1,0 +1,66 @@
+name: Tag Release
+
+# リリースタグを手動で発行するためのワークフロー。
+#
+# タグのpush自体は、Claude Codeセッションからは行えない
+# (組織ポリシーによりgit push含むタグ相当のrefへのpushが拒否される)。
+# 一方でGitHub Actions内のGITHUB_TOKEN(contents: write)からのpushは
+# この制約を受けないため、バージョン番号を受け取ってタグを計算・push
+# するだけのこのワークフローを手動実行(workflow_dispatch)することで
+# 迂回する。ここでpushしたタグは、通常のrelease.yml側の
+# `on: push: tags: "v*.*.*"` によって自動的に拾われ、ビルド・
+# GitHub Release作成まで実行される。
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "バージョン番号 (例: 0.1.0)"
+        required: true
+      rc:
+        description: "RC番号。正式リリースなら空欄のまま (例: 1 を指定すると v0.1.0-rc.1)"
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Compute and push tag
+        run: |
+          VERSION="${{ inputs.version }}"
+          RC="${{ inputs.rc }}"
+
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::versionはX.Y.Z形式で指定してください (入力値: $VERSION)"
+            exit 1
+          fi
+          if [ -n "$RC" ] && ! [[ "$RC" =~ ^[0-9]+$ ]]; then
+            echo "::error::rcは正の整数で指定してください (入力値: $RC)"
+            exit 1
+          fi
+
+          if [ -n "$RC" ]; then
+            TAG="v${VERSION}-rc.${RC}"
+          else
+            TAG="v${VERSION}"
+          fi
+
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error::タグ $TAG は既に存在します。付け直す場合は先に削除してください。"
+            exit 1
+          fi
+
+          echo "Tagging $(git rev-parse HEAD) as $TAG"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "$TAG"
+          git push origin "$TAG"
+
+          echo "### Tagged \`$TAG\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Releaseワークフローが自動的にトリガーされます: https://github.com/${{ github.repository }}/actions/workflows/release.yml" >> "$GITHUB_STEP_SUMMARY"
