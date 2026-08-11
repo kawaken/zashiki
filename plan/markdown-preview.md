@@ -62,7 +62,7 @@ Swiftモジュール名（`PRODUCT_MODULE_NAME = Ghostty`）等の**コード内
 **この転換に伴う波及的な決定**:
 
 - **macOSデプロイターゲットをmacOS 15.0（Sequoia）に引き上げる**（現状はZashiki関連ターゲットが13.0/13.1、一部ターゲット--おそらくWidget/AppIntents系--は既に15.5）。ユーザー確認済み（2026-08-10）。フロア決定の根拠: 2026-08-10時点の現行macOSは**26 Tahoe**（26.6、2026-07-27リリース）。WWDC 2025でOSバージョン番号がリリース年基準に統一され、Sequoia(15)の次がTahoe(26)になった（16〜25は欠番、iOS/iPadOS等も同時に統一）ため、実際の系譜は 13 Ventura → 14 Sonoma → 15 Sequoia → 26 Tahoe → 27 Golden Gate(2026年9月予定)。ユーザーの「直近2バージョンくらいで十分」という方針のうち、**現行の1つ前であるmacOS 15 Sequoiaをフロアとすることで確定**（Textualの要求macOS 15+とも一致）。CIランナーは既に`macos-15`なので追加対応不要
-- 画像読み込み（`AttachmentLoader`）はデフォルトでリモートURLをfetchしうる実装（`URLAttachmentLoader` → `ImageLoader.shared.image(for:)`）なので、**`file://`スキームのみ許可する独自`AttachmentLoader`を実装する**必要がある（「外部通信なし」要件を満たすため。未実装、要検証）
+- 画像読み込み（`AttachmentLoader`）はデフォルトでリモートURLをfetchしうる実装（`URLAttachmentLoader` → `ImageLoader.shared.image(for:)`）なので、**`file://`スキームのみ許可する独自`AttachmentLoader`を実装する**必要がある（「外部通信なし」要件を満たすため。✅ `MarkdownPreviewImageLoader.swift`として実装済み、Step 2）
 - markdown-it/highlight.js/github-markdown-cssのvendoring（`macos/MarkdownPreviewWeb/`）は不要になったため削除済み
 
 ## アーキテクチャ
@@ -81,34 +81,34 @@ MarkdownPreviewFileWatcher (DispatchSourceFileSystemObject)
  └─ delete/rename → ソース破棄→再アーム（atomic save対応、リトライ付き）
 ```
 
-- コンテンツ受け渡し: `MarkdownPreviewModel`の`@Published var content: String`をそのまま`StructuredText(markdown:)`に渡すだけ。WKWebView時代の`evaluateJavaScript`のような明示的なブリッジは不要（SwiftUIの差分更新に任せる）
-- スクロール位置維持: `StructuredText`はSwiftUIネイティブViewなので、内容差し替え時のスクロール位置維持はSwiftUI標準の挙動に依存する（`ScrollView`でラップする場合は`ScrollViewReader`等で明示制御が必要になる可能性があり、Step 2で要検証）
-- ダークモード: SwiftUIが自動追従（`.textual.structuredTextStyle(.gitHub)`がダーク/ライト両対応のテーマを提供する想定、Step 1で確認）
-- リンククリック: `StructuredText`が生成する`Text`のリンクは標準で`NSWorkspace`に委譲される想定（Step 2で要検証。委譲されない場合は環境値経由でハンドラを差し込む）
+- コンテンツ受け渡し: `MarkdownPreviewModel`の`@Published var content: String`をそのまま`StructuredText(markdown:)`に渡すだけ（実装済み）。WKWebView時代の`evaluateJavaScript`のような明示的なブリッジは不要（SwiftUIの差分更新に任せる）
+- スクロール位置維持: `StructuredText`はSwiftUIネイティブViewなので、内容差し替え時のスクロール位置維持はSwiftUI標準の挙動に依存する（`ScrollView`でラップする場合は`ScrollViewReader`等で明示制御が必要になる可能性がある。**未検証**——開発環境にGUI表示アクセスがなく、ユーザーの実機確認待ち）
+- ダークモード: SwiftUIが自動追従する想定（`.textual.structuredTextStyle(.gitHub)`がダーク/ライト両対応のテーマを提供する想定）。**未検証**——Step 1のテストビューは画面表示まで至らず削除済み、Step 2でも同様の理由で未確認
+- リンククリック: `StructuredText`が生成する`Text`のリンクは標準で`NSWorkspace`に委譲される想定。**未検証**（委譲されない場合は環境値経由でハンドラを差し込む）
 - QuickTerminalも継承で機構的に動くが未調整扱い（問題が出たらメニューvalidateで無効化）
 
 ## 変更・新規ファイル
 
-### 新規: `macos/Sources/Features/Markdown Preview/`（5ファイル）
+### 新規: `macos/Sources/Features/Markdown Preview/`（5ファイル、watcher以外は✅実装済み・2026-08-11）
 
-| ファイル                           | 責務                                                                                                                           |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `MarkdownPreviewModel.swift`       | ObservableObject。`isVisible`/`fileURL`/`content`/`revision`/`errorMessage`。`open(url:)`/`toggle()`/`close()`、watcher管理    |
-| `MarkdownPreviewFileWatcher.swift` | DispatchSourceラッパー。デバウンス+再アーム                                                                                    |
-| `MarkdownPreviewSplit.swift`       | `isVisible`で `SplitView(.horizontal)` に包むか素通しか切替（差分最小化の要）                                                  |
-| `MarkdownPreviewPane.swift`        | ヘッダ（ファイル名・閉じる）+ `StructuredText` + 空/エラー状態。空状態に「Open File...」ボタン（NSOpenPanel）                  |
-| `MarkdownPreviewImageLoader.swift` | `Textual`の`AttachmentLoader`プロトコル実装。`file://`スキーム以外の画像参照は読み込まずプレースホルダ表示（外部通信ゼロ担保） |
+| ファイル                           | 責務                                                                                                                                                                                                                                                                                                                                            |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MarkdownPreviewModel.swift`       | ✅ ObservableObject。`isVisible`/`fileURL`/`content`/`revision`/`errorMessage`。`open(url:)`/`reload()`/`toggle()`/`close()`。現状`reload()`は明示呼び出しのみ、自動検知はwatcher実装待ち                                                                                                                                                       |
+| `MarkdownPreviewFileWatcher.swift` | 未実装（Step 3）。DispatchSourceラッパー。デバウンス+再アーム                                                                                                                                                                                                                                                                                   |
+| `MarkdownPreviewSplit.swift`       | ✅ `isVisible`で `SplitView(.horizontal)` に包むか素通しか切替（InspectorViewのif/elseパターンを踏襲）                                                                                                                                                                                                                                          |
+| `MarkdownPreviewPane.swift`        | ✅ ヘッダ（ファイル名・閉じる）+ `StructuredText` + 空/エラー状態。空状態に「Open File...」ボタン（NSOpenPanel）                                                                                                                                                                                                                                |
+| `MarkdownPreviewImageLoader.swift` | ✅ `Textual`の`AttachmentLoader`プロトコル実装。`file://`スキーム以外はロードを`throw`で拒否（`WithAttachments`内部で`try?`により静かに無視される＝該当箇所は画像なしでレンダリング継続、明示的なプレースホルダ画像は出さない）。Textual内部の非公開`Attachment`型に依存せず、`Image`/`CGSize`/`String`のみで構成した自前の`Attachment`型を使用 |
 
 ### 既存ファイルへの変更（最小差分）
 
-| ファイル                                                       | 変更                                                                                                                                                                                                                                                                                                                                      |
-| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `macos/Sources/Features/Terminal/TerminalView.swift`           | `TerminalViewModel` に `var markdownPreview: MarkdownPreviewModel { get }` 追加。`.ready` の既存ZStackを `MarkdownPreviewSplit` で包む（開き2行+閉じ1行、`.frame` 修飾子は外側へ移動）                                                                                                                                                    |
-| `macos/Sources/Features/Terminal/BaseTerminalController.swift` | `let markdownPreview = MarkdownPreviewModel()` + `@IBAction func toggleMarkdownPreview(_:)`（非表示化時 `Ghostty.moveFocus(to: focusedSurface)`）                                                                                                                                                                                         |
-| `macos/Sources/App/macOS/MainMenu.xib`                         | Viewメニュー（Command Palette項目の後）に「Toggle Markdown Preview」Cmd+Shift+M、`target="-1"`（First Responder）で `toggleMarkdownPreview:`                                                                                                                                                                                              |
-| `macos/Ghostty-Info.plist`                                     | `CFBundleURLTypes` を新規追加。`CFBundleURLSchemes = ["zashiki"]`、`CFBundleURLName = "dev.kawaken.zashiki"`、`CFBundleTypeRole = Viewer`。既存の`UTExportedTypeDeclarations`と同じ場所・書式に倣う                                                                                                                                       |
-| `macos/Sources/App/macOS/AppDelegate.swift`                    | `func application(_ application: NSApplication, open urls: [URL])` を新規追加（既存の`application(_:openFile:)`の直後が自然）。`zashiki://markdown-preview/open?path=...`をパース → パス検証 → frontmost `TerminalController`解決 → `controller.markdownPreview.open(url:)`。未対応ホスト/不正パスはログのみで無視                        |
-| `macos/Ghostty.xcodeproj/project.pbxproj`                      | ①`Textual`のSPMリモートパッケージ参照を追加（`Sparkle`の既存エントリを雛形にする: `XCRemoteSwiftPackageReference` + `XCSwiftPackageProductDependency` + 対象ターゲットのFrameworks build phase）②Zashiki関連ターゲットの`MACOSX_DEPLOYMENT_TARGET`を13.0/13.1→15.0に引き上げ③Ghostty-iOSの`membershipExceptions`に新規Swiftファイルを追記 |
+| ファイル                                                       | 変更                                                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `macos/Sources/Features/Terminal/TerminalView.swift`           | ✅ `TerminalViewModel` に `var markdownPreview: MarkdownPreviewModel { get }` 追加。`.ready` の既存ZStackを `MarkdownPreviewSplit` で包み、`.frame(maxWidth: .greatestFiniteMagnitude, maxHeight: .greatestFiniteMagnitude)` は `MarkdownPreviewSplit` 側に移動                                                                      |
+| `macos/Sources/Features/Terminal/BaseTerminalController.swift` | ✅ `let markdownPreview = MarkdownPreviewModel()` + `@IBAction func toggleMarkdownPreview(_:)`（非表示化時 `Ghostty.moveFocus(to: focusedSurface)`）                                                                                                                                                                                 |
+| `macos/Sources/App/macOS/MainMenu.xib`                         | ✅ Viewメニュー（Command Palette項目の後）に「Toggle Markdown Preview」Cmd+Shift+M、`target="-1"`（First Responder）で `toggleMarkdownPreview:`                                                                                                                                                                                      |
+| `macos/Ghostty-Info.plist`                                     | 未実装（Step 4）。`CFBundleURLTypes` を新規追加。`CFBundleURLSchemes = ["zashiki"]`、`CFBundleURLName = "dev.kawaken.zashiki"`、`CFBundleTypeRole = Viewer`。既存の`UTExportedTypeDeclarations`と同じ場所・書式に倣う                                                                                                                |
+| `macos/Sources/App/macOS/AppDelegate.swift`                    | 未実装（Step 4）。`func application(_ application: NSApplication, open urls: [URL])` を新規追加（既存の`application(_:openFile:)`の直後が自然）。`zashiki://markdown-preview/open?path=...`をパース → パス検証 → frontmost `TerminalController`解決 → `controller.markdownPreview.open(url:)`。未対応ホスト/不正パスはログのみで無視 |
+| `macos/Ghostty.xcodeproj/project.pbxproj`                      | ✅ ①`Textual`のSPMリモートパッケージ参照（Step 1で追加済み）②Zashiki関連ターゲットの`MACOSX_DEPLOYMENT_TARGET`を13.0/13.1→15.0（Step 1で実施済み）③Ghostty-iOSの`membershipExceptions`にMarkdown Preview配下の新規Swift 4ファイルを追記（Step 2で実施済み）                                                                          |
 
 ### 新規: URLスキームCLIラッパー
 
@@ -143,9 +143,9 @@ MarkdownPreviewFileWatcher (DispatchSourceFileSystemObject)
 - **（解決済み）ビルドシステムの二重化とSYMROOT問題（2026-08-10）**: `zig build`（ルート`CLAUDE.md`が案内する本来のビルド方法）とは別に、macOS専用の`macos/build.nu`（要nushell）がビルド出力先を明示指定するためだけに存在していた。`zig build`側は出力先（`SYMROOT`）を指定しておらず、各マシンのXcode設定（DerivedData/レガシーどちらがデフォルトか）に依存する隠れた環境差があった。素の環境やCIランナーではDerivedData側に倒れ、`zig build`の「アプリをコピーする」ステップが空振りする潜在バグがあった。対応として`src/build/GhosttyXcodebuild.zig`を`src/build/ZashikiXcodebuild.zig`にリネームした上で、`build`/`xctest`両ステップに絶対パスの`SYMROOT`（`b.pathFromRoot("macos/build")`）を明示指定し、`macos/build.nu`を削除して`zig build`一本に統一した。**相対パスのSYMROOTだとSPMパッケージのモジュール解決が壊れる（`-target`問題と同種の症状が再発する）ことが分かったため、必ず絶対パスで指定する**必要がある。`zig build`（フルアプリビルド）・`zig build test -Demit-macos-app=false`（CIと同一コマンド、xcodebuild test含む）の両方で実機確認済み（後者は3095/3111件成功・16件スキップ・失敗0件）
 - **Textualが0.x系**: 初タグから半年程度でAPIが安定していない可能性がある。`Package.resolved`でバージョンを固定し、更新時は差分を確認する
 - **デプロイターゲット引き上げの影響範囲**: macOS 13.0/13.1→15.0に上げると、それ未満のmacOSでは起動不可になる。個人利用前提のため許容（ユーザー確認済み、2026-08-10）
-- **画像ローダーのネットワーク制限**: `Textual`のデフォルト`AttachmentLoader`はリモートURLをfetchしうる実装。`file://`スキーム以外を拒否する独自実装が必須（未実装）。これを怠ると「外部通信なし」要件が破れる
-- **SwiftUI構造切替によるサーフェス再アタッチ**: Inspector前例ありだが横分割+全体ラップは新パターン → Step 2のセッション生存確認を必須とする
-- **StructuredTextのスクロール位置維持・リンク委譲の挙動が未検証**: WKWebView時代は`evaluateJavaScript`や`decidePolicyFor`で明示制御していたが、Textual採用によりSwiftUI標準の挙動に依存する部分が増えた。Step 2で実機確認する
+- **（解決済み）画像ローダーのネットワーク制限**: `Textual`のデフォルト`AttachmentLoader`はリモートURLをfetchしうる実装だったため、`MarkdownPreviewImageLoader`で`file://`スキーム以外を`throw`で拒否する独自実装を追加した（2026-08-11実装）
+- **（未検証・要実機確認）SwiftUI構造切替によるサーフェス再アタッチ**: Inspector前例ありだが横分割+全体ラップは新パターン。コードは実装済みだが、この開発環境にGUI表示アクセスがなく（`screencapture`失敗）セッション生存確認ができていない。ユーザーの実機確認が必要
+- **（未検証・要実機確認）StructuredTextのスクロール位置維持・リンク委譲の挙動**: WKWebView時代は`evaluateJavaScript`や`decidePolicyFor`で明示制御していたが、Textual採用によりSwiftUI標準の挙動に依存する部分が増えた。上記と同じ理由で未確認
 - **configキーバインド連携は不可**（`syncMenuShortcut` はZigコアのアクション名前提）→ xibの静的Cmd+Shift+Mで代替。制約をLOCAL_PATCH.mdに明記
 - **ウィンドウサイズ**: デフォルト非表示なので初期サイズ算出に影響なし。表示時はウィンドウ幅維持でターミナルが縮む（Inspectorと同挙動）。自動拡幅はv2候補
 - **URLスキームの既定ハンドラ**: 同じ`dev.kawaken.zashiki`系Bundle IDのDebug/Release両方を並行して使う場合、`zashiki://`スキームの既定ハンドラは片方にしかならない（LSHandlerRankの仕様）。`open -a`で明示的にアプリを指定すれば既定ハンドラに関係なく届くため、`scripts/zashiki-md-preview`は`ZASHIKI_APP`未指定時のみ既定ハンドラ（`open`のみ）に頼る設計とする
