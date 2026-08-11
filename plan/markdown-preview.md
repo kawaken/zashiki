@@ -1,5 +1,12 @@
 # Markdownプレビューペイン実装計画（Zashikiフォーク）
 
+## 作業状況
+
+- **作業ブランチ**: `markdown-preview`（`kawaken/zashiki`、`main`から派生）
+- **PR**: [#12](https://github.com/kawaken/zashiki/pull/12)（`main`向け、未マージ）
+- 別環境でこの続きをやる場合は、まず`git fetch origin` → `git checkout markdown-preview`（無ければ`git checkout -b markdown-preview origin/markdown-preview`）でこのブランチの内容を取得すること。`main`のままだとStep 1・2の実装が一切乗っていない
+- 現在地: Step 1・2はコード実装完了・`zig build`成功確認済みだが、**画面上の動作確認は未実施**（作業した開発環境にGUI表示アクセスがなかったため）。次はStep 3（ファイル監視・ライブ更新）だが、着手前にStep 1・2の実機確認（`zig build`してCmd+Shift+M等を試す）をおすすめする
+
 ## Context
 
 ターミナルに「Claude.aiのアーティファクト」のようなMarkdownビューワーを組み込みたい。Claude Code（定額）がmdファイルを書き、ターミナル側は表示だけを担うのでAPI従量課金は発生しない。このフォークはmainが独自開発ライン（LOCAL_PATCH.md参照）であり、方針は「追加中心・既存APIシグネチャ変更なし・upstreamマージ競合最小化」。**Zigコアには手を入れず、Swift側のみで完結させる。**
