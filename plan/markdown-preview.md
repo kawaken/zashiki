@@ -5,11 +5,11 @@
 - **作業ブランチ**: `markdown-preview`（`kawaken/zashiki`、`main`から派生）
 - **PR**: [#12](https://github.com/kawaken/zashiki/pull/12)（`main`向け、未マージ）
 - 別環境でこの続きをやる場合は、まず`git fetch origin` → `git checkout markdown-preview`（無ければ`git checkout -b markdown-preview origin/markdown-preview`）でこのブランチの内容を取得すること。`main`のままだとStep 1・2の実装が一切乗っていない
-- 現在地: Step 1・2はコード実装完了・`zig build`成功確認済みだが、**画面上の動作確認は未実施**（作業した開発環境にGUI表示アクセスがなかったため）。次はStep 3（ファイル監視・ライブ更新）だが、着手前にStep 1・2の実機確認（`zig build`してCmd+Shift+M等を試す）をおすすめする
+- 現在地: Step 1・2・3はコード実装完了・`zig build`/`zig build test`成功確認済みだが、**画面上の動作確認は未実施**（作業した開発環境にGUI表示アクセスがない、`screencapture`失敗を確認済み）。次はStep 4（URLスキーム受け口）だが、着手前にStep 1〜3の実機確認（`zig build`してCmd+Shift+M・ファイル書き換えのライブ反映等を試す）をおすすめする
 
 ## Context
 
-ターミナルに「Claude.aiのアーティファクト」のようなMarkdownビューワーを組み込みたい。Claude Code（定額）がmdファイルを書き、ターミナル側は表示だけを担うのでAPI従量課金は発生しない。このフォークはmainが独自開発ライン（LOCAL_PATCH.md参照）であり、方針は「追加中心・既存APIシグネチャ変更なし・upstreamマージ競合最小化」。**Zigコアには手を入れず、Swift側のみで完結させる。**
+ターミナルに「Claude.aiのアーティファクト」のようなMarkdownビューワーを組み込みたい。Claude Code（定額）がmdファイルを書き、ターミナル側は表示だけを担うのでAPI従量課金は発生しない。このフォークはmainが独自開発ラインで、方針は「追加中心・既存APIシグネチャ変更なし・upstreamマージ競合最小化」。**Zigコアには手を入れず、Swift側のみで完結させる。**
 
 要件:
 
@@ -83,7 +83,7 @@ TerminalView.body (.readyケース)
          └─ StructuredText(markdown: content, baseURL: ...)   ← Textual、SwiftUIネイティブ
              .textual.structuredTextStyle(.gitHub)
              .textual.imageAttachmentLoader(MarkdownPreviewImageLoader())  ← file://のみ許可
-MarkdownPreviewFileWatcher (DispatchSourceFileSystemObject)
+MarkdownPreviewFileWatcher (DispatchSourceFileSystemObject)          ← ✅実装済み
  └─ write/extend → 80msデバウンスで再読込
  └─ delete/rename → ソース破棄→再アーム（atomic save対応、リトライ付き）
 ```
@@ -96,12 +96,12 @@ MarkdownPreviewFileWatcher (DispatchSourceFileSystemObject)
 
 ## 変更・新規ファイル
 
-### 新規: `macos/Sources/Features/Markdown Preview/`（5ファイル、watcher以外は✅実装済み・2026-08-11）
+### 新規: `macos/Sources/Features/Markdown Preview/`（5ファイル、✅実装済み・2026-08-11）
 
 | ファイル                           | 責務                                                                                                                                                                                                                                                                                                                                            |
 | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `MarkdownPreviewModel.swift`       | ✅ ObservableObject。`isVisible`/`fileURL`/`content`/`revision`/`errorMessage`。`open(url:)`/`reload()`/`toggle()`/`close()`。現状`reload()`は明示呼び出しのみ、自動検知はwatcher実装待ち                                                                                                                                                       |
-| `MarkdownPreviewFileWatcher.swift` | 未実装（Step 3）。DispatchSourceラッパー。デバウンス+再アーム                                                                                                                                                                                                                                                                                   |
+| `MarkdownPreviewModel.swift`       | ✅ ObservableObject。`isVisible`/`fileURL`/`content`/`revision`/`errorMessage`。`open(url:)`/`reload()`/`toggle()`/`close()`。`open(url:)`が`MarkdownPreviewFileWatcher`を起動し自動検知を配線済み（Step 3）                                                                                                                                    |
+| `MarkdownPreviewFileWatcher.swift` | ✅ `DispatchSourceFileSystemObject`ラッパー。write/extendは80msデバウンスして`onChange`（`reload()`）を呼ぶ。delete/rename（atomic saveでfdが無効化された場合含む）はsourceを破棄し即座に`onChange`を呼んでから100ms間隔で再アームをリトライし続け、ファイルが復活したら`onChange`で復帰。表示/非表示に関わらずwatchingを継続する                                                                                                          |
 | `MarkdownPreviewSplit.swift`       | ✅ `isVisible`で `SplitView(.horizontal)` に包むか素通しか切替（InspectorViewのif/elseパターンを踏襲）                                                                                                                                                                                                                                          |
 | `MarkdownPreviewPane.swift`        | ✅ ヘッダ（ファイル名・閉じる）+ `StructuredText` + 空/エラー状態。空状態に「Open File...」ボタン（NSOpenPanel）                                                                                                                                                                                                                                |
 | `MarkdownPreviewImageLoader.swift` | ✅ `Textual`の`AttachmentLoader`プロトコル実装。`file://`スキーム以外はロードを`throw`で拒否（`WithAttachments`内部で`try?`により静かに無視される＝該当箇所は画像なしでレンダリング継続、明示的なプレースホルダ画像は出さない）。Textual内部の非公開`Attachment`型に依存せず、`Image`/`CGSize`/`String`のみで構成した自前の`Attachment`型を使用 |
@@ -133,15 +133,17 @@ MarkdownPreviewFileWatcher (DispatchSourceFileSystemObject)
 2. **Model + ペインUI + TerminalView統合 + メニュー**（watcher以外、✅コード実装完了、2026-08-11）
    `MarkdownPreviewModel`/`MarkdownPreviewSplit`/`MarkdownPreviewPane`/`MarkdownPreviewImageLoader`の4ファイルを実装。`TerminalViewModel`に`markdownPreview`追加、`BaseTerminalController`に`markdownPreview`プロパティと`toggleMarkdownPreview(_:)`、`MainMenu.xib`に「Toggle Markdown Preview」（Cmd+Shift+M）を追加
    検証: `zig build`でBUILD SUCCEEDED（400/400ステップ）、コンパイルエラー・SwiftLint警告なし。**画面上での動作確認（トグル・Open File...・ディバイダドラッグ・シェルセッション生存・スクロール位置維持・リンク委譲）は未実施**——この開発環境（サンドボックス）にはGUI表示アクセスがなく（`screencapture`が"could not create image from display"で失敗）、アプリ自体は正常起動・終了できることは確認したが画面は見れない。ユーザー自身の実機での確認が必要
-3. **ライブ更新（watcher）**
-   検証: (a) `>>` 追記 (b) vimの`:w`（atomic save） (c) Claude Codeによる書き換え (d) `mv` でのrename上書き → 1秒以内に再描画・スクロール維持。(e) 削除→エラー表示→再作成で復帰
+3. **ライブ更新（watcher）**（✅コード実装完了、2026-08-11）
+   `MarkdownPreviewFileWatcher`を実装し、`MarkdownPreviewModel.open(url:)`から起動するよう配線。
+   検証: `zig build`（フルアプリビルド）でBUILD SUCCEEDED、`zig build test -Demit-macos-app=false`（CIと同一コマンド）も実機確認済み（221件成功・1件スキップ・失敗0件。1回目の実行はplan記載済みの既知フレーキーさでテストが空振りしたため2回目で確認）。コンパイルエラー・SwiftLint警告なし
+   (a) `>>` 追記 (b) vimの`:w`（atomic save） (c) Claude Codeによる書き換え (d) `mv` でのrename上書き → 1秒以内に再描画・スクロール維持。(e) 削除→エラー表示→再作成で復帰 — **いずれも未実施**（Step 2と同じ理由でこの開発環境にはGUI表示アクセスがなく、`screencapture`も失敗する。ユーザー自身の実機での確認が必要）
 4. **URLスキーム受け口 + シェルラッパー**
    検証（アプリは絶対パス指定）:
    `open -a <abs>/macos/build/Debug/Zashiki.app "zashiki://markdown-preview/open?path=/tmp/test.md"` でDebugビルドへ直接配送されること
    `ZASHIKI_APP=<abs>/macos/build/Debug/Zashiki.app scripts/zashiki-md-preview README.md`
    まず `application(_:open:)` が `CFBundleURLTypes` 登録だけでカスタムスキームに対して実際に呼ばれるか確認（呼ばれない場合は`applicationWillFinishLaunching`で`NSAppleEventManager`に`kInternetEventClass`/`kAEGetURL`の明示ハンドラを登録するフォールバックに切り替える。この点は未検証のため要注意）
    エラーパス（存在しないファイル、ウィンドウなし、不正なpath）も確認
-5. **仕上げ**: `swiftlint lint --strict --fix` → フルビルド `zig build -Doptimize=ReleaseFast -Dxcframework-target=native` → `zig build test`（新規SwiftファイルがCIのlint/testに引っかからないか確認）→ LOCAL_PATCH.mdの手順で `/Applications` 配備 → Claude Codeにmdを書かせて実運用確認 → LOCAL_PATCH.md追記（変更ファイル表・使い方・動作確認手順・依存ライブラリ出典・upstream競合注意・デプロイターゲット引き上げの記録）→ コミット
+5. **仕上げ**: `swiftlint lint --strict --fix` → フルビルド `zig build -Doptimize=ReleaseFast -Dxcframework-target=native` → `zig build test`（新規SwiftファイルがCIのlint/testに引っかからないか確認）→ ビルドした`Zashiki.app`を`/Applications`に配備 → Claude Codeにmdを書かせて実運用確認 → 本plan文書に最終的な使い方・動作確認手順・依存ライブラリ出典・upstream競合注意・デプロイターゲット引き上げの記録を追記（変更ファイル表等は各Stepの実装時に随時更新済み）→ コミット
 
 ## 主要リスクと対処
 
@@ -153,7 +155,7 @@ MarkdownPreviewFileWatcher (DispatchSourceFileSystemObject)
 - **（解決済み）画像ローダーのネットワーク制限**: `Textual`のデフォルト`AttachmentLoader`はリモートURLをfetchしうる実装だったため、`MarkdownPreviewImageLoader`で`file://`スキーム以外を`throw`で拒否する独自実装を追加した（2026-08-11実装）
 - **（未検証・要実機確認）SwiftUI構造切替によるサーフェス再アタッチ**: Inspector前例ありだが横分割+全体ラップは新パターン。コードは実装済みだが、この開発環境にGUI表示アクセスがなく（`screencapture`失敗）セッション生存確認ができていない。ユーザーの実機確認が必要
 - **（未検証・要実機確認）StructuredTextのスクロール位置維持・リンク委譲の挙動**: WKWebView時代は`evaluateJavaScript`や`decidePolicyFor`で明示制御していたが、Textual採用によりSwiftUI標準の挙動に依存する部分が増えた。上記と同じ理由で未確認
-- **configキーバインド連携は不可**（`syncMenuShortcut` はZigコアのアクション名前提）→ xibの静的Cmd+Shift+Mで代替。制約をLOCAL_PATCH.mdに明記
+- **configキーバインド連携は不可**（`syncMenuShortcut` はZigコアのアクション名前提）→ xibの静的Cmd+Shift+Mで代替。制約は本plan文書に明記（このセクション）
 - **ウィンドウサイズ**: デフォルト非表示なので初期サイズ算出に影響なし。表示時はウィンドウ幅維持でターミナルが縮む（Inspectorと同挙動）。自動拡幅はv2候補
 - **URLスキームの既定ハンドラ**: 同じ`dev.kawaken.zashiki`系Bundle IDのDebug/Release両方を並行して使う場合、`zashiki://`スキームの既定ハンドラは片方にしかならない（LSHandlerRankの仕様）。`open -a`で明示的にアプリを指定すれば既定ハンドラに関係なく届くため、`scripts/zashiki-md-preview`は`ZASHIKI_APP`未指定時のみ既定ハンドラ（`open`のみ）に頼る設計とする
 - **`application(_:open:)`がカスタムURLスキームに対して実際に発火するかは未検証**: ファイルオープン（Documentタイプ）での実績はあるが、`CFBundleURLTypes`経由のGetURL Apple Eventで同じデリゲートメソッドが呼ばれるかはStep 4で確認するまで確定情報ではない。発火しない場合は`NSAppleEventManager`への明示ハンドラ登録に切り替える
