@@ -3,24 +3,19 @@
 ## 作業状況
 
 - 2026-08-12: Exploreエージェントによる網羅調査＋過去のリネームコミット（`ff09c5f94` 〜 `4475d5352` 等、フェーズ1〜のZashikiリネーム作業）を突き合わせて本ドキュメントを作成。まだコード修正には着手していない（一覧化のみ）
-- 前提: このフォークの命名方針は「[[ghostty_fork_direction]]」（アプリ名はZashiki）。過去のリネームで **表示文言（UI text）は対応済みの箇所と未対応の箇所が混在**しており、**内部シンボル（モジュール名・通知名・実行ファイル名）はupstream追従のため意図的にGhosttyのまま維持**する方針がすでに確立している
+- 前提: このフォークの命名方針は「[[ghostty_fork_direction]]」（アプリ名はZashiki）
+- **2026-08-12 追記（方針転換）**: 「upstream競合最小化」を理由に内部シンボルや`src/`のCLI文言をGhosttyのまま残す、という過去方針（コミット`4475d5352`, `84d1b93e8`）はユーザー判断により**撤回**。以後は内部シンボル・実行ファイル名・`src/`のCLI文言も含めてフルブランド化を対応対象とする。旧A・旧Dは統合して下記Dに移動し、代わりに各項目ごとの**upstream競合とは別の実装コスト・実害**を明記する形に更新した
 
-## 方針（重要）
+## 方針（更新後）
 
-このリポジトリは「upstream（本家Ghostty）を追従し続ける」ことを明言したフォーク（`AboutView.swift`の説明文 "A personal, macOS-only fork of Ghostty, tracking upstream rather than diverging from it." より）。過去のリネーム作業でも一貫して次のルールが取られている:
+- **`macos/`配下のUI表示文言**（メニュー、ダイアログ、About画面等）: 対応してOK（変更なし）
+- **内部シンボル・実行ファイル名・`src/`のCLI文言**: 従来「upstream追従のため維持」としていたが、その制約は撤廃。**対応対象に格上げ**（下記D）。ただしupstream競合以外の技術的コスト・実害（設定移行、ビルドパイプライン追従、テストファイル書き換え等）は個別に残るため、それぞれ注記する
 
-- **`macos/`配下のUI表示文言**（メニュー、ダイアログ、About画面等）: フォーク独自にビルド・保守する範囲なので **対応してOK**
-- **内部シンボル**（Swiftモジュール名`PRODUCT_MODULE_NAME`、`EXECUTABLE_NAME`、`NSUserInterfaceItemIdentifier`、`Notification.Name`、UserDefaults suite名など）: 変更するとupstreamとの差分が広がり将来のマージが困難になるため **意図的に`Ghostty`のまま維持**（コミット`4475d5352`, `84d1b93e8`で明言済み）
-- **`src/`配下（Zigコア、Linux/GTK版とも共有）**: upstreamと共有しているコードなので、CLIの`--version`/`--help`出力等に残る"Ghostty"表記を変更するかは **要相談**（変更するとupstream同期のたびコンフリクトが増える。マージ頻度・実利益とのトレードオフ）
-
-## A. 対応不要（意図的にGhosttyのまま維持・修正しないこと）
+## A. 対応不要（ブランド名残ではなく、意味のある記述）
 
 | 項目 | 根拠 |
 |---|---|
-| `project.pbxproj`: `EXECUTABLE_NAME = ghostty;`（全Configuration） | コミット `84d1b93e8`「EXECUTABLE_NAME自体は変更方針により小文字"ghostty"のまま」 |
-| `project.pbxproj`: `PRODUCT_MODULE_NAME = Ghostty;` | コミット `4475d5352`「内部シンボルはupstream競合最小化のため変更しない」。`MainMenu.xib`の`customModule="Ghostty"`もこれに追従済み |
-| `GhosttyPackage.swift`等の`Notification.Name("com.mitchellh.ghostty.*")`、`NSUserInterfaceItemIdentifier`、`UserDefaults.ghostty`/`ghosttySuite` | 同上の内部シンボル方針 |
-| `AboutView.swift:86` "A personal, macOS-only fork of **Ghostty**, tracking upstream..." | 事実として本家Ghosttyのフォークであることを説明する文脈であり、ブランド名残ではなく仕様文言 |
+| `AboutView.swift:86` "A personal, macOS-only fork of **Ghostty**, tracking upstream..." | 事実として本家Ghosttyのフォークであることを説明する文脈であり、ブランド名残ではなく仕様文言（upstream追従方針とは無関係に、フォーク元を明示する記述として残す） |
 | コード内コメント、`os_log`のデバッグログ文言 | ユーザーに見えるUIではない |
 | `GhosttyKit.xcframework`, `*.entitlements`, テストターゲットの`PRODUCT_BUNDLE_IDENTIFIER`等ビルド成果物・非出荷物 | 非UI |
 
@@ -77,18 +72,36 @@
 |---|---|
 | `UpdateDelegate.swift:14-15` | Sparkleのappcast URLが `tip.files.ghostty.org` / `release.files.ghostty.org`（本家）のまま。**このURLを変えない限りUpdate画面には本家Ghosttyのリリースノートが表示される**。フォーク独自のリリースフローを持つ気がなければ、そもそもUpdate機能自体をどう扱うかから要検討 |
 
-## D. 要相談（`src/`＝Zigコア、upstream共有部分）
+## D. 対応対象（内部シンボル・実行ファイル名・`src/`のCLI文言。旧方針撤回により格上げ）
 
-以下はupstream追従方針とのトレードオフがあるため、対応するかどうかまずユーザーに確認する:
+upstream競合の懸念は考慮不要になったが、それぞれ個別の実装コスト・実害があるため着手前に把握しておくこと。
+
+### D-1. 内部シンボル（Swiftモジュール名・識別子）
+
+| 項目 | 内容 | 変更に伴う実装コスト・実害 |
+|---|---|---|
+| `project.pbxproj`: `PRODUCT_MODULE_NAME = Ghostty;`（全Configuration） | Swiftモジュール名をZashikiへ | `GhosttyTests`配下17ファイルの`@testable import Ghostty`を全て書き換え要。`MainMenu.xib`ほか各xibの`customModule="Ghostty"`も追従が必要（コミット`4475d5352`が一度この作業を避けて維持を選んだ経緯あり） |
+| `GhosttyPackage.swift`等の`Notification.Name("com.mitchellh.ghostty.*")`、`NSUserInterfaceItemIdentifier` | 内部通知・識別子名の変更 | 送受信両側の書き換え漏れがあると通知が届かなくなるだけで、外部への実害は基本なし。全参照箇所の洗い出しが必要 |
+| `UserDefaults.ghostty` / `UserDefaults.ghosttySuite`（`UserDefaults+Extension.swift`） | suite名の変更 | **要注意**: suite名を変えると既存ユーザーの設定が新suiteから見えなくなり初期化されたように見える。移行処理（旧suiteから新suiteへの値コピー）を別途実装しない限り、ビルド更新のタイミングでユーザー設定が消失する |
+
+### D-2. 実行ファイル名
+
+| 項目 | 内容 | 変更に伴う実装コスト・実害 |
+|---|---|---|
+| `project.pbxproj`: `EXECUTABLE_NAME = ghostty;`（全Configuration） | `zashiki`へ変更 | コードサイニング・entitlements・`src/build/GhosttyXcodebuild.zig`のscheme参照（`-scheme "Ghostty"`は前回のリネームで未改修と明記あり）等、ビルドパイプライン側の追従が必要。`TEST_HOST`パス（既に`Zashiki.app`）の末尾バイナリ名も追従要 |
+
+### D-3. `src/`（Zigコア、Linux/GTK版とも共有）のCLI出力文言
 
 | ファイル:行 | 内容 |
 |---|---|
 | `src/cli/version.zig:29` | `"Ghostty {s}\n\n"`（`--version`出力） |
-| `src/cli/help.zig:36-56` | `"Usage: ghostty [+action]..."`, `"Run the Ghostty terminal emulator..."`, `` "open -na Ghostty.app" ``（`--help`出力。実バイナリ名は`ghostty`のままなので`ghostty`部分は実態と一致しているが、`Ghostty.app`は実際のバンドル名`Zashiki.app`と不一致） |
+| `src/cli/help.zig:36-56` | `"Usage: ghostty [+action]..."`, `"Run the Ghostty terminal emulator..."`, `` "open -na Ghostty.app" ``（`--help`出力。バイナリ名を`zashiki`に変えるなら`Usage:`行もそれに追従） |
 | `src/cli/ssh.zig:16` | `"Usage: ghostty +ssh..."` |
 | `src/input/command.zig:674` | コマンドパレットの組み込みデフォルトコマンドのタイトルが`"Ghostty"` |
 | `src/Surface.zig:1355` | `"Ghostty failed to launch the requested command:"`（ターミナル画面に描画されるエラー文言） |
 | `macos/Sources/App/macOS/main.swift:16` | CLI起動失敗時のstderr文言（macos側だがCLI起動シナリオ） |
+
+備考: 本フォークはmacOS専用運用（Linux/GTK版はビルド・実行対象外、コミット`ff09c5f94`より）なので、Linux/GTK版との共有を理由にした変更のためらいは不要。
 
 ## E. 未確認・要確認
 
@@ -98,7 +111,7 @@
 
 ## 次のアクション（要ユーザー判断）
 
-1. **B（macos/配下のUI文言）は対応して良いか** → 良ければB-1から順に着手
+1. **B（macos/配下のUI文言）** → 対応してOK、B-1から順に着手
 2. **C（Sparkle appcast URL）** → 独自リリースフローを持つ気があるか、それとも自動更新機能自体を無効化するか
-3. **D（src/のCLI文言）** → upstream追従を優先してこのまま残すか、ブランド一貫性を優先して変更するか
+3. **D（内部シンボル・実行ファイル名・src/のCLI文言）** → 対応対象。ただしD-1のUserDefaults suite名変更は設定移行の実装が別途必要、D-2のEXECUTABLE_NAME変更はビルドパイプラインへの影響範囲確認が必要なので、**着手順序は最後（D-3のsrc/文言 → D-1の通知名等 → 影響範囲の大きいD-1のsuite名・D-2のEXECUTABLE_NAME の順）を推奨**
 4. **E（iOSターゲット）** → 出荷対象かどうか
