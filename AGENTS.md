@@ -60,3 +60,11 @@ The `GHOSTTY_LOG` environment variable controls log destinations (`stderr`,
 - macOS app: `macos/`
 - Feature/implementation plan docs (not yet built, or design notes for a
   change in progress): `plan/`
+- Write-ups of what actually happened for completed plans, including how
+  it diverged from the plan: `docs/history/`
+
+Once a plan's PR is merged, delete the `plan/*.md` file. If what actually
+happened differed from the plan in a way worth remembering, write a short
+`docs/history/*.md` first (see existing files there for the format) — plain
+delete-and-forget is fine if there's nothing worth capturing. This keeps
+`plan/` limited to work that's actually still in flight.
