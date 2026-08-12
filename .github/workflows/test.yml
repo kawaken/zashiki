@@ -14,7 +14,8 @@ name: Test
 # push/pull_requestの両方が発火して二重実行になるのを避ける。
 #
 # plan/配下(設計ドキュメントのみ)・.github/workflows配下(CI設定自体)・
-# README.md/AGENTS.md/LICENSE・scripts/配下・typos.toml・Makefileは
+# .claude/配下(Claude Codeの設定)・README.md/AGENTS.md/LICENSE・
+# scripts/配下・typos.toml・Makefileは
 # ビルド・テスト対象のコードに影響しないため、paths-ignoreでCIをスキップ
 # する。それ以外のファイルが1つでも変更に含まれていれば通常通り実行される。
 # (example/・po/・dist/・pkg/はドキュメントに見えても実ビルド入力を含む
@@ -31,6 +32,7 @@ on:
     paths-ignore:
       - "plan/**"
       - ".github/workflows/**"
+      - ".claude/**"
       - "README.md"
       - "AGENTS.md"
       - "LICENSE"
@@ -41,6 +43,7 @@ on:
     paths-ignore:
       - "plan/**"
       - ".github/workflows/**"
+      - ".claude/**"
       - "README.md"
       - "AGENTS.md"
       - "LICENSE"
