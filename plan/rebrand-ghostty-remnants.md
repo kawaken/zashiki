@@ -68,11 +68,17 @@
 |---|---|
 | `Ghostty-Info.plist`の`GhosttyBuild`/`GhosttyCommit`キー | 値は`AboutView.swift`/`UpdateViewModel.swift`のバージョン表示に使われる。キー名自体はビルドスクリプトが書き込む内部キーなので必須ではないが、一貫性のため`ZashikiBuild`/`ZashikiCommit`へのリネームも検討可（ビルドスクリプト側の追従が必要） |
 
-## C. 機能面（UIに間接的に影響、対応要否は相談）
+## C. 対応対象（Sparkle appcast URLを自前に差し替え、2026-08-12決定）
 
 | 項目 | 内容 |
 |---|---|
-| `UpdateDelegate.swift:14-15` | Sparkleのappcast URLが `tip.files.ghostty.org` / `release.files.ghostty.org`（本家）のまま。**このURLを変えない限りUpdate画面には本家Ghosttyのリリースノートが表示される**。フォーク独自のリリースフローを持つ気がなければ、そもそもUpdate機能自体をどう扱うかから要検討 |
+| `UpdateDelegate.swift:14-15` | Sparkleのappcast URLが `tip.files.ghostty.org` / `release.files.ghostty.org`（本家）のまま。**自分のappcast URLに差し替える方針で決定**（Update機能自体は維持） |
+
+対応方針・注意点:
+
+- 単なる文字列置換では終わらない。**appcast.xmlを実際に配信するインフラが要る**（GitHub Releases + `appcast.xml`をホストする形が有力。`.github/workflows/release.yml`は既に「タグを打ったらad-hoc署名のZashiki.appをzipにしてGitHub Releaseに添付する」最小構成が動いている）
+- `release.yml`のコメントに「Apple Developer Program登録後にnotarization・Developer ID署名・Sparkle自動更新を追加するのは別タスク」と明記されている。[[atok_patch_distribution_plan]]（Apple Developer Program登録の方針は決定済み・登録自体はこの時点で未確認）を参照し、**Developer登録状況を先に確認**してから着手すること（未署名アプリへのSparkle自動更新はGatekeeper警告と絡んで体験が悪い可能性がある）
+- 実装順序の目安: (1) Developer登録状況を確認 → (2) `release.yml`にappcast.xml生成・公開ステップを追加 → (3) `UpdateDelegate.swift`のURLを自前ドメイン/GitHub Pages等に差し替え → (4) 実リリースで動作確認
 
 ## D. 対応対象（内部シンボル・実行ファイル名・`src/`のCLI文言）
 
@@ -118,6 +124,6 @@ upstream競合は考慮不要（upstream機能を実際に取り込みたくな�
 ## 次のアクション
 
 1. **B（macos/配下のUI文言）** → 対応対象、B-1から順に着手
-2. **C（Sparkle appcast URL）** → 未解決。独自リリースフローを持つ気があるか、それとも自動更新機能自体を無効化するか要確認
+2. **C（Sparkle appcast URL）** → 対応対象（自前appcastへ差し替え）。ただしDeveloper登録状況の確認が前提なので、B/D/Eの後、単独タスクとして着手するのが良さそう
 3. **D（内部シンボル・実行ファイル名・src/のCLI文言）** → 対応対象。D-1のUserDefaults suite名変更は設定移行の実装、D-2のEXECUTABLE_NAME変更はビルドパイプライン追従が必要な点だけ実装時に注意（着手判断の材料ではなく実装メモ）
 4. **E（iOSターゲット等）** → 対応対象
