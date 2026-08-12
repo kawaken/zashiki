@@ -44,7 +44,7 @@ class GhosttyCustomConfigCase: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments.append(contentsOf: ["-ApplePersistenceIgnoreState", "YES"])
         app.launchEnvironment["GHOSTTY_CONFIG_PATH"] = configFile.path
-        app.launchEnvironment["GHOSTTY_USER_DEFAULTS_SUITE"] = defaultsSuite
+        app.launchEnvironment["ZASHIKI_USER_DEFAULTS_SUITE"] = defaultsSuite
         return app
     }
 }

@@ -277,7 +277,7 @@ enum UpdateState: Equatable {
         let reply: @Sendable (SPUUserUpdateChoice) -> Void
 
         var releaseNotes: ReleaseNotes? {
-            let currentCommit = Bundle.main.infoDictionary?["GhosttyCommit"] as? String
+            let currentCommit = Bundle.main.infoDictionary?["ZashikiCommit"] as? String
             return ReleaseNotes(displayVersionString: appcastItem.displayVersionString, currentCommit: currentCommit)
         }
     }

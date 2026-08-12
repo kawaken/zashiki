@@ -1071,7 +1071,7 @@ extension Ghostty {
 
             // If the user has force click enabled then we do a quick look. There
             // is no public API for this as far as I can tell.
-            guard UserDefaults.ghostty.bool(forKey: "com.apple.trackpad.forceClick") else { return }
+            guard UserDefaults.zashiki.bool(forKey: "com.apple.trackpad.forceClick") else { return }
             quickLook(with: event)
         }
 

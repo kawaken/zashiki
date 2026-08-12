@@ -401,7 +401,7 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
     config.emit_terminfo = b.option(
         bool,
         "emit-terminfo",
-        "Install Ghostty terminfo source file",
+        "Install Zashiki terminfo source file",
     ) orelse switch (target.result.os.tag) {
         .windows => true,
         else => switch (optimize) {
@@ -413,7 +413,7 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
     config.emit_termcap = b.option(
         bool,
         "emit-termcap",
-        "Install Ghostty termcap file",
+        "Install Zashiki termcap file",
     ) orelse switch (optimize) {
         .Debug => true,
         .ReleaseSafe, .ReleaseFast, .ReleaseSmall => false,
@@ -422,7 +422,7 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
     config.emit_themes = b.option(
         bool,
         "emit-themes",
-        "Install bundled iTerm2-Color-Schemes Ghostty themes",
+        "Install bundled iTerm2-Color-Schemes Zashiki themes",
     ) orelse true;
 
     config.emit_webdata = b.option(
