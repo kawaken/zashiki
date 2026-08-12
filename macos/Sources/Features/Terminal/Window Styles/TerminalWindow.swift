@@ -171,7 +171,7 @@ class TerminalWindow: NSWindow {
         tab.accessoryView = stackView
 
         // Get our saved level
-        level = UserDefaults.ghostty.value(forKey: Self.defaultLevelKey) as? NSWindow.Level ?? .normal
+        level = UserDefaults.zashiki.value(forKey: Self.defaultLevelKey) as? NSWindow.Level ?? .normal
     }
 
     // Both of these must be true for windows without decorations to be able to
@@ -275,7 +275,7 @@ class TerminalWindow: NSWindow {
 
     /// This identifier is attached to the tab bar view controller when we detect it being
     /// added.
-    static let tabBarIdentifier: NSUserInterfaceItemIdentifier = .init("_ghosttyTabBar")
+    static let tabBarIdentifier: NSUserInterfaceItemIdentifier = .init("_zashikiTabBar")
 
     var hasMoreThanOneTabs: Bool {
         /// accessing ``tabGroup?.windows`` here
@@ -702,11 +702,11 @@ private struct TabColorIndicatorView: View {
 // MARK: - Tab Context Menu
 
 extension TerminalWindow {
-    private static let closeTabsOnRightMenuItemIdentifier = NSUserInterfaceItemIdentifier("com.mitchellh.ghostty.closeTabsOnTheRightMenuItem")
-    private static let changeTitleMenuItemIdentifier = NSUserInterfaceItemIdentifier("com.mitchellh.ghostty.changeTitleMenuItem")
-    private static let tabColorSeparatorIdentifier = NSUserInterfaceItemIdentifier("com.mitchellh.ghostty.tabColorSeparator")
+    private static let closeTabsOnRightMenuItemIdentifier = NSUserInterfaceItemIdentifier("dev.kawaken.zashiki.closeTabsOnTheRightMenuItem")
+    private static let changeTitleMenuItemIdentifier = NSUserInterfaceItemIdentifier("dev.kawaken.zashiki.changeTitleMenuItem")
+    private static let tabColorSeparatorIdentifier = NSUserInterfaceItemIdentifier("dev.kawaken.zashiki.tabColorSeparator")
 
-    private static let tabColorPaletteIdentifier = NSUserInterfaceItemIdentifier("com.mitchellh.ghostty.tabColorPalette")
+    private static let tabColorPaletteIdentifier = NSUserInterfaceItemIdentifier("dev.kawaken.zashiki.tabColorPalette")
 
     func configureTabContextMenuIfNeeded(_ menu: NSMenu) {
         guard isTabContextMenu(menu) else { return }

@@ -8,7 +8,7 @@ struct AboutView: View {
 
     /// Read the commit from the bundle.
     private var build: String? { Bundle.main.infoDictionary?["CFBundleVersion"] as? String }
-    private var commit: String? { Bundle.main.infoDictionary?["GhosttyCommit"] as? String }
+    private var commit: String? { Bundle.main.infoDictionary?["ZashikiCommit"] as? String }
     private var version: String? { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String }
 
     private enum VersionConfig {

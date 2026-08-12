@@ -179,13 +179,13 @@ class AppDelegate: NSObject,
     func applicationWillFinishLaunching(_ notification: Notification) {
         #if DEBUG
         if
-            let suite = UserDefaults.ghosttySuite,
+            let suite = UserDefaults.zashikiSuite,
             let clear = ProcessInfo.processInfo.environment["GHOSTTY_CLEAR_USER_DEFAULTS"],
             (clear as NSString).boolValue {
-            UserDefaults.ghostty.removePersistentDomain(forName: suite)
+            UserDefaults.zashiki.removePersistentDomain(forName: suite)
         }
         #endif
-        UserDefaults.ghostty.register(defaults: [
+        UserDefaults.zashiki.register(defaults: [
             // Disable the automatic full screen menu item because we handle
             // it manually.
             "NSFullScreenMenuItemEverywhere": false,
@@ -204,7 +204,7 @@ class AppDelegate: NSObject,
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // System settings overrides
-        UserDefaults.ghostty.register(defaults: [
+        UserDefaults.zashiki.register(defaults: [
             // Disable this so that repeated key events make it through to our terminal views.
             "ApplePressAndHoldEnabled": false,
         ])
@@ -213,7 +213,7 @@ class AppDelegate: NSObject,
         applicationLaunchTime = ProcessInfo.processInfo.systemUptime
 
         // Check if secure input was enabled when we last quit.
-        if UserDefaults.ghostty.bool(forKey: "SecureInput") != SecureInput.shared.enabled {
+        if UserDefaults.zashiki.bool(forKey: "SecureInput") != SecureInput.shared.enabled {
             toggleSecureInput(self)
         }
 
@@ -494,7 +494,7 @@ class AppDelegate: NSObject,
             // may want to show this as a sheet on the focused window (especially if we're
             // opening a tab). I'm not sure.
             let alert = NSAlert()
-            alert.messageText = "Allow Ghostty to execute \"\(filename)\"?"
+            alert.messageText = "Allow Zashiki to execute \"\(filename)\"?"
             alert.addButton(withTitle: "Allow")
             alert.addButton(withTitle: "Cancel")
             alert.alertStyle = .warning
@@ -809,10 +809,10 @@ class AppDelegate: NSObject,
         // configuration. This is the only way to carefully control whether macOS invokes the
         // state restoration system.
         switch config.windowSaveState {
-        case "never": UserDefaults.ghostty.setValue(false, forKey: "NSQuitAlwaysKeepsWindows")
-        case "always": UserDefaults.ghostty.setValue(true, forKey: "NSQuitAlwaysKeepsWindows")
+        case "never": UserDefaults.zashiki.setValue(false, forKey: "NSQuitAlwaysKeepsWindows")
+        case "always": UserDefaults.zashiki.setValue(true, forKey: "NSQuitAlwaysKeepsWindows")
         case "default": fallthrough
-        default: UserDefaults.ghostty.removeObject(forKey: "NSQuitAlwaysKeepsWindows")
+        default: UserDefaults.zashiki.removeObject(forKey: "NSQuitAlwaysKeepsWindows")
         }
 
         // Sync our auto-update settings. If SUEnableAutomaticChecks (in our Info.plist) is
@@ -984,7 +984,7 @@ class AppDelegate: NSObject,
             input.global.toggle()
         }
         self.menuSecureInput?.state = if input.global { .on } else { .off }
-        UserDefaults.ghostty.set(input.global, forKey: "SecureInput")
+        UserDefaults.zashiki.set(input.global, forKey: "SecureInput")
     }
 
     // MARK: - IB Actions
@@ -1293,7 +1293,7 @@ extension AppDelegate {
     }
 
     @IBAction func useAsDefault(_ sender: NSMenuItem) {
-        let ud = UserDefaults.ghostty
+        let ud = UserDefaults.zashiki
         let key = TerminalWindow.defaultLevelKey
         if menuFloatOnTop?.state == .on {
             ud.set(NSWindow.Level.floating, forKey: key)
@@ -1309,7 +1309,7 @@ extension AppDelegate {
                 let alert = NSAlert()
                 alert.messageText = "Failed to Set Default Terminal"
                 alert.informativeText = """
-                Ghostty could not be set as the default terminal application.
+                Zashiki could not be set as the default terminal application.
 
                 Error: \(error.localizedDescription)
                 """
@@ -1371,7 +1371,7 @@ extension AppDelegate {
         if controllersNeedConfirmation.count == 1 {
             Task {
                 let response = await controllersNeedConfirmation[0].confirmCloseAsync(
-                    messageText: "Quit Ghostty?",
+                    messageText: "Quit Zashiki?",
                     informativeText: "The terminal still has a running process. If you quit, the process will be killed.",
                     confirmButtonTitle: "Terminate",
                 )
@@ -1409,7 +1409,7 @@ extension AppDelegate {
         Task {
             for controller in controllers {
                 let response = await controller.confirmCloseAsync(
-                    messageText: "Quit Ghostty?",
+                    messageText: "Quit Zashiki?",
                     informativeText: "The terminal still has a running process. If you quit, the process will be killed.",
                     confirmButtonTitle: "Terminate",
                 )

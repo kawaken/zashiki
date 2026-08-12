@@ -55,9 +55,9 @@
 			</array>
 		</dict>
 	</array>
-	<key>GhosttyBuild</key>
+	<key>ZashikiBuild</key>
 	<string></string>
-	<key>GhosttyCommit</key>
+	<key>ZashikiCommit</key>
 	<string></string>
 	<key>LSEnvironment</key>
 	<dict>

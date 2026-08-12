@@ -2,7 +2,8 @@ import AppKit
 
 extension UserDefaults {
     private static let customIconKeyOld = "CustomGhosttyIcon"
-    private static let customIconKeyNew = "CustomGhosttyIcon2"
+    private static let customIconKeyGhostty = "CustomGhosttyIcon2"
+    private static let customIconKeyNew = "CustomZashikiIcon"
 
     var appIcon: AppIcon? {
         get {
@@ -11,11 +12,20 @@ extension UserDefaults {
                 removeObject(forKey: Self.customIconKeyOld)
             }
 
-            // Check if we have the new key for our dock tile plugin format.
-            guard let data = data(forKey: Self.customIconKeyNew) else {
+            // Check if we have the current key first.
+            if let data = data(forKey: Self.customIconKeyNew) {
+                return try? JSONDecoder().decode(AppIcon.self, from: data)
+            }
+
+            // Fall back to the pre-rename key (from before the Zashiki
+            // rebrand) so an existing custom icon selection isn't lost.
+            // Migrate it forward to the new key so this only runs once.
+            guard let legacyData = data(forKey: Self.customIconKeyGhostty) else {
                 return nil
             }
-            return try? JSONDecoder().decode(AppIcon.self, from: data)
+            set(legacyData, forKey: Self.customIconKeyNew)
+            removeObject(forKey: Self.customIconKeyGhostty)
+            return try? JSONDecoder().decode(AppIcon.self, from: legacyData)
         }
 
         set {

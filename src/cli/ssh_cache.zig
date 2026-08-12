@@ -26,7 +26,7 @@ pub const Options = struct {
 
 /// Manage the SSH terminfo cache for automatic remote host setup.
 ///
-/// The `+ssh` action installs Ghostty's terminfo on remote hosts and records
+/// The `+ssh` action installs Zashiki's terminfo on remote hosts and records
 /// each success in this cache so it doesn't re-upload on later connections.
 /// (`+ssh` runs automatically from the shell integration when
 /// `shell-integration-features` includes `ssh-terminfo`.) This command
@@ -49,13 +49,13 @@ pub const Options = struct {
 /// `--prune=6h`, `--prune=1y`.
 ///
 /// Examples:
-///   ghostty +ssh-cache                           # List all cached destinations
-///   ghostty +ssh-cache user@example.com          # Show that destination
-///   ghostty +ssh-cache example.com               # Show all users on that host
-///   ghostty +ssh-cache --add=user@example.com    # Manually add a destination
-///   ghostty +ssh-cache --remove=user@example.com # Remove a destination
-///   ghostty +ssh-cache --prune=30d               # Remove entries older than 30 days
-///   ghostty +ssh-cache --clear                   # Clear entire cache
+///   zashiki +ssh-cache                           # List all cached destinations
+///   zashiki +ssh-cache user@example.com          # Show that destination
+///   zashiki +ssh-cache example.com               # Show all users on that host
+///   zashiki +ssh-cache --add=user@example.com    # Manually add a destination
+///   zashiki +ssh-cache --remove=user@example.com # Remove a destination
+///   zashiki +ssh-cache --prune=30d               # Remove entries older than 30 days
+///   zashiki +ssh-cache --clear                   # Clear entire cache
 pub fn run(alloc_gpa: Allocator) !u8 {
     var arena = std.heap.ArenaAllocator.init(alloc_gpa);
     defer arena.deinit();
@@ -89,7 +89,7 @@ pub fn run(alloc_gpa: Allocator) !u8 {
             if (is_host_flag) {
                 try stderr.print(
                     "Warning: --host is deprecated; pass the destination " ++
-                        "directly, e.g. `ghostty +ssh-cache {s}`.\n",
+                        "directly, e.g. `zashiki +ssh-cache {s}`.\n",
                     .{arg["--host=".len..]},
                 );
             }
@@ -166,7 +166,7 @@ pub fn runInner(
     }
 
     // Setup our disk cache to the standard location
-    const cache_path = try DiskCache.defaultPath(alloc, "ghostty");
+    const cache_path = try DiskCache.defaultPath(alloc, "zashiki");
     const cache: DiskCache = .{ .path = cache_path };
 
     if (opts.clear) {

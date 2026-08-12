@@ -13,11 +13,11 @@ const global = @import("../global.zig");
 const log = std.log.scoped(.ssh);
 
 const usage =
-    \\Usage: ghostty +ssh [flags] [--] <ssh args...>
+    \\Usage: zashiki +ssh [flags] [--] <ssh args...>
     \\
     \\Flags:
     \\  --forward-env[=bool]  Enable TERM / SendEnv forwarding. Default: true.
-    \\  --terminfo[=bool]     Install Ghostty terminfo on first connect. Default: true.
+    \\  --terminfo[=bool]     Install Zashiki terminfo on first connect. Default: true.
     \\  --cache[=bool]        Use the terminfo install cache. Default: true.
     \\  --ssh=<path>          Path to the ssh binary. Default: first `ssh` on PATH.
     \\  --verbose             Print +ssh status lines to stderr.
@@ -99,7 +99,7 @@ pub const Options = struct {
     }
 };
 
-/// Wrap `ssh` to automatically configure Ghostty terminal integration on
+/// Wrap `ssh` to automatically configure Zashiki terminal integration on
 /// remote hosts.
 ///
 /// Any arguments that aren't recognized as `+ssh` flags are passed to
@@ -112,10 +112,10 @@ pub const Options = struct {
 /// `shell-integration-features` includes `ssh-env` or `ssh-terminfo`,
 /// each shell defines an `ssh` function that runs:
 ///
-///     ghostty +ssh <flags> -- "$@"
+///     zashiki +ssh <flags> -- "$@"
 ///
-/// You can also run `ghostty +ssh` directly, or alias it yourself (e.g.
-/// `alias ssh='ghostty +ssh --'`) if you prefer not to use the shell
+/// You can also run `zashiki +ssh` directly, or alias it yourself (e.g.
+/// `alias ssh='zashiki +ssh --'`) if you prefer not to use the shell
 /// integration.
 ///
 /// `+ssh` performs up to two pieces of setup before launching `ssh`:
@@ -123,15 +123,15 @@ pub const Options = struct {
 ///   1. **Environment forwarding** (`--forward-env`). Sets `TERM` to
 ///      `xterm-256color` and requests `SendEnv` forwarding of
 ///      `COLORTERM`, `TERM_PROGRAM`, and `TERM_PROGRAM_VERSION` so the
-///      remote shell can still detect that it's running inside Ghostty.
+///      remote shell can still detect that it's running inside Zashiki.
 ///      The remote `sshd_config` must list these in `AcceptEnv` for
 ///      forwarding to succeed.
 ///
 ///   2. **Terminfo install** (`--terminfo`). On the first connection to a
-///      given destination, installs Ghostty's terminfo entry on the remote
+///      given destination, installs Zashiki's terminfo entry on the remote
 ///      host using `infocmp -x xterm-ghostty | ssh tic -x -` over a
 ///      shared `ControlMaster` connection. Successful installs are cached
-///      (see `ghostty +ssh-cache`) so subsequent connections skip this
+///      (see `zashiki +ssh-cache`) so subsequent connections skip this
 ///      step. When terminfo is successfully installed or already cached,
 ///      `TERM` is set to `xterm-ghostty` instead of `xterm-256color`.
 ///
@@ -151,7 +151,7 @@ pub const Options = struct {
 ///     When `false`, both the cache read (skip-if-installed) and the
 ///     cache write (record-on-success) are bypassed, and every
 ///     connection performs the install. To one-shot reinstall a single
-///     host while keeping the cache in use, prefer `ghostty +ssh-cache
+///     host while keeping the cache in use, prefer `zashiki +ssh-cache
 ///     --remove=<host>` followed by a normal connection.
 ///
 ///   * `--ssh=<path>`: Path to the `ssh` binary to execute. Default: the
@@ -163,19 +163,19 @@ pub const Options = struct {
 /// Examples:
 ///
 ///   # Basic invocation using defaults:
-///   ghostty +ssh user@example.com
+///   zashiki +ssh user@example.com
 ///
-///   # Forward Ghostty env vars but skip the terminfo install:
-///   ghostty +ssh --terminfo=false user@example.com
+///   # Forward Zashiki env vars but skip the terminfo install:
+///   zashiki +ssh --terminfo=false user@example.com
 ///
 ///   # `ssh` flags (short-form `-p`, etc.) pass through unchanged:
-///   ghostty +ssh -p 2222 -i ~/.ssh/id_ed25519 user@example.com
+///   zashiki +ssh -p 2222 -i ~/.ssh/id_ed25519 user@example.com
 ///
 ///   # Use `--` explicitly if your ssh args might collide with our flags:
-///   ghostty +ssh -- --some-rare-ssh-arg user@example.com
+///   zashiki +ssh -- --some-rare-ssh-arg user@example.com
 ///
 /// Pass `--verbose` to see what `+ssh` is doing. For cache inspection
-/// and management, see `ghostty +ssh-cache`.
+/// and management, see `zashiki +ssh-cache`.
 ///
 /// Available since: 1.4.0
 pub fn run(alloc_gpa: Allocator) !u8 {
@@ -244,8 +244,8 @@ fn runInner(
         };
 
         const cache: ?DiskCache = if (opts.cache) cache: {
-            const path = DiskCache.defaultPath(alloc, "ghostty") catch |err| {
-                warnPrint(stderr, "ghostty terminfo cache unavailable: {}", .{err});
+            const path = DiskCache.defaultPath(alloc, "zashiki") catch |err| {
+                warnPrint(stderr, "zashiki terminfo cache unavailable: {}", .{err});
                 break :session .{ .term = "xterm-256color" };
             };
             break :cache .{ .path = path };
@@ -458,7 +458,7 @@ fn installRemoteTerminfo(
     // ControlPath as the bind address for a Unix domain socket; macOS
     // limits sockaddr_un.sun_path to ~104 bytes, so keeping the path
     // short leaves margin.
-    const control_path = try internal_os.randomTmpPath(alloc, "ghostty-ssh-");
+    const control_path = try internal_os.randomTmpPath(alloc, "zashiki-ssh-");
     const control_path_opt = try std.fmt.allocPrint(
         alloc,
         "ControlPath={s}",

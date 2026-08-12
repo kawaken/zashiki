@@ -11,6 +11,9 @@ zig-out/
 # macos is managed by XCode GUI
 macos/
 
+# working notes, not user-facing docs
+plan/
+
 # Xcode asset catalogs
 **/*.xcassets/
 
