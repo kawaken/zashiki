@@ -2,6 +2,23 @@
 
 A file for [guiding coding agents](https://agents.md/).
 
+## Project Context
+
+This is **Zashiki**, [@kawaken](https://github.com/kawaken)'s personal fork
+of [Ghostty](https://github.com/ghostty-org/ghostty), maintained as an
+ongoing product rather than a one-off patch set:
+
+- macOS-only (no other platforms planned)
+- Actively incorporates improvements aimed at Japanese-language
+  input/IME (e.g. ATOK preedit styling)
+- Develops fork-specific features independently (e.g. the Markdown
+  preview pane)
+- Does **not** always track upstream. Divergence from
+  `ghostty-org/ghostty`, or a change that would make a future upstream
+  merge harder, is not by itself a reason to avoid or reject a change.
+  Upstream changes are adopted selectively when useful, not
+  automatically.
+
 ## Commands
 
 - **Build:** `zig build`
@@ -30,7 +47,7 @@ sudo xcode-select --switch /Applications/Xcode.app
 macOS unified logging is enabled by default. View logs with:
 
 ```shell-session
-sudo log stream --level debug --predicate 'subsystem=="com.mitchellh.ghostty"'
+sudo log stream --level debug --predicate 'subsystem=="dev.kawaken.zashiki"'
 ```
 
 The `GHOSTTY_LOG` environment variable controls log destinations (`stderr`,
