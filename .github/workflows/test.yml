@@ -13,10 +13,12 @@ name: Test
 # pull_requestイベント経由でのみ実行し、同じコミットに対して
 # push/pull_requestの両方が発火して二重実行になるのを避ける。
 #
-# plan/配下(設計ドキュメントのみ)や.github/workflows配下(CI設定自体)の
-# 変更はビルド・テスト対象のコードに影響しないため、paths-ignoreで
-# CIをスキップする。それ以外のファイルが1つでも変更に含まれていれば
-# 通常通り実行される。
+# plan/配下(設計ドキュメントのみ)・.github/workflows配下(CI設定自体)・
+# README.md/AGENTS.md/LICENSE・scripts/配下・typos.toml・Makefileは
+# ビルド・テスト対象のコードに影響しないため、paths-ignoreでCIをスキップ
+# する。それ以外のファイルが1つでも変更に含まれていれば通常通り実行される。
+# (example/・po/・dist/・pkg/はドキュメントに見えても実ビルド入力を含む
+# ため対象外。詳細はビルドスクリプト側の依存を確認すること)
 # 注意: この仕組み上、test.yml自身の変更もスキップ対象になる
 # (このワークフローが変更後の自分自身の内容で実行されることはない)。
 # 記述ミスはActionsの構文チェックでは検出されるが、ロジックの誤りは
@@ -29,10 +31,22 @@ on:
     paths-ignore:
       - "plan/**"
       - ".github/workflows/**"
+      - "README.md"
+      - "AGENTS.md"
+      - "LICENSE"
+      - "scripts/**"
+      - "typos.toml"
+      - "Makefile"
   pull_request:
     paths-ignore:
       - "plan/**"
       - ".github/workflows/**"
+      - "README.md"
+      - "AGENTS.md"
+      - "LICENSE"
+      - "scripts/**"
+      - "typos.toml"
+      - "Makefile"
   workflow_dispatch: {}
 
 concurrency:
