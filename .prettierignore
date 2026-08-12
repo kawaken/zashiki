@@ -8,6 +8,9 @@ zig-out/
 # jujutsu
 .jj/
 
+# Claude Code local settings, not user-facing docs
+.claude/
+
 # macos is managed by XCode GUI
 macos/
 
