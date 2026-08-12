@@ -9,6 +9,10 @@ name: Release
 #
 # Apple Developer Program登録後にnotarization・Developer ID署名・
 # Sparkle自動更新を追加するのは別タスク。
+#
+# test.yml(push/PR)はCI時間短縮のため-Demit-xcframework=falseで
+# xcodebuild test(macOSアプリ側のテスト)を除外している。その分の
+# 品質保証はここ(タグpush時のフルテスト)で担保する。
 
 on:
   push:
@@ -30,7 +34,8 @@ permissions:
 jobs:
   release:
     runs-on: macos-15
-    timeout-minutes: 30
+    # フルテスト(xcodebuild test含む)+ビルドで実測20分超のため余裕を持たせる
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -65,6 +70,12 @@ jobs:
         uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
         with:
           version: ${{ steps.zig.outputs.version }}
+
+      - name: zig build test
+        # macOSアプリのxcodebuild testも含むフルテスト。フラグなしで
+        # emit_xcframeworkのデフォルト値(true)に任せる。失敗したら
+        # ここでリリースを止める。
+        run: zig build test
 
       - name: Build Zashiki.app
         run: zig build -Doptimize=ReleaseFast -Dxcframework-target=native
