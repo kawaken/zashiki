@@ -6,6 +6,12 @@
 - 前提: このフォークの命名方針は「[[ghostty_fork_direction]]」（アプリ名はZashiki）
 - **2026-08-12 追記（方針転換）**: 「upstream競合最小化」を理由に内部シンボルや`src/`のCLI文言をGhosttyのまま残す、という過去方針（コミット`4475d5352`, `84d1b93e8`）はユーザー判断により**撤回**。以後は内部シンボル・実行ファイル名・`src/`のCLI文言も含めてフルブランド化を対応対象とする。旧A・旧Dは統合して下記Dに移動し、代わりに各項目ごとの**upstream競合とは別の実装コスト・実害**を明記する形に更新した
 - **2026-08-12 追記2（方針再確定）**: D・Eも含めて**基本的に全部変える**方針に確定。D各項目の実装コスト・実害の注記は「着手をためらう理由」ではなく単なる実装メモとして残す。upstream競合は「実際にupstreamの機能を取り込みたくなったとき」に個別対応すればよく、それを理由に今リネームを避ける必要はない。E（iOSターゲット等）も対応対象に格上げ
+- **2026-08-12 実装完了**: B・D-3・D-1a・D-1b・D-2・Eをコミット`838c1edb6`で対応済み。Cのみ未着手（別タスク）。実装時の追加知見:
+  - D-1b（UserDefaults suite名）: 想定していた「設定移行が必要」という懸念は誤りと判明。`UserDefaults.ghostty`はRelease版では常に`.standard`にフォールバックする設計で、実運用で使われるsuite名（DockTilePlugin連携用）は前回のリネームで既に`dev.kawaken.zashiki`に追従済みだった。実際に移行が必要だったのは想定外の`CustomGhosttyIcon2`（カスタムDockアイコン設定のUserDefaultsキー）で、こちらは一回限りの移行読み込みを追加した
+  - D-2（EXECUTABLE_NAME）: `-scheme "Ghostty"`は前回のmarkdown-preview作業で既に`-scheme "Zashiki"`に修正済みだった（本ドキュメント作成時点の記載は古い情報）。実際に必要だったのは`EXECUTABLE_NAME`・`TEST_HOST`末尾・`ZashikiXcodebuild.zig`の`open`ステップの3箇所のみ
+  - 最終確認スイープで計画外の追加箇所を発見・対応: `src/cli/show_face.zig`・`list_themes.zig`・`ssh_cache.zig`（`+show-face`/`+list-themes`/`+ssh-cache`のCLI文言）、`Ghostty.Config.swift`のカスタムアイコンデフォルトパス、`Fullscreen.swift`の内部通知識別子（`com.mitchellh.fullscreenDid*`）
+  - 意図的に対応外としたもの: Swiftモジュール名・型名（`Ghostty.App`等）、Zigビルドシステムの内部ファイル名、`xterm-ghostty` terminfoエントリ、libghostty-vtのC API型名（`GhosttyBuffer`等）、`GhosttyPackage.swift`内の約30個の`Notification.Name`プロパティ名（文字列値はリネーム済みだがSwift側のプロパティ名は`ghostty*`のまま）。いずれも外部エコシステム互換性またはより大規模な別リファクタが必要なため
+  - 要注意: `QuickTerminalWindow.swift`のアクセシビリティ識別子をリネームしたため、AeroSpace等サードパーティAppからこの識別子を参照する既存設定がある場合は追従が必要
 
 ## 方針（更新後）
 
