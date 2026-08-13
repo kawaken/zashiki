@@ -13,7 +13,8 @@ name: Test
 # pull_requestイベント経由でのみ実行し、同じコミットに対して
 # push/pull_requestの両方が発火して二重実行になるのを避ける。
 #
-# plan/配下(設計ドキュメントのみ)・.github/workflows配下(CI設定自体)・
+# plan/配下(設計ドキュメントのみ)・docs/history/配下(完了済みplanの
+# アーカイブ)・.github/workflows配下(CI設定自体)・
 # .claude/配下(Claude Codeの設定)・README.md/AGENTS.md/LICENSE・
 # scripts/配下・typos.toml・Makefileは
 # ビルド・テスト対象のコードに影響しないため、paths-ignoreでCIをスキップ
@@ -31,6 +32,7 @@ on:
       - main
     paths-ignore:
       - "plan/**"
+      - "docs/history/**"
       - ".github/workflows/**"
       - ".claude/**"
       - "README.md"
@@ -42,6 +44,7 @@ on:
   pull_request:
     paths-ignore:
       - "plan/**"
+      - "docs/history/**"
       - ".github/workflows/**"
       - ".claude/**"
       - "README.md"
@@ -98,7 +101,14 @@ jobs:
           version: ${{ steps.zig.outputs.version }}
 
       - name: zig build test
-        run: zig build test -Demit-macos-app=false
+        # -Demit-macos-app=falseだけではxcodebuild testが暗黙のtest_step依存
+        # (build.zigのemit_xcframeworkデフォルト値経由)から外れないため、
+        # -Demit-xcframework=falseも明示する。これによりmacOSアプリの
+        # xcodebuild test(実測で全体の1分半ほど、かつローカル環境でも
+        # 「複数destinationにマッチ」でfailed command扱いになっており
+        # 実効性が疑わしい)をスキップし、Zigコアのテストのみ実行する。
+        # macOSアプリを含むフルテストはリリース時(release.yml)に回す想定。
+        run: zig build test -Demit-macos-app=false -Demit-xcframework=false
 
   build:
     name: zig build (macOS app)
