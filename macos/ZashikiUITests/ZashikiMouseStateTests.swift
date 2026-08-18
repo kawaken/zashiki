@@ -1,21 +1,21 @@
 //
-//  GhosttyMouseStateTests.swift
-//  Ghostty
+//  ZashikiMouseStateTests.swift
+//  Zashiki
 //
 //  Created by Lukas on 19.03.2026.
 //
 
 import XCTest
 
-final class GhosttyMouseStateTests: GhosttyCustomConfigCase {
-    // https://github.com/ghostty-org/ghostty/pull/11276
+final class ZashikiMouseStateTests: ZashikiCustomConfigCase {
+    // https://github.com/zashiki-org/zashiki/pull/11276
     @MainActor func testSelectionFocusChange() async throws {
         let app = XCUIApplication()
         app.activate()
         // Write dummy text to a temp file, cat it into the terminal, then clean up
         let lines = (1...200).map { "Line \($0): The quick brown fox jumps over the lazy dog. Lorem ipsum dolor sit amet, consectetur adipiscing elit." }
         let text = lines.joined(separator: "\n") + "\n"
-        let tmpFile = NSTemporaryDirectory() + "ghostty_test_dummy.txt"
+        let tmpFile = NSTemporaryDirectory() + "zashiki_test_dummy.txt"
         try text.write(toFile: tmpFile, atomically: true, encoding: .utf8)
         defer { try? FileManager.default.removeItem(atPath: tmpFile) }
 
@@ -49,7 +49,7 @@ final class GhosttyMouseStateTests: GhosttyCustomConfigCase {
     }
 
     @MainActor func testSearchFocusState() async throws {
-        let app = try ghosttyApplication()
+        let app = try zashikiApplication()
         app.activate()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 5), "New window should appear")
         app.typeKey("f", modifierFlags: .command)

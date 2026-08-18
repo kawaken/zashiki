@@ -1,13 +1,13 @@
 //
-//  GhosttyWindowPositionUITests.swift
-//  GhosttyUITests
+//  ZashikiWindowPositionUITests.swift
+//  ZashikiUITests
 //
 //  Created by Claude on 2026-03-11.
 //
 
 import XCTest
 
-final class GhosttyWindowPositionUITests: GhosttyCustomConfigCase {
+final class ZashikiWindowPositionUITests: ZashikiCustomConfigCase {
     // MARK: - Cascading
 
     @MainActor func testWindowCascading() async throws {
@@ -15,11 +15,11 @@ final class GhosttyWindowPositionUITests: GhosttyCustomConfigCase {
             """
             window-width = 30
             window-height = 10
-            title = "GhosttyWindowPositionUITests"
+            title = "ZashikiWindowPositionUITests"
             """
         )
 
-        let app = try ghosttyApplication()
+        let app = try zashikiApplication()
         // Suppress Restoration
         app.launchArguments += ["-NSQuitAlwaysKeepsWindows", "NO"]
         // Clean run
@@ -76,12 +76,12 @@ final class GhosttyWindowPositionUITests: GhosttyCustomConfigCase {
             """
             window-width = 40
             window-height = 20
-            title = "GhosttyWindowPositionUITests"
+            title = "ZashikiWindowPositionUITests"
             macos-titlebar-style = hidden
             """
         )
 
-        let app = try ghosttyApplication()
+        let app = try zashikiApplication()
         // Suppress Restoration
         app.launchArguments += ["-NSQuitAlwaysKeepsWindows", "NO"]
         // Clean run
@@ -95,7 +95,7 @@ final class GhosttyWindowPositionUITests: GhosttyCustomConfigCase {
         // remove fixed size
         try updateConfig(
             """
-            title = "GhosttyWindowPositionUITests"
+            title = "ZashikiWindowPositionUITests"
             macos-titlebar-style = hidden
             """
         )
@@ -131,12 +131,12 @@ final class GhosttyWindowPositionUITests: GhosttyCustomConfigCase {
             """
             window-width = 40
             window-height = 20
-            title = "GhosttyWindowPositionUITests"
+            title = "ZashikiWindowPositionUITests"
             macos-titlebar-style = hidden
             """
         )
 
-        let app = try ghosttyApplication()
+        let app = try zashikiApplication()
         // Suppress Restoration
         app.launchArguments += ["-NSQuitAlwaysKeepsWindows", "NO"]
         // Clean run
@@ -189,11 +189,11 @@ final class GhosttyWindowPositionUITests: GhosttyCustomConfigCase {
         try updateConfig(
             """
             maximize = true
-            title = "GhosttyWindowPositionUITests"
+            title = "ZashikiWindowPositionUITests"
             """
         )
 
-        let app = try ghosttyApplication()
+        let app = try zashikiApplication()
         app.launch()
 
         let window = app.windows.firstMatch
@@ -209,7 +209,7 @@ final class GhosttyWindowPositionUITests: GhosttyCustomConfigCase {
             window-position-y = 50
             window-width = 30
             window-height = 30
-            title = "GhosttyWindowPositionUITests"
+            title = "ZashikiWindowPositionUITests"
             """
         )
         app.typeKey(",", modifierFlags: [.command, .shift])
@@ -237,11 +237,11 @@ final class GhosttyWindowPositionUITests: GhosttyCustomConfigCase {
         try updateConfig(
             """
             maximize = true
-            title = "GhosttyWindowPositionUITests"
+            title = "ZashikiWindowPositionUITests"
             """
         )
 
-        let app = try ghosttyApplication()
+        let app = try zashikiApplication()
         app.launch()
 
         let window = app.windows.firstMatch
@@ -255,7 +255,7 @@ final class GhosttyWindowPositionUITests: GhosttyCustomConfigCase {
             """
             window-width = 30
             window-height = 30
-            title = "GhosttyWindowPositionUITests"
+            title = "ZashikiWindowPositionUITests"
             """
         )
         app.typeKey(",", modifierFlags: [.command, .shift])
@@ -287,11 +287,11 @@ final class GhosttyWindowPositionUITests: GhosttyCustomConfigCase {
         try updateConfig(
             """
             macos-titlebar-style = \(titlebarStyle)
-            title = "GhosttyWindowPositionUITests"
+            title = "ZashikiWindowPositionUITests"
             """
         )
 
-        let app = try ghosttyApplication()
+        let app = try zashikiApplication()
         // Suppress Restoration
         app.launchArguments += ["-NSQuitAlwaysKeepsWindows", "NO"]
         // Clean run

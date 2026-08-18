@@ -1,15 +1,15 @@
 //
-//  GhosttyCommandPaletteTests.swift
-//  Ghostty
+//  ZashikiCommandPaletteTests.swift
+//  Zashiki
 //
 //  Created by Lukas on 19.03.2026.
 //
 
 import XCTest
 
-final class GhosttyCommandPaletteTests: GhosttyCustomConfigCase {
+final class ZashikiCommandPaletteTests: ZashikiCustomConfigCase {
     @MainActor func testDismissingCommandPalette() async throws {
-        let app = try ghosttyApplication()
+        let app = try zashikiApplication()
         app.activate()
 
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 5), "New window should appear")
@@ -63,7 +63,7 @@ final class GhosttyCommandPaletteTests: GhosttyCustomConfigCase {
     }
 
     @MainActor func testSelectCommandWithMouse() async throws {
-        let app = try ghosttyApplication()
+        let app = try zashikiApplication()
         app.activate()
 
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 5), "New window should appear")

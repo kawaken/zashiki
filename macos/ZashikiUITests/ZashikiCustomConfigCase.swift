@@ -1,13 +1,13 @@
 //
-//  GhosttyCustomConfigCase.swift
-//  Ghostty
+//  ZashikiCustomConfigCase.swift
+//  Zashiki
 //
 //  Created by luca on 16.10.2025.
 //
 
 import XCTest
 
-class GhosttyCustomConfigCase: XCTestCase {
+class ZashikiCustomConfigCase: XCTestCase {
     /// We only want run these UI tests
     /// when testing manually with Xcode IDE
     ///
@@ -23,10 +23,10 @@ class GhosttyCustomConfigCase: XCTestCase {
         }
     }
 
-    static let defaultsSuiteName: String = "GHOSTTY_UI_TESTS"
+    static let defaultsSuiteName: String = "ZASHIKI_UI_TESTS"
 
     private let configFile: URL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        .appendingPathExtension("ghostty")
+        .appendingPathExtension("zashiki")
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -40,7 +40,7 @@ class GhosttyCustomConfigCase: XCTestCase {
         try newConfig.write(to: configFile, atomically: true, encoding: .utf8)
     }
 
-    func ghosttyApplication(defaultsSuite: String = GhosttyCustomConfigCase.defaultsSuiteName) throws -> XCUIApplication {
+    func zashikiApplication(defaultsSuite: String = ZashikiCustomConfigCase.defaultsSuiteName) throws -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments.append(contentsOf: ["-ApplePersistenceIgnoreState", "YES"])
         app.launchEnvironment["GHOSTTY_CONFIG_PATH"] = configFile.path

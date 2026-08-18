@@ -1,27 +1,27 @@
 //
-//  GhosttyTitlebarTabsUITests.swift
-//  Ghostty
+//  ZashikiTitlebarTabsUITests.swift
+//  Zashiki
 //
 //  Created by luca on 16.10.2025.
 //
 
 import XCTest
 
-final class GhosttyTitlebarTabsUITests: GhosttyCustomConfigCase {
+final class ZashikiTitlebarTabsUITests: ZashikiCustomConfigCase {
     override func setUp() async throws {
         try await super.setUp()
 
         try updateConfig(
             """
             macos-titlebar-style = tabs
-            title = "GhosttyTitlebarTabsUITests"
+            title = "ZashikiTitlebarTabsUITests"
             """
         )
     }
 
     @MainActor
     func testCustomTitlebar() throws {
-        let app = try ghosttyApplication()
+        let app = try zashikiApplication()
         app.launch()
         // create a split
         app.groups["Terminal pane"].typeKey("d", modifierFlags: .command)
@@ -35,7 +35,7 @@ final class GhosttyTitlebarTabsUITests: GhosttyCustomConfigCase {
 
     @MainActor
     func testTabsGeometryInNormalWindow() throws {
-        let app = try ghosttyApplication()
+        let app = try zashikiApplication()
         app.launch()
         app.groups["Terminal pane"].typeKey("t", modifierFlags: .command)
         XCTAssertEqual(app.tabs.count, 2, "There should be 2 tabs")
@@ -44,7 +44,7 @@ final class GhosttyTitlebarTabsUITests: GhosttyCustomConfigCase {
 
     @MainActor
     func testTabsGeometryInFullscreen() throws {
-        let app = try ghosttyApplication()
+        let app = try zashikiApplication()
         app.launch()
         app.typeKey("f", modifierFlags: [.command, .control])
         // using app to type ⌘+t might not be able to create tabs
@@ -55,7 +55,7 @@ final class GhosttyTitlebarTabsUITests: GhosttyCustomConfigCase {
 
     @MainActor
     func testTabsGeometryAfterMovingTabs() throws {
-        let app = try ghosttyApplication()
+        let app = try zashikiApplication()
         app.launch()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 1), "Main window should exist")
         // create another 2 tabs
@@ -93,7 +93,7 @@ final class GhosttyTitlebarTabsUITests: GhosttyCustomConfigCase {
 
     @MainActor
     func testTabsGeometryAfterMergingAllWindows() throws {
-        let app = try ghosttyApplication()
+        let app = try zashikiApplication()
         app.launch()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 1), "Main window should exist")
 

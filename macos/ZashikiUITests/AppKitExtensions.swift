@@ -1,6 +1,6 @@
 //
 //  AppKitExtensions.swift
-//  Ghostty
+//  Zashiki
 //
 //  Created by luca on 27.10.2025.
 //
