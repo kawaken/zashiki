@@ -43,6 +43,18 @@
   したのみ）
 - `/Applications`への実配備・実運用確認
 
+## マージ後の変更（2026-08-13）
+
+CIレビューで「`scripts/zashiki-md-preview`が`AppDelegate.swift`から参照されて
+いるのに`paths-ignore`の`scripts/**`でCIスキップ対象になっている」との指摘を
+受けたが、調査の結果`AppDelegate.swift`側はdocコメントでファイル名に言及して
+いるだけでビルドには一切組み込まれていなかった（`xcodeproj`にも`zig build`にも
+非依存）。Markdownプレビュー機能自体はアプリ本体の`zashiki://`URLスキームで
+完結しており、`scripts/zashiki-md-preview`はパス絶対化+URLエンコードのみを
+行う薄いラッパーに過ぎず必要性が薄いと判断し削除。CLIから開く場合は直接
+`open "zashiki://markdown-preview/open?path=<percent-encoded absolute path>"`
+を使う。これに伴い`paths-ignore`の`scripts/**`エントリも削除。
+
 ## 関連コミット
 
 - `8d65532b3` Step1(Textual導入)

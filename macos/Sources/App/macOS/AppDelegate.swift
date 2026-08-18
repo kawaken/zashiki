@@ -521,10 +521,10 @@ class AppDelegate: NSObject,
     }
 
     /// Handles `zashiki://` URLs delivered via `CFBundleURLTypes` (see
-    /// `Ghostty-Info.plist`), e.g. from `scripts/zashiki-md-preview` or a
-    /// plain `open "zashiki://..."`. This is this fork's own CLI entry
-    /// point, not a public API, so unrecognized input is just logged and
-    /// ignored rather than surfaced to the user.
+    /// `Ghostty-Info.plist`), e.g. from a plain `open "zashiki://..."`.
+    /// This is this fork's own CLI entry point, not a public API, so
+    /// unrecognized input is just logged and ignored rather than surfaced
+    /// to the user.
     ///
     /// Recognized: `zashiki://markdown-preview/open?path=<percent-encoded
     /// absolute path>`.
