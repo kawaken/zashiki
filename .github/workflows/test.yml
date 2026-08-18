@@ -86,7 +86,7 @@ jobs:
           path: |
             ~/Library/Developer/Xcode/DerivedData
             ~/Library/Caches/org.swift.swiftpm
-          key: xcode-derived-data-debug-${{ runner.arch }}-${{ hashFiles('macos/**/*.swift', 'macos/Ghostty.xcodeproj/project.pbxproj') }}
+          key: xcode-derived-data-debug-${{ runner.arch }}-${{ hashFiles('macos/**/*.swift', 'macos/Zashiki.xcodeproj/project.pbxproj') }}
           restore-keys: |
             xcode-derived-data-debug-${{ runner.arch }}-
 
@@ -140,7 +140,7 @@ jobs:
           path: |
             ~/Library/Developer/Xcode/DerivedData
             ~/Library/Caches/org.swift.swiftpm
-          key: xcode-derived-data-release-${{ runner.arch }}-${{ hashFiles('macos/**/*.swift', 'macos/Ghostty.xcodeproj/project.pbxproj') }}
+          key: xcode-derived-data-release-${{ runner.arch }}-${{ hashFiles('macos/**/*.swift', 'macos/Zashiki.xcodeproj/project.pbxproj') }}
           restore-keys: |
             xcode-derived-data-release-${{ runner.arch }}-
 

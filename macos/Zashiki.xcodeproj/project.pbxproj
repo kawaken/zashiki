@@ -326,7 +326,7 @@
 					};
 				};
 			};
-			buildConfigurationList = A5B3052C299BEAAA0047F10C /* Build configuration list for PBXProject "Ghostty" */;
+			buildConfigurationList = A5B3052C299BEAAA0047F10C /* Build configuration list for PBXProject "Zashiki" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -1062,7 +1062,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = ReleaseLocal;
 		};
-		A5B3052C299BEAAA0047F10C /* Build configuration list for PBXProject "Ghostty" */ = {
+		A5B3052C299BEAAA0047F10C /* Build configuration list for PBXProject "Zashiki" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A5B3053E299BEAAB0047F10C /* Debug */,

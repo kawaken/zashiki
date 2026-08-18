@@ -17,7 +17,7 @@
                BlueprintIdentifier = "A5B30530299BEAAA0047F10C"
                BuildableName = "Zashiki.app"
                BlueprintName = "Zashiki"
-               ReferencedContainer = "container:Ghostty.xcodeproj">
+               ReferencedContainer = "container:Zashiki.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -42,7 +42,7 @@
                BlueprintIdentifier = "A54F45F22E1F047A0046BD5C"
                BuildableName = "GhosttyTests.xctest"
                BlueprintName = "GhosttyTests"
-               ReferencedContainer = "container:Ghostty.xcodeproj">
+               ReferencedContainer = "container:Zashiki.xcodeproj">
             </BuildableReference>
          </TestableReference>
          <TestableReference
@@ -53,7 +53,7 @@
                BlueprintIdentifier = "810ACC9E2E9D3301004F8F92"
                BuildableName = "GhosttyUITests.xctest"
                BlueprintName = "GhosttyUITests"
-               ReferencedContainer = "container:Ghostty.xcodeproj">
+               ReferencedContainer = "container:Zashiki.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -75,7 +75,7 @@
             BlueprintIdentifier = "A5B30530299BEAAA0047F10C"
             BuildableName = "Zashiki.app"
             BlueprintName = "Zashiki"
-            ReferencedContainer = "container:Ghostty.xcodeproj">
+            ReferencedContainer = "container:Zashiki.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>
@@ -105,7 +105,7 @@
             BlueprintIdentifier = "A5B30530299BEAAA0047F10C"
             BuildableName = "Zashiki.app"
             BlueprintName = "Zashiki"
-            ReferencedContainer = "container:Ghostty.xcodeproj">
+            ReferencedContainer = "container:Zashiki.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
