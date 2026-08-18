@@ -521,7 +521,7 @@ class AppDelegate: NSObject,
     }
 
     /// Handles `zashiki://` URLs delivered via `CFBundleURLTypes` (see
-    /// `Ghostty-Info.plist`), e.g. from `scripts/zashiki-md-preview` or a
+    /// `Zashiki-Info.plist`), e.g. from `scripts/zashiki-md-preview` or a
     /// plain `open "zashiki://..."`. This is this fork's own CLI entry
     /// point, not a public API, so unrecognized input is just logged and
     /// ignored rather than surfaced to the user.
@@ -829,7 +829,7 @@ class AppDelegate: NSObject,
                 autoUpdate == .download
             /*
              To test `auto-update` easily, uncomment the line below and
-             delete `SUEnableAutomaticChecks` in Ghostty-Info.plist.
+             delete `SUEnableAutomaticChecks` in Zashiki-Info.plist.
 
              Note: When `auto-update = download`, you may need to
              `Clean Build Folder` if a background install has already begun.

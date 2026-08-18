@@ -29,7 +29,7 @@
       shouldUseLaunchSchemeArgsEnv = "YES">
       <TestPlans>
          <TestPlanReference
-            reference = "container:Ghostty.xctestplan"
+            reference = "container:Zashiki.xctestplan"
             default = "YES">
          </TestPlanReference>
       </TestPlans>
