@@ -32,11 +32,11 @@ struct InputTextIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult {
         guard await requestIntentPermission() else {
-            throw GhosttyIntentError.permissionDenied
+            throw ZashikiIntentError.permissionDenied
         }
 
         guard let surface = terminal.surfaceModel else {
-            throw GhosttyIntentError.surfaceNotFound
+            throw ZashikiIntentError.surfaceNotFound
         }
 
         surface.sendText(text)
@@ -84,11 +84,11 @@ struct KeyEventIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult {
         guard await requestIntentPermission() else {
-            throw GhosttyIntentError.permissionDenied
+            throw ZashikiIntentError.permissionDenied
         }
 
         guard let surface = terminal.surfaceModel else {
-            throw GhosttyIntentError.surfaceNotFound
+            throw ZashikiIntentError.surfaceNotFound
         }
 
         // Convert KeyEventMods array to Ghostty.Input.Mods
@@ -148,11 +148,11 @@ struct MouseButtonIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult {
         guard await requestIntentPermission() else {
-            throw GhosttyIntentError.permissionDenied
+            throw ZashikiIntentError.permissionDenied
         }
 
         guard let surface = terminal.surfaceModel else {
-            throw GhosttyIntentError.surfaceNotFound
+            throw ZashikiIntentError.surfaceNotFound
         }
 
         // Convert KeyEventMods array to Ghostty.Input.Mods
@@ -211,11 +211,11 @@ struct MousePosIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult {
         guard await requestIntentPermission() else {
-            throw GhosttyIntentError.permissionDenied
+            throw ZashikiIntentError.permissionDenied
         }
 
         guard let surface = terminal.surfaceModel else {
-            throw GhosttyIntentError.surfaceNotFound
+            throw ZashikiIntentError.surfaceNotFound
         }
 
         // Convert KeyEventMods array to Ghostty.Input.Mods
@@ -281,11 +281,11 @@ struct MouseScrollIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult {
         guard await requestIntentPermission() else {
-            throw GhosttyIntentError.permissionDenied
+            throw ZashikiIntentError.permissionDenied
         }
 
         guard let surface = terminal.surfaceModel else {
-            throw GhosttyIntentError.surfaceNotFound
+            throw ZashikiIntentError.surfaceNotFound
         }
 
         let scrollEvent = Ghostty.Input.MouseScrollEvent(

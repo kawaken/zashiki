@@ -34,7 +34,7 @@ struct CyclingIconView: View {
     private func iconView(for icon: Ghostty.MacOSIcon?) -> some View {
         let iconImage: Image = switch icon?.assetName {
         case let assetName?: Image(assetName)
-        case nil: ghosttyIconImage()
+        case nil: zashikiIconImage()
         }
 
         iconImage

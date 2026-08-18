@@ -1,6 +1,6 @@
 import Cocoa
 
-struct ColorizedGhosttyIcon {
+struct ColorizedZashikiIcon {
     /// The colors that make up the gradient of the screen.
     let screenColors: [NSColor]
 
@@ -10,7 +10,7 @@ struct ColorizedGhosttyIcon {
     /// The frame type to use
     let frame: Ghostty.MacOSIconFrame
 
-    /// Make a custom colorized ghostty icon.
+    /// Make a custom colorized Zashiki icon.
     func makeImage(in bundle: Bundle) -> NSImage? {
         // All of our layers (not in order)
         guard let screen = bundle.image(forResource: "CustomIconScreen") else { return nil }
@@ -56,7 +56,7 @@ struct ColorizedGhosttyIcon {
 
 // MARK: Codable
 
-extension ColorizedGhosttyIcon: Codable {
+extension ColorizedZashikiIcon: Codable {
     private enum CodingKeys: String, CodingKey {
         case version
         case screenColors
@@ -75,7 +75,7 @@ extension ColorizedGhosttyIcon: Codable {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: decoder.codingPath,
-                    debugDescription: "Unsupported ColorizedGhosttyIcon version: \(version)"
+                    debugDescription: "Unsupported ColorizedZashikiIcon version: \(version)"
                 )
             )
         }
@@ -106,7 +106,7 @@ extension ColorizedGhosttyIcon: Codable {
 
 // MARK: Equatable
 
-extension ColorizedGhosttyIcon: Equatable {
+extension ColorizedZashikiIcon: Equatable {
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.frame == rhs.frame &&
             lhs.screenColors.compactMap(\.hexString) == rhs.screenColors.compactMap(\.hexString) &&

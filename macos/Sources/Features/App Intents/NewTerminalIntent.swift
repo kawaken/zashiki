@@ -56,10 +56,10 @@ struct NewTerminalIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<TerminalEntity?> {
         guard await requestIntentPermission() else {
-            throw GhosttyIntentError.permissionDenied
+            throw ZashikiIntentError.permissionDenied
         }
         guard let appDelegate = NSApp.delegate as? AppDelegate else {
-            throw GhosttyIntentError.appUnavailable
+            throw ZashikiIntentError.appUnavailable
         }
         let ghostty = appDelegate.ghostty
 
@@ -90,7 +90,7 @@ struct NewTerminalIntent: AppIntent {
         let parent: Ghostty.SurfaceView?
         if let parentParam = self.parent {
             guard let view = parentParam.surfaceView else {
-                throw GhosttyIntentError.surfaceNotFound
+                throw ZashikiIntentError.surfaceNotFound
             }
 
             parent = view
@@ -127,7 +127,7 @@ struct NewTerminalIntent: AppIntent {
         case .splitLeft, .splitRight, .splitUp, .splitDown:
             guard let parent,
                   let controller = parent.window?.windowController as? BaseTerminalController else {
-                throw GhosttyIntentError.surfaceNotFound
+                throw ZashikiIntentError.surfaceNotFound
             }
 
             if let view = controller.newSplit(

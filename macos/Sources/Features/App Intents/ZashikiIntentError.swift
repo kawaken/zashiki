@@ -1,4 +1,4 @@
-enum GhosttyIntentError: Error, CustomLocalizedStringResourceConvertible {
+enum ZashikiIntentError: Error, CustomLocalizedStringResourceConvertible {
     case appUnavailable
     case surfaceNotFound
     case permissionDenied

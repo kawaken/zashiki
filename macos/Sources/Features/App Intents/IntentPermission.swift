@@ -19,7 +19,7 @@ import AppKit
 /// @MainActor
 /// func perform() async throws -> some IntentResult {
 ///     guard await requestIntentPermission() else {
-///         throw GhosttyIntentError.permissionDenied
+///         throw ZashikiIntentError.permissionDenied
 ///     }
 ///     // ... continue with intent implementation
 /// }
