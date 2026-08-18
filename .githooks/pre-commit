@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+#
+# Auto-formats staged files before commit (zig fmt / swiftlint --fix /
+# prettier -w) and re-stages anything that changed, so formatting issues
+# don't slip through to CI. See AGENTS.md for one-time setup
+# (`git config core.hooksPath .githooks`).
+#
+# Written for bash 3.2 (macOS system default `/bin/bash`) — no
+# mapfile/readarray, and newline- rather than NUL-delimited (bash
+# variables can't hold NUL bytes, so `git diff -z` output would get
+# silently concatenated). This assumes staged filenames don't contain
+# newlines, which is fine for this repo.
+#
+# Formatters are skipped (with a warning) if not installed, rather than
+# blocking the commit. This only auto-fixes; it doesn't fail the commit
+# on remaining lint warnings, since CI is the source of truth for that.
+
+set -uo pipefail
+
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[[ -z "$staged" ]] && exit 0
+
+zig_files=$(printf '%s\n' "$staged" | grep -E '\.zig$' || true)
+swift_files=$(printf '%s\n' "$staged" | grep -E '\.swift$' || true)
+
+if [[ -n "$zig_files" ]]; then
+  if command -v zig >/dev/null 2>&1; then
+    printf '%s\n' "$zig_files" | xargs zig fmt
+  else
+    echo "pre-commit: zig not found, skipping zig fmt" >&2
+  fi
+fi
+
+if [[ -n "$swift_files" ]]; then
+  if command -v swiftlint >/dev/null 2>&1; then
+    printf '%s\n' "$swift_files" | xargs swiftlint lint --strict --fix --quiet || true
+  else
+    echo "pre-commit: swiftlint not found, skipping" >&2
+  fi
+fi
+
+if command -v npx >/dev/null 2>&1; then
+  # .prettierignore (macos/, plan/, etc.) is respected automatically.
+  printf '%s\n' "$staged" | xargs npx --yes prettier --write --ignore-unknown >/dev/null 2>&1 || true
+else
+  echo "pre-commit: npx not found, skipping prettier" >&2
+fi
+
+# Re-stage anything the formatters modified.
+printf '%s\n' "$staged" | xargs git add --
+
+exit 0
