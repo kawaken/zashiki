@@ -1698,6 +1698,14 @@ pub const CAPI = struct {
         return surface.core_surface.getProcessInfo(.foreground_pid) orelse 0;
     }
 
+    /// Returns the unique ID for this surface (see Surface.id in the core
+    /// surface). Exposed so embedders can correlate a surface with the
+    /// ZASHIKI_SURFACE_ID environment variable value observed by a child
+    /// process running in that surface.
+    export fn ghostty_surface_id(surface: *Surface) u64 {
+        return surface.core_surface.id;
+    }
+
     /// Returns the PTY name for the surface. The returned string must be
     /// freed by the caller via ghostty_string_free.
     export fn ghostty_surface_tty_name(surface: *Surface) String {

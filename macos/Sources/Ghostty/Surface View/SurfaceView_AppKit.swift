@@ -148,6 +148,14 @@ extension Ghostty {
             return ghostty_surface_process_exited(surface)
         }
 
+        // Returns this surface's unique Ghostty Surface ID (same value
+        // exposed to child processes as ZASHIKI_SURFACE_ID), or nil if the
+        // surface has been closed.
+        var ghosttySurfaceID: UInt64? {
+            guard let surface = self.surface else { return nil }
+            return ghostty_surface_id(surface)
+        }
+
         // Returns the inspector instance for this surface, or nil if the
         // surface has been closed or no inspector is active.
         var inspector: Ghostty.Inspector? {

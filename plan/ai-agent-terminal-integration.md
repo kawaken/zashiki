@@ -94,18 +94,52 @@ Claude CodeのBashツールから任意のOSCを送る、という設計は前�
 1. **`zashiki://` URLスキーム（実装済み）** — `open`コマンドの効果は
    Launch Services経由の副作用であり、「stdoutのテキストがどう表示されるか」
    というサニタイズの対象と無関係。Bashツール経由でも問題なく機能する
-2. **環境変数（`GHOSTTY_SURFACE_ID`等）** — サニタイズの対象は「出力」であって
+2. **環境変数（`ZASHIKI_SURFACE_ID`等）** — サニタイズの対象は「出力」であって
    「環境変数」ではないため、Bashツールのサブプロセスにも普通に継承される
 
-## 今後の方向性（未着手）
+## `zashiki://`クエリパラメータの汎用規約（実装済み）
 
-### 一方向（AIエージェント→Zashikiへのアクション要求）
+URLの構造は`zashiki://<feature>/<verb>?<args>`。「REST」ではなく
+**RPC-over-URL**として設計している（カスタムURLスキームにはHTTPメソッドの
+軸が存在しないため、動詞を`path`セグメントに埋め込む形。Slack Web API の
+`chat.postMessage`的な命名と同じ発想）。
 
-`zashiki://` URLスキームに`surface=<GHOSTTY_SURFACE_ID>`のようなパラメータを
-足し、`AppDelegate`側で正確な発火元ウィンドウを特定する。ただし今のmacOS側は
-Zig側の`Surface.id` (u64、DBus IPC用に元々作られた識別子) を一切認識しておらず、
-`Ghostty.SurfaceView.id`という独立したUUIDを使っている。libghostty C API経由で
-`Surface.id`をSwift側に配線する必要がある（規模は中程度）。
+- `<feature>`: 機能の名前空間（例: `markdown-preview`）
+- `<verb>`: その名前空間内での動作。小さな統制語彙を使う（`open`/`close`/
+  `toggle`/`show`/`ask`など、新しい動詞が要る時は既存語彙から選べないか
+  先に検討する）
+- `<args>`: 各verb固有の引数 + 全アクション共通の予約引数
+  - **予約引数（現時点で`surface`のみ）**: 発火元ウィンドウのSurface ID。
+    値は`0x`+16桁hex（環境変数`ZASHIKI_SURFACE_ID`と同一フォーマット、
+    AIエージェント側は`$ZASHIKI_SURFACE_ID`をそのまま埋め込むだけでよい）。
+    省略可、省略時・解決失敗時は直近アクティブウィンドウにフォールバック
+- 未知の`host`/`path`/`query`は黙って無視してログのみ（前方互換性のため、
+  既存実装のまま）
+
+### 一方向: Surface正確特定（実装済み）
+
+`zashiki://`の全アクション共通の規約として`surface=`パラメータを採用した。
+
+- Zig: `Surface.id` (u64) を`ghostty_surface_id()` C APIとして公開
+  (`src/apprt/embedded.zig`, `include/ghostty.h`)。元々`GHOSTTY_SURFACE_ID`
+  という名前でGTK版DBus IPC専用に設計されていた環境変数は、他でリネーム
+  済みの命名規則に合わせて`ZASHIKI_SURFACE_ID`にリネームした
+  (`src/Surface.zig`)。旧名は誰にも消費されていなかった（macOS側は今回まで
+  未消費、GTK側は削除済み）ため後方互換のエイリアスは設けていない
+- Swift: `Ghostty.SurfaceView.ghosttySurfaceID: UInt64?`
+  (`SurfaceView_AppKit.swift`) + 逆引き関数
+  `AppDelegate.terminalController(forGhosttySurfaceID:)`
+  (`AppDelegate+Ghostty.swift`。既存の`ghosttySurface(id: UUID)`とは別軸の
+  識別子なので別関数として追加、両方残す)
+- パース責務: `AppDelegate.handleZashikiURL`（ホスト振り分けの前段、全
+  アクション共通の入口）で一度だけ`surface`を解決し、
+  `BaseTerminalController?`を各アクションハンドラに渡す。「見つからない
+  場合にどうフォールバックするか」はアクション固有の判断としてハンドラ側に
+  委ねた（markdown-previewは`sourceController ?? preferredParent ??
+  newWindow`の順）
+- 後方互換性: `surface`なし、または解決失敗時は常に既存の
+  `preferredParent`ベースの推測にフォールバックするため、既存の呼び出し
+  （`surface`パラメータ無し）は無変更で動作し続ける
 
 ### 双方向（Zashiki→AIエージェントへの応答、例: Yes/No確認）
 
@@ -117,12 +151,11 @@ Bashツールが起動するサブプロセスがそもそも実PTYに透過的�
 
 有力な代替案: ターミナルI/Oに依存しない別のローカルIPC（Unix domain socket・
 loopback HTTP等）を、CLIヘルパープロセスとZashiki本体（既に起動中のGUIプロセス）
-の間に用意する。サーフェス特定には環境変数`GHOSTTY_SURFACE_ID`をリクエスト
+の間に用意する。サーフェス特定には環境変数`ZASHIKI_SURFACE_ID`をリクエスト
 ペイロードに含める。
 
 ## 未解決の課題
 
-- Surface.id (u64) をlibghostty C API経由でSwift側に公開する具体的な設計
 - 双方向IPC（Unix domain socket等）の実装規模・セキュリティ境界（ローカル
   プロセス間とはいえ、他ユーザー・他アプリからの不正な接続をどう防ぐか）
 - Claude Codeのhookシステム（`PreToolUse`/`PostToolUse`/`Notification`等）に
