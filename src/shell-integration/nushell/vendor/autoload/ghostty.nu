@@ -13,7 +13,7 @@ export module ghostty {
       return
     }
 
-    let ghostty = ($env.GHOSTTY_BIN_DIR? | default "") | path join "ghostty"
+    let zashiki = ($env.GHOSTTY_BIN_DIR? | default "") | path join "zashiki"
     mut flags = []
     if not (has_feature "ssh-env") {
       $flags = ($flags ++ ["--forward-env=false"])
@@ -21,7 +21,7 @@ export module ghostty {
     if not (has_feature "ssh-terminfo") {
       $flags = ($flags ++ ["--terminfo=false"])
     }
-    ^$ghostty "+ssh" ...$flags "--" ...$args
+    ^$zashiki "+ssh" ...$flags "--" ...$args
   }
 
   # Wrap `sudo` to preserve Ghostty's TERMINFO environment variable
