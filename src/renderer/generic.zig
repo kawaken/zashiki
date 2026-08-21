@@ -20,7 +20,6 @@ const rowNeverExtendBg = @import("row.zig").neverExtendBg;
 const Overlay = @import("Overlay.zig");
 const imagepkg = @import("image.zig");
 const ImageState = imagepkg.State;
-const shadertoy = @import("shadertoy.zig");
 const assert = @import("../quirks.zig").inlineAssert;
 const Allocator = std.mem.Allocator;
 const ArenaAllocator = std.heap.ArenaAllocator;
@@ -117,10 +116,6 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
         /// True if the window is focused
         focused: bool,
 
-        /// Flag to indicate that our focus state changed for custom
-        /// shaders to update their state.
-        custom_shader_focused_changed: bool = false,
-
         /// The most recent scrollbar state. We use this as a cache to
         /// determine if we need to notify the apprt that there was a
         /// scrollbar change.
@@ -156,19 +151,6 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
 
         /// The current GPU uniform values.
         uniforms: shaderpkg.Uniforms,
-
-        /// Custom shader uniform values.
-        custom_shader_uniforms: shadertoy.Uniforms,
-
-        /// Timestamp we rendered out first frame.
-        ///
-        /// This is used when updating custom shader uniforms.
-        first_frame_time: ?std.Io.Timestamp = null,
-
-        /// Timestamp when we rendered out more recent frame.
-        ///
-        /// This is used when updating custom shader uniforms.
-        last_frame_time: ?std.Io.Timestamp = null,
 
         /// The font structures.
         font_grid: *font.SharedGrid,
@@ -214,9 +196,6 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
         /// If something happened that requires us to reinitialize our shaders,
         /// this is set to true so that we can do that whenever possible.
         reinitialize_shaders: bool = false,
-
-        /// Whether or not we have custom shaders.
-        has_custom_shaders: bool = false,
 
         /// Our shader pipelines.
         shaders: Shaders,
@@ -264,12 +243,12 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             /// the renderer is deinited after that.
             defunct: bool = false,
 
-            pub fn init(api: GraphicsAPI, custom_shaders: bool) !SwapChain {
+            pub fn init(api: GraphicsAPI) !SwapChain {
                 var result: SwapChain = .{ .frames = undefined };
 
                 // Initialize all of our frame state.
                 for (&result.frames) |*frame| {
-                    frame.* = try FrameState.init(api, custom_shaders);
+                    frame.* = try FrameState.init(api);
                 }
 
                 return result;
@@ -336,15 +315,12 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             /// See property of same name on Renderer for explanation.
             bg_image_buffer_modified: usize = 0,
 
-            /// Custom shader state, this is null if we have no custom shaders.
-            custom_shader_state: ?CustomShaderState = null,
-
             const UniformBuffer = Buffer(shaderpkg.Uniforms);
             const CellBgBuffer = Buffer(shaderpkg.CellBg);
             const CellTextBuffer = Buffer(shaderpkg.CellText);
             const BgImageBuffer = Buffer(shaderpkg.BgImage);
 
-            pub fn init(api: GraphicsAPI, custom_shaders: bool) !FrameState {
+            pub fn init(api: GraphicsAPI) !FrameState {
                 // Uniform buffer contains exactly 1 uniform struct. The
                 // uniform data will be undefined so this must be set before
                 // a frame is drawn.
@@ -386,13 +362,6 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
                 });
                 errdefer color.deinit();
 
-                var custom_shader_state =
-                    if (custom_shaders)
-                        try CustomShaderState.init(api)
-                    else
-                        null;
-                errdefer if (custom_shader_state) |*state| state.deinit();
-
                 // Initialize the target. Just as with the other resources,
                 // start it off as small as we can since it'll be resized.
                 const target = try api.initTarget(1, 1);
@@ -405,7 +374,6 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
                     .grayscale = grayscale,
                     .color = color,
                     .target = target,
-                    .custom_shader_state = custom_shader_state,
                 };
             }
 
@@ -417,7 +385,6 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
                 self.grayscale.deinit();
                 self.color.deinit();
                 self.bg_image_buffer.deinit();
-                if (self.custom_shader_state) |*state| state.deinit();
             }
 
             pub fn resize(
@@ -426,117 +393,12 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
                 width: usize,
                 height: usize,
             ) !void {
-                if (self.custom_shader_state) |*state| {
-                    try state.resize(api, width, height);
-                }
                 const target = try api.initTarget(width, height);
                 self.target.deinit();
                 self.target = target;
             }
         };
 
-        /// State relevant to our custom shaders if we have any.
-        const CustomShaderState = struct {
-            /// When we have a custom shader state, we maintain a front
-            /// and back texture which we use as a swap chain to render
-            /// between when multiple custom shaders are defined.
-            front_texture: Texture,
-            back_texture: Texture,
-
-            /// Shadertoy uses a sampler for accessing the various channel
-            /// textures. In Metal, we need to explicitly create these since
-            /// the glslang-to-msl compiler doesn't do it for us (as we
-            /// normally would in hand-written MSL). To keep it clean and
-            /// consistent, we just force all rendering APIs to provide an
-            /// explicit sampler.
-            ///
-            /// Samplers are immutable and describe sampling properties so
-            /// we can share the sampler across front/back textures (although
-            /// we only need it for the source texture at a time, we don't
-            /// need to "swap" it).
-            sampler: Sampler,
-
-            uniforms: UniformBuffer,
-
-            const UniformBuffer = Buffer(shadertoy.Uniforms);
-
-            /// Swap the front and back textures.
-            pub fn swap(self: *CustomShaderState) void {
-                std.mem.swap(Texture, &self.front_texture, &self.back_texture);
-            }
-
-            pub fn init(api: GraphicsAPI) !CustomShaderState {
-                // Create a GPU buffer to hold our uniforms.
-                var uniforms = try UniformBuffer.init(api.uniformBufferOptions(), 1);
-                errdefer uniforms.deinit();
-
-                // Initialize the front and back textures at 1x1 px, this
-                // is slightly wasteful but it's only done once so whatever.
-                const front_texture = try Texture.init(
-                    api.textureOptions(),
-                    1,
-                    1,
-                    null,
-                );
-                errdefer front_texture.deinit();
-                const back_texture = try Texture.init(
-                    api.textureOptions(),
-                    1,
-                    1,
-                    null,
-                );
-                errdefer back_texture.deinit();
-
-                const sampler = try Sampler.init(api.samplerOptions());
-                errdefer sampler.deinit();
-
-                return .{
-                    .front_texture = front_texture,
-                    .back_texture = back_texture,
-                    .sampler = sampler,
-                    .uniforms = uniforms,
-                };
-            }
-
-            pub fn deinit(self: *CustomShaderState) void {
-                self.front_texture.deinit();
-                self.back_texture.deinit();
-                self.sampler.deinit();
-                self.uniforms.deinit();
-            }
-
-            pub fn resize(
-                self: *CustomShaderState,
-                api: GraphicsAPI,
-                width: usize,
-                height: usize,
-            ) !void {
-                const front_texture = try Texture.init(
-                    api.textureOptions(),
-                    @intCast(width),
-                    @intCast(height),
-                    null,
-                );
-                errdefer front_texture.deinit();
-                const back_texture = try Texture.init(
-                    api.textureOptions(),
-                    @intCast(width),
-                    @intCast(height),
-                    null,
-                );
-                errdefer back_texture.deinit();
-
-                self.front_texture.deinit();
-                self.back_texture.deinit();
-
-                self.front_texture = front_texture;
-                self.back_texture = back_texture;
-            }
-        };
-
-        /// The configuration for this renderer that is derived from the main
-        /// configuration. This must be exported so that we don't need to
-        /// pass around Config pointers which makes memory management a pain.
         pub const DerivedConfig = struct {
             arena: ArenaAllocator,
 
@@ -562,7 +424,6 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             faint_opacity: u8,
             min_contrast: f32,
             padding_color: configpkg.WindowPaddingColor,
-            custom_shaders: configpkg.RepeatablePath,
             bg_image: ?configpkg.Path,
             bg_image_opacity: f32,
             bg_image_position: configpkg.BackgroundImagePosition,
@@ -582,9 +443,6 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
                 var arena = ArenaAllocator.init(alloc_gpa);
                 errdefer arena.deinit();
                 const alloc = arena.allocator();
-
-                // Copy our shaders
-                const custom_shaders = try config.@"custom-shader".clone(alloc);
 
                 // Copy our background image
                 const bg_image =
@@ -636,7 +494,6 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
                     .search_selected_background = config.@"search-selected-background",
                     .search_selected_foreground = config.@"search-selected-foreground",
 
-                    .custom_shaders = custom_shaders,
                     .bg_image = bg_image,
                     .bg_image_opacity = config.@"background-image-opacity",
                     .bg_image_position = config.@"background-image-position",
@@ -666,13 +523,8 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             var api = try GraphicsAPI.init(alloc, options);
             errdefer api.deinit();
 
-            const has_custom_shaders = options.config.custom_shaders.value.items.len > 0;
-
             // Prepare our swap chain
-            var swap_chain = try SwapChain.init(
-                api,
-                has_custom_shaders,
-            );
+            var swap_chain = try SwapChain.init(api);
             errdefer swap_chain.deinit();
 
             // Create the font shaper.
@@ -745,35 +597,6 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
                         .use_linear_correction = options.config.blending == .@"linear-corrected",
                     },
                 },
-                .custom_shader_uniforms = .{
-                    .resolution = .{ 0, 0, 1 },
-                    .time = 0,
-                    .time_delta = 0,
-                    .frame_rate = 60, // not currently updated
-                    .frame = 0,
-                    .channel_time = @splat(@splat(0)), // not currently updated
-                    .channel_resolution = @splat(@splat(0)),
-                    .mouse = @splat(0), // not currently updated
-                    .date = @splat(0), // not currently updated
-                    .sample_rate = 0, // N/A, we don't have any audio
-                    .current_cursor = @splat(0),
-                    .previous_cursor = @splat(0),
-                    .current_cursor_color = @splat(0),
-                    .previous_cursor_color = @splat(0),
-                    .current_cursor_style = 0,
-                    .previous_cursor_style = 0,
-                    .cursor_visible = 0,
-                    .cursor_change_time = 0,
-                    .time_focus = 0,
-                    .focus = 1, // assume focused initially
-                    .palette = @splat(@splat(0)),
-                    .background_color = @splat(0),
-                    .foreground_color = @splat(0),
-                    .cursor_color = @splat(0),
-                    .cursor_text = @splat(0),
-                    .selection_background_color = @splat(0),
-                    .selection_foreground_color = @splat(0),
-                },
                 .bg_image_buffer = undefined,
 
                 // Fonts
@@ -838,30 +661,10 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
         }
 
         fn initShaders(self: *Self) !void {
-            var arena = ArenaAllocator.init(self.alloc);
-            defer arena.deinit();
-            const arena_alloc = arena.allocator();
-
-            // Load our custom shaders
-            const custom_shaders: []const [:0]const u8 = shadertoy.loadFromFiles(
-                arena_alloc,
-                self.config.custom_shaders,
-                GraphicsAPI.custom_shader_target,
-            ) catch |err| err: {
-                log.warn("error loading custom shaders err={}", .{err});
-                break :err &.{};
-            };
-
-            const has_custom_shaders = custom_shaders.len > 0;
-
-            var shaders = try self.api.initShaders(
-                self.alloc,
-                custom_shaders,
-            );
+            var shaders = try self.api.initShaders(self.alloc);
             errdefer shaders.deinit(self.alloc);
 
             self.shaders = shaders;
-            self.has_custom_shaders = has_custom_shaders;
         }
 
         /// This is called early right after surface creation.
@@ -957,10 +760,7 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
 
             // We reinitialize our shaders and our swap chain.
             try self.initShaders();
-            self.swap_chain = try SwapChain.init(
-                self.api,
-                self.has_custom_shaders,
-            );
+            self.swap_chain = try SwapChain.init(self.api);
             self.reinitialize_shaders = false;
             self.target_config_modified = 1;
         }
@@ -1015,7 +815,8 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
         /// True if our renderer has animations so that a higher frequency
         /// timer is used.
         pub fn hasAnimations(self: *const Self) bool {
-            return self.has_custom_shaders;
+            _ = self;
+            return false;
         }
 
         /// True if our renderer is using vsync. If true, the renderer or apprt
@@ -1034,9 +835,6 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             assert(self.focused != focus);
 
             self.focused = focus;
-
-            // Flag that we need to update our custom shaders
-            self.custom_shader_focused_changed = true;
 
             // If we're not focused, then we want to stop the display link
             // because it is a waste of resources and we can move to pure
@@ -1422,9 +1220,6 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
                 ) catch |err| {
                     log.warn("error updating overlay images err={}", .{err});
                 };
-
-                // Update custom shader uniforms that depend on terminal state.
-                self.updateCustomShaderUniformsFromState();
             }
 
             // Notify our shaper we're done for the frame. For some shapers,
@@ -1503,23 +1298,6 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             // Our shaders should not be defunct at this point.
             assert(!self.shaders.defunct);
 
-            // If we have custom shaders, make sure we have the
-            // custom shader state in our frame state, otherwise
-            // if we have a state but don't need it we remove it.
-            if (self.has_custom_shaders) {
-                if (frame.custom_shader_state == null) {
-                    frame.custom_shader_state = try .init(self.api);
-                    try frame.custom_shader_state.?.resize(
-                        self.api,
-                        surface_size.width,
-                        surface_size.height,
-                    );
-                }
-            } else if (frame.custom_shader_state) |*state| {
-                state.deinit();
-                frame.custom_shader_state = null;
-            }
-
             // If our stored size doesn't match the
             // surface size we need to update it.
             if (size_changed) {
@@ -1550,9 +1328,6 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
 
             // Upload the background image to the GPU as necessary.
             try self.uploadBackgroundImage();
-
-            // Update per-frame custom shader uniforms.
-            try self.updateCustomShaderUniformsForFrame();
 
             // Setup our frame data
             try frame.uniforms.sync(&.{self.uniforms});
@@ -1590,10 +1365,7 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
 
             {
                 var pass = frame_ctx.renderPass(&.{.{
-                    .target = if (frame.custom_shader_state) |state|
-                        .{ .texture = state.back_texture }
-                    else
-                        .{ .target = frame.target },
+                    .target = .{ .target = frame.target },
                     .clear_color = .{ 0.0, 0.0, 0.0, 0.0 },
                 }});
                 defer pass.complete();
@@ -1686,36 +1458,6 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
                     &pass,
                     .overlay,
                 );
-            }
-
-            // If we have custom shaders, then we render them.
-            if (frame.custom_shader_state) |*state| {
-                // Sync our uniforms.
-                try state.uniforms.sync(&.{self.custom_shader_uniforms});
-
-                for (self.shaders.post_pipelines, 0..) |pipeline, i| {
-                    defer state.swap();
-
-                    var pass = frame_ctx.renderPass(&.{.{
-                        .target = if (i < self.shaders.post_pipelines.len - 1)
-                            .{ .texture = state.front_texture }
-                        else
-                            .{ .target = frame.target },
-                        .clear_color = .{ 0.0, 0.0, 0.0, 0.0 },
-                    }});
-                    defer pass.complete();
-
-                    pass.step(.{
-                        .pipeline = pipeline,
-                        .uniforms = state.uniforms.buffer,
-                        .textures = &.{state.back_texture},
-                        .samplers = &.{state.sampler},
-                        .draw = .{
-                            .type = .triangle,
-                            .vertex_count = 3,
-                        },
-                    });
-                }
             }
         }
 
@@ -1888,7 +1630,6 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
                     config.bg_image != null;
 
             const old_blending = self.config.blending;
-            const custom_shaders_changed = !self.config.custom_shaders.equal(config.custom_shaders);
 
             self.config.deinit();
             self.config = config.*;
@@ -1912,10 +1653,6 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
                 // And indicate that our swap chain targets need to
                 // be re-created to account for the new blending mode.
                 self.target_config_modified +%= 1;
-            }
-
-            if (custom_shaders_changed) {
-                self.reinitialize_shaders = true;
             }
         }
 
@@ -2006,223 +1743,6 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             };
             // Signal that the buffer was modified.
             self.bg_image_buffer_modified +%= 1;
-        }
-
-        /// Update custom shader uniforms that depend on terminal state.
-        ///
-        /// This should be called in `updateFrame` when terminal state changes.
-        fn updateCustomShaderUniformsFromState(self: *Self) void {
-            // We only need to do this if we have custom shaders.
-            if (!self.has_custom_shaders) return;
-
-            // Only update when terminal state is dirty.
-            if (self.terminal_state.dirty == .false) return;
-
-            const uniforms: *shadertoy.Uniforms = &self.custom_shader_uniforms;
-            const colors: *const terminal.RenderState.Colors = &self.terminal_state.colors;
-
-            // 256-color palette
-            for (colors.palette, 0..) |color, i| {
-                uniforms.palette[i] = .{
-                    @as(f32, @floatFromInt(color.r)) / 255.0,
-                    @as(f32, @floatFromInt(color.g)) / 255.0,
-                    @as(f32, @floatFromInt(color.b)) / 255.0,
-                    1.0,
-                };
-            }
-
-            // Background color
-            uniforms.background_color = .{
-                @as(f32, @floatFromInt(colors.background.r)) / 255.0,
-                @as(f32, @floatFromInt(colors.background.g)) / 255.0,
-                @as(f32, @floatFromInt(colors.background.b)) / 255.0,
-                1.0,
-            };
-
-            // Foreground color
-            uniforms.foreground_color = .{
-                @as(f32, @floatFromInt(colors.foreground.r)) / 255.0,
-                @as(f32, @floatFromInt(colors.foreground.g)) / 255.0,
-                @as(f32, @floatFromInt(colors.foreground.b)) / 255.0,
-                1.0,
-            };
-
-            // Cursor color
-            if (colors.cursor) |cursor_color| {
-                uniforms.cursor_color = .{
-                    @as(f32, @floatFromInt(cursor_color.r)) / 255.0,
-                    @as(f32, @floatFromInt(cursor_color.g)) / 255.0,
-                    @as(f32, @floatFromInt(cursor_color.b)) / 255.0,
-                    1.0,
-                };
-            }
-
-            // NOTE: the following could be optimized to follow a change in
-            // config for a slight optimization however this is only 12 bytes
-            // each being updated and likely isn't a cause for concern
-
-            // Cursor text color
-            if (self.config.cursor_text) |cursor_text| {
-                uniforms.cursor_text = .{
-                    @as(f32, @floatFromInt(cursor_text.color.r)) / 255.0,
-                    @as(f32, @floatFromInt(cursor_text.color.g)) / 255.0,
-                    @as(f32, @floatFromInt(cursor_text.color.b)) / 255.0,
-                    1.0,
-                };
-            }
-
-            // Selection background color
-            if (self.config.selection_background) |selection_bg| {
-                uniforms.selection_background_color = .{
-                    @as(f32, @floatFromInt(selection_bg.color.r)) / 255.0,
-                    @as(f32, @floatFromInt(selection_bg.color.g)) / 255.0,
-                    @as(f32, @floatFromInt(selection_bg.color.b)) / 255.0,
-                    1.0,
-                };
-            }
-
-            // Selection foreground color
-            if (self.config.selection_foreground) |selection_fg| {
-                uniforms.selection_foreground_color = .{
-                    @as(f32, @floatFromInt(selection_fg.color.r)) / 255.0,
-                    @as(f32, @floatFromInt(selection_fg.color.g)) / 255.0,
-                    @as(f32, @floatFromInt(selection_fg.color.b)) / 255.0,
-                    1.0,
-                };
-            }
-
-            // Cursor visibility
-            uniforms.cursor_visible = @intFromBool(self.terminal_state.cursor.visible);
-
-            // Cursor style
-            const cursor_style: renderer.CursorStyle = .fromTerminal(self.terminal_state.cursor.visual_style);
-            uniforms.previous_cursor_style = uniforms.current_cursor_style;
-            uniforms.current_cursor_style = @as(i32, @intFromEnum(cursor_style));
-        }
-
-        /// Update per-frame custom shader uniforms.
-        ///
-        /// This should be called exactly once per frame, inside `drawFrame`.
-        fn updateCustomShaderUniformsForFrame(self: *Self) !void {
-            // We only need to do this if we have custom shaders.
-            if (!self.has_custom_shaders) return;
-
-            const uniforms: *shadertoy.Uniforms = &self.custom_shader_uniforms;
-
-            const now: std.Io.Timestamp = .now(global.io(), .awake);
-            defer self.last_frame_time = now;
-            const first_frame_time = self.first_frame_time orelse t: {
-                self.first_frame_time = now;
-                break :t now;
-            };
-            const last_frame_time = self.last_frame_time orelse now;
-
-            const since_ns: f32 = @floatFromInt(first_frame_time.durationTo(now).nanoseconds);
-            uniforms.time = since_ns / std.time.ns_per_s;
-
-            const delta_ns: f32 = @floatFromInt(last_frame_time.durationTo(now).nanoseconds);
-            uniforms.time_delta = delta_ns / std.time.ns_per_s;
-
-            uniforms.frame += 1;
-
-            const screen = self.size.screen;
-            const padding = self.size.padding;
-            const cell = self.size.cell;
-
-            uniforms.resolution = .{
-                @floatFromInt(screen.width),
-                @floatFromInt(screen.height),
-                1,
-            };
-            uniforms.channel_resolution[0] = .{
-                @floatFromInt(screen.width),
-                @floatFromInt(screen.height),
-                1,
-                0,
-            };
-
-            if (self.cells.getCursorGlyph()) |cursor| {
-                const cursor_width: f32 = @floatFromInt(cursor.glyph_size[0]);
-                const cursor_height: f32 = @floatFromInt(cursor.glyph_size[1]);
-
-                // Left edge of the cell the cursor is in.
-                var pixel_x: f32 = @floatFromInt(
-                    cursor.grid_pos[0] * cell.width + padding.left,
-                );
-                // Top edge, relative to the top of the
-                // screen, of the cell the cursor is in.
-                var pixel_y: f32 = @floatFromInt(
-                    cursor.grid_pos[1] * cell.height + padding.top,
-                );
-
-                // If +Y is up in our shaders, we need to flip the coordinate
-                // so that it's instead the top edge of the cell relative to
-                // the *bottom* of the screen.
-                if (!GraphicsAPI.custom_shader_y_is_down) {
-                    pixel_y = @as(f32, @floatFromInt(screen.height)) - pixel_y;
-                }
-
-                // Add the X bearing to get the -X (left) edge of the cursor.
-                pixel_x += @floatFromInt(cursor.bearings[0]);
-
-                // How we deal with the Y bearing depends on which direction
-                // is "up", since we want our final `pixel_y` value to be the
-                // +Y edge of the cursor.
-                if (GraphicsAPI.custom_shader_y_is_down) {
-                    // As a reminder, the Y bearing is the distance from the
-                    // bottom of the cell to the top of the glyph, so to get
-                    // the +Y edge we need to add the cell height, subtract
-                    // the Y bearing, and add the glyph height to get the +Y
-                    // (bottom) edge of the cursor.
-                    pixel_y += @floatFromInt(cell.height);
-                    pixel_y -= @floatFromInt(cursor.bearings[1]);
-                    pixel_y += @floatFromInt(cursor.glyph_size[1]);
-                } else {
-                    // If the Y direction is reversed though, we instead want
-                    // the *top* edge of the cursor, which means we just need
-                    // to subtract the cell height and add the Y bearing.
-                    pixel_y -= @floatFromInt(cell.height);
-                    pixel_y += @floatFromInt(cursor.bearings[1]);
-                }
-
-                const new_cursor: [4]f32 = .{
-                    pixel_x,
-                    pixel_y,
-                    cursor_width,
-                    cursor_height,
-                };
-                const cursor_color: [4]f32 = .{
-                    @as(f32, @floatFromInt(cursor.color[0])) / 255.0,
-                    @as(f32, @floatFromInt(cursor.color[1])) / 255.0,
-                    @as(f32, @floatFromInt(cursor.color[2])) / 255.0,
-                    @as(f32, @floatFromInt(cursor.color[3])) / 255.0,
-                };
-
-                const cursor_changed: bool =
-                    !std.meta.eql(new_cursor, uniforms.current_cursor) or
-                    !std.meta.eql(cursor_color, uniforms.current_cursor_color);
-
-                if (cursor_changed) {
-                    uniforms.previous_cursor = uniforms.current_cursor;
-                    uniforms.previous_cursor_color = uniforms.current_cursor_color;
-                    uniforms.current_cursor = new_cursor;
-                    uniforms.current_cursor_color = cursor_color;
-                    uniforms.cursor_change_time = uniforms.time;
-                }
-            }
-
-            // Update focus uniforms
-            uniforms.focus = @intFromBool(self.focused);
-
-            // If we need to update the time our focus state changed
-            // then update it to our current frame time. This may not be
-            // exactly correct since it is frame time, not exact focus
-            // time, but focus time on its own isn't exactly correct anyways
-            // since it comes async from a message.
-            if (self.custom_shader_focused_changed and self.focused) {
-                uniforms.time_focus = uniforms.time;
-                self.custom_shader_focused_changed = false;
-            }
         }
 
         /// Build the overlay as configured. Returns null if there is no

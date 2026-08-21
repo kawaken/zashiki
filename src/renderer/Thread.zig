@@ -115,12 +115,10 @@ flags: packed struct {
 } = .{},
 
 pub const DerivedConfig = struct {
-    custom_shader_animation: configpkg.CustomShaderAnimation,
     scrollback_compression: bool,
 
     pub fn init(config: *const configpkg.Config) DerivedConfig {
         return .{
-            .custom_shader_animation = config.@"custom-shader-animation",
             .scrollback_compression = config.@"scrollback-compression",
         };
     }
@@ -311,20 +309,12 @@ fn setQosClass(self: *const Thread) void {
 
 fn syncDrawTimer(self: *Thread) void {
     skip: {
-        // If our renderer supports animations and has them, then we
-        // can apply draw timer based on custom shader animation configuration.
+        // If our renderer supports animations and has them, keep the
+        // draw timer running.
         if (@hasDecl(rendererpkg.Renderer, "hasAnimations") and
             self.renderer.hasAnimations())
         {
-            // If our config says to always animate, we do so.
-            switch (self.config.custom_shader_animation) {
-                // Always animate
-                .always => break :skip,
-                // Only when focused
-                .true => if (self.flags.focused) break :skip,
-                // Never animate
-                .false => {},
-            }
+            break :skip;
         }
 
         // We're skipping the draw timer. Stop it on the next iteration.

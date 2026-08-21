@@ -4,7 +4,6 @@ const build_config = @import("build_config.zig");
 const cli = @import("cli.zig");
 const internal_os = @import("os/main.zig");
 const fontconfig = @import("fontconfig");
-const glslang = @import("glslang");
 const harfbuzz = @import("harfbuzz");
 const oni = @import("oniguruma");
 const crash = @import("crash/main.zig");
@@ -202,9 +201,6 @@ pub fn init(opts: InitOpts) !void {
     // We need to re-sync the environment after this completes.
     try internal_os.ensureLocale();
     syncEnviron();
-
-    // Initialize glslang for shader compilation
-    try glslang.init();
 
     // Initialize oniguruma for regex
     try oni.init(&.{oni.Encoding.utf8});
