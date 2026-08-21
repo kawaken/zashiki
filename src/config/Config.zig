@@ -1272,7 +1272,7 @@ command: ?Command = null,
 /// will result in `foo=baz` being passed to the launched commands.
 ///
 /// These environment variables will override any existing environment
-/// variables set by Ghostty. For example, if you set `GHOSTTY_RESOURCES_DIR`
+/// variables set by Ghostty. For example, if you set `ZASHIKI_RESOURCES_DIR`
 /// then the value you set here will override the value Ghostty typically
 /// automatically injects.
 ///

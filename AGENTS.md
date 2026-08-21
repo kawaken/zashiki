@@ -50,7 +50,7 @@ macOS unified logging is enabled by default. View logs with:
 sudo log stream --level debug --predicate 'subsystem=="dev.kawaken.zashiki"'
 ```
 
-The `GHOSTTY_LOG` environment variable controls log destinations (`stderr`,
+The `ZASHIKI_LOG` environment variable controls log destinations (`stderr`,
 `macos`); prefix with `no-` to disable, comma-separate to combine, or use
 `true`/`false` to enable/disable all.
 

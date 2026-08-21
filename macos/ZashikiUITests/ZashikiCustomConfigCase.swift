@@ -43,7 +43,7 @@ class ZashikiCustomConfigCase: XCTestCase {
     func zashikiApplication(defaultsSuite: String = ZashikiCustomConfigCase.defaultsSuiteName) throws -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments.append(contentsOf: ["-ApplePersistenceIgnoreState", "YES"])
-        app.launchEnvironment["GHOSTTY_CONFIG_PATH"] = configFile.path
+        app.launchEnvironment["ZASHIKI_CONFIG_PATH"] = configFile.path
         app.launchEnvironment["ZASHIKI_USER_DEFAULTS_SUITE"] = defaultsSuite
         return app
     }

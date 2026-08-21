@@ -1,7 +1,7 @@
 # Ghostty shell integration
 export module ghostty {
   def has_feature [feature: string] {
-    $feature in ($env.GHOSTTY_SHELL_FEATURES | default "" | split row ',')
+    $feature in ($env.ZASHIKI_SHELL_FEATURES | default "" | split row ',')
   }
 
   # Wrap `ssh` with `ghostty +ssh` and translate the shell-integration
@@ -13,7 +13,7 @@ export module ghostty {
       return
     }
 
-    let zashiki = ($env.GHOSTTY_BIN_DIR? | default "") | path join "zashiki"
+    let zashiki = ($env.ZASHIKI_BIN_DIR? | default "") | path join "zashiki"
     mut flags = []
     if not (has_feature "ssh-env") {
       $flags = ($flags ++ ["--forward-env=false"])
@@ -47,10 +47,10 @@ export module ghostty {
   }
 }
 
-# Clean up XDG_DATA_DIRS by removing GHOSTTY_SHELL_INTEGRATION_XDG_DIR
-if 'GHOSTTY_SHELL_INTEGRATION_XDG_DIR' in $env {
+# Clean up XDG_DATA_DIRS by removing ZASHIKI_SHELL_INTEGRATION_XDG_DIR
+if 'ZASHIKI_SHELL_INTEGRATION_XDG_DIR' in $env {
   if 'XDG_DATA_DIRS' in $env {
-    $env.XDG_DATA_DIRS = ($env.XDG_DATA_DIRS | str replace $"($env.GHOSTTY_SHELL_INTEGRATION_XDG_DIR):" "")
+    $env.XDG_DATA_DIRS = ($env.XDG_DATA_DIRS | str replace $"($env.ZASHIKI_SHELL_INTEGRATION_XDG_DIR):" "")
   }
-  hide-env GHOSTTY_SHELL_INTEGRATION_XDG_DIR
+  hide-env ZASHIKI_SHELL_INTEGRATION_XDG_DIR
 }
