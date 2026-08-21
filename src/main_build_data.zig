@@ -11,19 +11,6 @@ const Allocator = std.mem.Allocator;
 const cli = @import("cli.zig");
 
 pub const Action = enum {
-    // Shell completions
-    bash,
-    fish,
-    zsh,
-
-    // Editor syntax files
-    sublime,
-    @"vim-syntax",
-    @"vim-ftdetect",
-    @"vim-ftplugin",
-    @"vim-compiler",
-
-    // Other
     terminfo,
 };
 
@@ -37,14 +24,6 @@ pub fn main(init: std.process.Init) !void {
     var stdout_writer = std.Io.File.stdout().writerStreaming(init.io, &buffer);
     const writer = &stdout_writer.interface;
     switch (action) {
-        .bash => try writer.writeAll(@import("extra/bash.zig").completions),
-        .fish => try writer.writeAll(@import("extra/fish.zig").completions),
-        .zsh => try writer.writeAll(@import("extra/zsh.zig").completions),
-        .sublime => try writer.writeAll(@import("extra/sublime.zig").syntax),
-        .@"vim-syntax" => try writer.writeAll(@import("extra/vim.zig").syntax),
-        .@"vim-ftdetect" => try writer.writeAll(@import("extra/vim.zig").ftdetect),
-        .@"vim-ftplugin" => try writer.writeAll(@import("extra/vim.zig").ftplugin),
-        .@"vim-compiler" => try writer.writeAll(@import("extra/vim.zig").compiler),
         .terminfo => try @import("terminfo/ghostty.zig").ghostty.encode(writer),
     }
     try stdout_writer.end();

@@ -40,11 +40,9 @@ strip: bool = false,
 patchelf: ?PatchElf = null,
 
 /// Artifacts
-emit_bench: bool = false,
 emit_docs: bool = false,
 emit_exe: bool = false,
 emit_helpgen: bool = false,
-emit_lib_vt: bool = false,
 emit_macos_app: bool = false,
 emit_terminfo: bool = false,
 emit_termcap: bool = false,
@@ -244,12 +242,12 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
         };
     };
 
-    // libghostty-vt properties
+    // libghostty properties
 
     const lib_version_string = b.option(
         []const u8,
         "lib-version-string",
-        "A specific version string to use for the build of libghostty-vt. " ++
+        "A specific version string to use for the build of libghostty. " ++
             "If not specified, git will be used. This must be a semantic version.",
     );
 
@@ -313,17 +311,11 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
     //---------------------------------------------------------------
     // Artifacts to Emit
 
-    config.emit_lib_vt = b.option(
-        bool,
-        "emit-lib-vt",
-        "Set defaults for a libghostty-vt-only build (disables xcframework, macOS app, and docs).",
-    ) orelse false;
-
     config.emit_exe = b.option(
         bool,
         "emit-exe",
         "Build and install main executables with 'build'",
-    ) orelse !config.emit_lib_vt;
+    ) orelse true;
 
     config.emit_test_exe = b.option(
         bool,
@@ -335,12 +327,6 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
         bool,
         "emit-unicode-table-gen",
         "Build and install executables that generate unicode tables with 'build'",
-    ) orelse false;
-
-    config.emit_bench = b.option(
-        bool,
-        "emit-bench",
-        "Build and install the benchmark executables.",
     ) orelse false;
 
     config.emit_helpgen = b.option(
@@ -355,10 +341,8 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
         "Build and install auto-generated documentation (requires pandoc)",
     ) orelse emit_docs: {
         // If we are emitting any other artifacts then we default to false.
-        if (config.emit_bench or
-            config.emit_test_exe or
-            config.emit_helpgen or
-            config.emit_lib_vt) break :emit_docs false;
+        if (config.emit_test_exe or
+            config.emit_helpgen) break :emit_docs false;
 
         // We always emit docs in system package mode.
         if (system_package) break :emit_docs true;
@@ -410,17 +394,8 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
     ) orelse emit_xcfw: {
         if (!builtin.target.os.tag.isDarwin() or target.result.os.tag != .macos)
             break :emit_xcfw false;
-        if (config.emit_lib_vt) {
-            // In lib-vt mode default to whether xcodebuild is available,
-            // since xcodebuild is required to produce the XCFramework.
-            const path = expandPath(b.graph.io, b.allocator, &b.graph.environ_map, "xcodebuild") catch
-                break :emit_xcfw false;
-            defer if (path) |p| b.allocator.free(p);
-            break :emit_xcfw path != null;
-        }
         break :emit_xcfw config.app_runtime == .none and
-            (!config.emit_bench and
-                !config.emit_test_exe and
+            (!config.emit_test_exe and
                 !config.emit_helpgen);
     };
 
@@ -428,7 +403,7 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
         bool,
         "emit-macos-app",
         "Build and install the macOS app bundle.",
-    ) orelse !config.emit_lib_vt and config.emit_xcframework;
+    ) orelse config.emit_xcframework;
 
     //---------------------------------------------------------------
     // System Packages
@@ -548,7 +523,6 @@ pub fn terminalOptions(
         .artifact = artifact,
         .simd = self.simd,
         .oniguruma = true,
-        .c_abi = false,
         .version = switch (artifact) {
             .ghostty => self.version,
             .lib => self.lib_version,
