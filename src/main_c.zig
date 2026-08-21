@@ -156,16 +156,6 @@ pub export fn ghostty_info() Info {
     };
 }
 
-/// Translate a string maintained by libghostty into the current
-/// application language. This will return the same string (same pointer)
-/// if no translation is found, so the pointer must be stable through
-/// the function call.
-///
-/// This should only be used for singular strings maintained by Ghostty.
-pub export fn ghostty_translate(msgid: [*:0]const u8) [*:0]const u8 {
-    return internal_os.i18n._(msgid);
-}
-
 /// Free a string allocated by Ghostty.
 pub export fn ghostty_string_free(str: String) void {
     str.deinit();

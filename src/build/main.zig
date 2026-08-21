@@ -12,7 +12,6 @@ pub const GhosttyExe = @import("GhosttyExe.zig");
 pub const GhosttyFrameData = @import("GhosttyFrameData.zig");
 pub const GhosttyLib = @import("GhosttyLib.zig");
 pub const GhosttyResources = @import("GhosttyResources.zig");
-pub const GhosttyI18n = @import("GhosttyI18n.zig");
 pub const ZashikiXcodebuild = @import("ZashikiXcodebuild.zig");
 pub const GhosttyXCFramework = @import("GhosttyXCFramework.zig");
 pub const GhosttyWebdata = @import("GhosttyWebdata.zig");

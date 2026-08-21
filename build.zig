@@ -61,14 +61,8 @@ pub fn build(b: *std.Build) !void {
         "test-valgrind",
         "Run tests under valgrind",
     );
-    const translations_step = b.step(
-        "update-translations",
-        "Update translation files",
-    );
-
     // Ghostty resources like terminfo, shell integration, themes, etc.
     const resources = try buildpkg.GhosttyResources.init(b, &config, &deps);
-    const i18n = if (config.i18n) try buildpkg.GhosttyI18n.init(b, &config) else null;
 
     // Ghostty executable, the actual runnable Ghostty program.
     const exe = try buildpkg.GhosttyExe.init(b, &config, &deps);
@@ -106,7 +100,6 @@ pub fn build(b: *std.Build) !void {
         if (config.emit_exe) {
             exe.install();
             resources.install();
-            if (i18n) |v| v.install();
         }
     } else {
         // The macOS Ghostty Library
@@ -148,7 +141,6 @@ pub fn build(b: *std.Build) !void {
             // The xcframework build always installs resources because our
             // macOS xcode project contains references to them.
             resources.install();
-            if (i18n) |v| v.install();
         }
 
         // Zashiki macOS app
@@ -158,7 +150,6 @@ pub fn build(b: *std.Build) !void {
             .{
                 .xcframework = &xcframework,
                 .docs = &docs,
-                .i18n = if (i18n) |v| &v else null,
                 .resources = &resources,
             },
         );
@@ -204,7 +195,6 @@ pub fn build(b: *std.Build) !void {
                 .{
                     .xcframework = &xcframework_native,
                     .docs = &docs,
-                    .i18n = if (i18n) |v| &v else null,
                     .resources = &resources,
                 },
             );
@@ -288,14 +278,6 @@ pub fn build(b: *std.Build) !void {
         valgrind_run.addArtifactArg(test_exe);
         config.addPatchElf(test_exe, &valgrind_run.step);
         test_valgrind_step.dependOn(&valgrind_run.step);
-    }
-
-    // update-translations does what it sounds like and updates the "pot"
-    // files. These should be committed to the repo.
-    if (i18n) |v| {
-        translations_step.dependOn(v.update_step);
-    } else {
-        try translations_step.addError("cannot update translations when i18n is disabled", .{});
     }
 }
 

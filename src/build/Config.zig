@@ -27,7 +27,6 @@ font_backend: FontBackend = .coretext,
 /// Feature flags
 sentry: bool = true,
 simd: bool = true,
-i18n: bool = true,
 
 /// Ghostty exe properties
 exe_entrypoint: ExeEntrypoint = .ghostty,
@@ -166,16 +165,6 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
         "simd",
         "Build with SIMD-accelerated code paths. Results in significant performance improvements.",
     ) orelse true;
-
-    config.i18n = b.option(
-        bool,
-        "i18n",
-        "Enables gettext-based internationalization. Enabled by default only for macOS, and other Unix-like systems like Linux and FreeBSD when using glibc.",
-    ) orelse switch (target.result.os.tag) {
-        .macos, .ios => true,
-        .linux, .freebsd => target.result.isGnuLibC(),
-        else => false,
-    };
 
     //---------------------------------------------------------------
     // Ghostty Exe Properties
@@ -478,7 +467,6 @@ pub fn addOptions(self: *const Config, step: *std.Build.Step.Options) !void {
     // support all types.
     step.addOption(bool, "sentry", self.sentry);
     step.addOption(bool, "simd", self.simd);
-    step.addOption(bool, "i18n", self.i18n);
     step.addOption(ApprtRuntime, "app_runtime", self.app_runtime);
     step.addOption(FontBackend, "font_backend", self.font_backend);
     step.addOption(RendererBackend, "renderer", self.renderer);
@@ -569,7 +557,6 @@ pub fn fromOptions() Config {
         .font_backend = std.meta.stringToEnum(FontBackend, @tagName(options.font_backend)).?,
         .renderer = std.meta.stringToEnum(RendererBackend, @tagName(options.renderer)).?,
         .exe_entrypoint = std.meta.stringToEnum(ExeEntrypoint, @tagName(options.exe_entrypoint)).?,
-        .i18n = options.i18n,
     };
 }
 

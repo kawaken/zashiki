@@ -403,21 +403,6 @@ pub fn add(
                 macos_dep.artifact("macos").getEmittedBin(),
             );
         }
-
-        // Apple platforms do not include libc libintl so we bundle it.
-        // This is LGPL but since our source code is open source we are
-        // in compliance with the LGPL since end users can modify this
-        // build script to replace the bundled libintl with their own.
-        if (b.lazyDependency("libintl", .{
-            .target = target,
-            .optimize = optimize,
-        })) |libintl_dep| {
-            step.root_module.linkLibrary(libintl_dep.artifact("intl"));
-            try static_libs.append(
-                b.allocator,
-                libintl_dep.artifact("intl").getEmittedBin(),
-            );
-        }
     }
 
     // Fonts
