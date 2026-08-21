@@ -16,7 +16,7 @@ name: Test
 # plan/配下(設計ドキュメントのみ)・docs/history/配下(完了済みplanの
 # アーカイブ)・.github/workflows配下(CI設定自体)・
 # .claude/配下(Claude Codeの設定)・README.md/AGENTS.md/LICENSE・
-# scripts/配下・typos.toml・Makefileは
+# typos.toml・Makefileは
 # ビルド・テスト対象のコードに影響しないため、paths-ignoreでCIをスキップ
 # する。それ以外のファイルが1つでも変更に含まれていれば通常通り実行される。
 # (example/・po/・dist/・pkg/はドキュメントに見えても実ビルド入力を含む
@@ -38,7 +38,6 @@ on:
       - "README.md"
       - "AGENTS.md"
       - "LICENSE"
-      - "scripts/**"
       - "typos.toml"
       - "Makefile"
   pull_request:
@@ -50,7 +49,6 @@ on:
       - "README.md"
       - "AGENTS.md"
       - "LICENSE"
-      - "scripts/**"
       - "typos.toml"
       - "Makefile"
   workflow_dispatch: {}

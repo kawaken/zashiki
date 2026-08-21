@@ -521,13 +521,27 @@ class AppDelegate: NSObject,
     }
 
     /// Handles `zashiki://` URLs delivered via `CFBundleURLTypes` (see
-    /// `Zashiki-Info.plist`), e.g. from `scripts/zashiki-md-preview` or a
-    /// plain `open "zashiki://..."`. This is this fork's own CLI entry
-    /// point, not a public API, so unrecognized input is just logged and
-    /// ignored rather than surfaced to the user.
+    /// `Zashiki-Info.plist`), e.g. from a plain `open "zashiki://..."`.
+    /// This is this fork's own CLI entry point, not a public API, so
+    /// unrecognized input is just logged and ignored rather than surfaced
+    /// to the user.
+    ///
+    /// URL shape: `zashiki://<feature>/<verb>?<args>`. `<feature>` is a
+    /// namespace (e.g. `markdown-preview`), `<verb>` is an action within
+    /// it (e.g. `open`). This is RPC-over-URL, not REST -- there's no
+    /// HTTP-verb axis, so `<verb>` stands in for it.
+    ///
+    /// One query item is reserved across every action: `surface`, the
+    /// originating terminal surface's ID (`0x` + 16 lowercase hex
+    /// digits, same value as the `ZASHIKI_SURFACE_ID` environment
+    /// variable set in that surface's child processes). It's optional;
+    /// when present and still live, the action targets that surface's
+    /// window instead of guessing. It's resolved once here, before host
+    /// dispatch, so every action gets a consistently-resolved (possibly
+    /// nil) source controller instead of re-parsing it individually.
     ///
     /// Recognized: `zashiki://markdown-preview/open?path=<percent-encoded
-    /// absolute path>`.
+    /// absolute path>&surface=<0x...>`.
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
             handleZashikiURL(url)
@@ -541,16 +555,43 @@ class AppDelegate: NSObject,
             return
         }
 
+        let sourceController = resolveSourceController(components)
+
         switch components.host {
         case "markdown-preview":
-            handleMarkdownPreviewURL(components)
+            handleMarkdownPreviewURL(components, sourceController: sourceController)
 
         default:
             Self.logger.warning("zashiki URL: unknown host \(components.host ?? "(nil)", privacy: .public)")
         }
     }
 
-    private func handleMarkdownPreviewURL(_ components: URLComponents) {
+    /// Parses the `surface` query item (if present) and resolves it to
+    /// the terminal window controller that currently owns that surface.
+    /// Returns nil if `surface` is absent, malformed, or no longer
+    /// resolves to a live surface (e.g. the window was closed) --
+    /// callers should fall back to their own default target in that
+    /// case.
+    private func resolveSourceController(_ components: URLComponents) -> BaseTerminalController? {
+        guard let raw = components.queryItems?.first(where: { $0.name == "surface" })?.value else {
+            return nil
+        }
+        guard raw.hasPrefix("0x"),
+              let id = UInt64(raw.dropFirst(2), radix: 16) else {
+            Self.logger.warning("zashiki URL: malformed 'surface' query item \(raw, privacy: .public)")
+            return nil
+        }
+        guard let controller = terminalController(forZashikiSurfaceID: id) else {
+            Self.logger.warning("zashiki URL: no live surface for id \(raw, privacy: .public)")
+            return nil
+        }
+        return controller
+    }
+
+    private func handleMarkdownPreviewURL(
+        _ components: URLComponents,
+        sourceController: BaseTerminalController?
+    ) {
         guard components.path == "/open" else {
             Self.logger.warning("zashiki URL: unknown markdown-preview path \(components.path, privacy: .public)")
             return
@@ -568,11 +609,14 @@ class AppDelegate: NSObject,
             return
         }
 
-        // Mirrors application(_:openFile:) below: if there's no window to
-        // attach to (e.g. all windows were closed, or we're still early
-        // in launch), open a new one rather than silently dropping the
-        // request.
-        let controller = TerminalController.preferredParent ?? TerminalController.newWindow(ghostty)
+        // Prefer the surface that made the request. Mirrors
+        // application(_:openFile:) below: if there's no window to
+        // attach to (no resolved source, no preferred parent, e.g. all
+        // windows were closed or we're still early in launch), open a
+        // new one rather than silently dropping the request.
+        let controller: BaseTerminalController = sourceController
+            ?? TerminalController.preferredParent
+            ?? TerminalController.newWindow(ghostty)
         controller.markdownPreview.open(url: URL(fileURLWithPath: path))
     }
 

@@ -32,6 +32,9 @@ ongoing product rather than a one-off patch set:
 - **Formatting (Zig)**: `zig fmt .`
 - **Formatting (Swift)**: `swiftlint lint --strict --fix`
 - **Formatting (other)**: `prettier -w .`
+- These three run automatically on staged files via a pre-commit hook
+  (`.githooks/pre-commit`). One-time setup per clone:
+  `git config core.hooksPath .githooks`.
 
 ## Xcode
 
