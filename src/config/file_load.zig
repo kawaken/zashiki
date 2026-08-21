@@ -15,7 +15,7 @@ pub fn defaultXdgPath(alloc: Allocator) ![]const u8 {
     return try internal_os.xdg.config(
         alloc,
         &environ_map,
-        .{ .subdir = "ghostty/config.ghostty" },
+        .{ .subdir = "zashiki/config.ghostty" },
     );
 }
 
@@ -27,7 +27,7 @@ pub fn legacyDefaultXdgPath(alloc: Allocator) ![]const u8 {
     return try internal_os.xdg.config(
         alloc,
         &environ_map,
-        .{ .subdir = "ghostty/config" },
+        .{ .subdir = "zashiki/config" },
     );
 }
 

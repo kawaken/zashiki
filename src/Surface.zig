@@ -639,8 +639,8 @@ pub fn init(
         };
         errdefer env.deinit();
 
-        // don't leak GHOSTTY_LOG to any subprocesses
-        _ = env.orderedRemove("GHOSTTY_LOG");
+        // don't leak ZASHIKI_LOG to any subprocesses
+        _ = env.orderedRemove("ZASHIKI_LOG");
 
         var buf: [18]u8 = undefined;
         try env.put(

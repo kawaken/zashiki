@@ -145,7 +145,7 @@ pub fn init(opts: InitOpts) !void {
     // this. Env vars are useful for logging too because they are
     // easy to set.
     logging: {
-        const v = self.environ.getAlloc(self.alloc, "GHOSTTY_LOG") catch |err| switch (err) {
+        const v = self.environ.getAlloc(self.alloc, "ZASHIKI_LOG") catch |err| switch (err) {
             error.EnvironmentVariableMissing => break :logging,
             else => return err,
         };

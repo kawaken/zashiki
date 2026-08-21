@@ -1,0 +1,49 @@
+{
+  "configurations" : [
+    {
+      "id" : "22895D97-CB9E-4452-A6AA-702CC0152032",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "commandLineArgumentEntries" : [
+      {
+        "argument" : "-NS🐞 YES"
+      }
+    ],
+    "environmentVariableEntries" : [
+      {
+        "key" : "ZASHIKI_CONFIG_PATH",
+        "value" : "\/tmp\/Zashiki\/testing_config.ghostty"
+      }
+    ],
+    "performanceAntipatternCheckerEnabled" : true,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:Zashiki.xcodeproj",
+      "identifier" : "A5B30530299BEAAA0047F10C",
+      "name" : "Zashiki"
+    }
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:Zashiki.xcodeproj",
+        "identifier" : "A54F45F22E1F047A0046BD5C",
+        "name" : "ZashikiTests"
+      }
+    },
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:Zashiki.xcodeproj",
+        "identifier" : "810ACC9E2E9D3301004F8F92",
+        "name" : "ZashikiUITests"
+      }
+    }
+  ],
+  "version" : 1
+}

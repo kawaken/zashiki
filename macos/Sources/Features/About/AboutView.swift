@@ -83,7 +83,7 @@ struct AboutView: View {
                     Text("Zashiki")
                         .bold()
                         .font(.title)
-                    Text("A personal, macOS-only fork of Ghostty, \ntracking upstream rather than diverging from it.")
+                    Text("A personal fork of Ghostty.")
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                         .font(.caption)

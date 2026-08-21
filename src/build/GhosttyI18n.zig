@@ -5,7 +5,7 @@ const builtin = @import("builtin");
 const Config = @import("Config.zig");
 const locales = @import("../os/i18n_locales.zig").locales;
 
-const domain = "com.mitchellh.ghostty";
+const domain = "dev.kawaken.zashiki";
 
 owner: *std.Build,
 steps: []*std.Build.Step,
