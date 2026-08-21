@@ -14,7 +14,10 @@
   matching how ATOK itself distinguishes it.
 - **Markdown preview pane** — toggle a preview pane (`Cmd+Shift+M`) that
   renders Markdown natively in SwiftUI (no WebKit). Open a file from the
-  CLI via a custom `zashiki://` URL scheme (e.g. `open "zashiki://markdown-preview/open?path=<path>"`,
+  CLI via a custom `zashiki://` URL scheme (e.g. `open "zashiki://markdown-preview/open?path=<path>&surface=$ZASHIKI_SURFACE_ID"`,
   with `<path>` percent-encoded); the pane live-updates as the file
-  changes. Handy for previewing files an agent like Claude Code is
-  writing to.
+  changes. The optional `surface` query item (a surface's
+  `ZASHIKI_SURFACE_ID` environment variable) targets the exact window
+  the request came from; omit it to target the most-recently-active
+  window instead. Handy for previewing files an agent like Claude Code
+  is writing to.
