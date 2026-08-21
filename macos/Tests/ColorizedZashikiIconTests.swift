@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 import Testing
-@testable import Ghostty
+@testable import Zashiki
 
 struct ColorizedZashikiIconTests {
     private func makeIcon(
@@ -10,7 +10,7 @@ struct ColorizedZashikiIconTests {
             NSColor(hex: "#AABBCC")!,
         ],
         ghostColor: NSColor = NSColor(hex: "#445566")!,
-        frame: Ghostty.MacOSIconFrame = .aluminum
+        frame: Zashiki.MacOSIconFrame = .aluminum
     ) -> ColorizedZashikiIcon {
         .init(screenColors: screenColors, ghostColor: ghostColor, frame: frame)
     }

@@ -8,7 +8,7 @@
 import XCTest
 
 final class ZashikiMouseStateTests: ZashikiCustomConfigCase {
-    // https://github.com/zashiki-org/zashiki/pull/11276
+    // https://github.com/ghostty-org/ghostty/pull/11276
     @MainActor func testSelectionFocusChange() async throws {
         let app = XCUIApplication()
         app.activate()

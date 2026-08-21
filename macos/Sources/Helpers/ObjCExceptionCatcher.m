@@ -19,7 +19,7 @@ BOOL GhosttyAddTabbedWindowSafely(
     } @catch (NSException *exception) {
         if (error != NULL) {
             NSString *reason = exception.reason ?: @"Unknown Objective-C exception";
-            *error = [NSError errorWithDomain:@"Ghostty.ObjCException"
+            *error = [NSError errorWithDomain:@"Zashiki.ObjCException"
                                          code:1
                                      userInfo:@{
                                          NSLocalizedDescriptionKey: reason,

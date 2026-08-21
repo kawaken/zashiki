@@ -8,7 +8,7 @@ struct ColorizedZashikiIcon {
     let ghostColor: NSColor
 
     /// The frame type to use
-    let frame: Ghostty.MacOSIconFrame
+    let frame: Zashiki.MacOSIconFrame
 
     /// Make a custom colorized Zashiki icon.
     func makeImage(in bundle: Bundle) -> NSImage? {
@@ -90,7 +90,7 @@ extension ColorizedZashikiIcon: Codable {
                 debugDescription: "Failed to decode ghost color from \(ghostColorHex)"
             )
         }
-        let frame = try container.decode(Ghostty.MacOSIconFrame.self, forKey: .frame)
+        let frame = try container.decode(Zashiki.MacOSIconFrame.self, forKey: .frame)
         self.init(screenColors: screenColors, ghostColor: ghostColor, frame: frame)
     }
 

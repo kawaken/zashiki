@@ -17,7 +17,7 @@ enum AppIcon: Equatable, Codable, Sendable {
     case customStyle(_ icon: ColorizedZashikiIcon)
 
 #if !DOCK_TILE_PLUGIN
-    init?(config: Ghostty.Config) {
+    init?(config: Zashiki.Config) {
         switch config.macosIcon {
         case .official:
             return nil
@@ -93,7 +93,7 @@ actor AppIconUpdater {
         // Notify DockTilePlugin to update dock icon
         DistributedNotificationCenter.default()
             .postNotificationName(
-                .ghosttyIconDidChange,
+                .zashikiIconDidChange,
                 object: nil,
                 userInfo: nil,
                 deliverImmediately: true,

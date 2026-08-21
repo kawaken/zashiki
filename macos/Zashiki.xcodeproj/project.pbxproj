@@ -32,7 +32,7 @@
 			containerPortal = A5B30529299BEAAA0047F10C /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = A5B30530299BEAAA0047F10C;
-			remoteInfo = Ghostty;
+			remoteInfo = Zashiki;
 		};
 		819324672F2502FB00A9ED8F /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -46,7 +46,7 @@
 			containerPortal = A5B30529299BEAAA0047F10C /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = A5B30530299BEAAA0047F10C;
-			remoteInfo = Ghostty;
+			remoteInfo = Zashiki;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -97,8 +97,8 @@
 				"Features/Custom App Icon/DockTilePlugin.swift",
 				"Features/Custom App Icon/Extensions/Notification+AppIcon.swift",
 				"Features/Custom App Icon/Extensions/UserDefaults+AppIcon.swift",
-				Ghostty/Ghostty.ConfigTypes.swift,
-				Ghostty/GhosttyPackageMeta.swift,
+				Zashiki/Zashiki.ConfigTypes.swift,
+				Zashiki/ZashikiPackageMeta.swift,
 				Helpers/CrossKit.swift,
 				"Helpers/Extensions/NSImage+Extension.swift",
 				"Helpers/Extensions/OSColor+Extension.swift",
@@ -295,7 +295,7 @@
 				A51BFC262B30F1B800E92F16 /* Sparkle */,
 				1F5CE0950D1FAC97748F788F /* Textual */,
 			);
-			productName = Ghostty;
+			productName = Zashiki;
 			productReference = A5B30531299BEAAA0047F10C /* Zashiki.app */;
 			productType = "com.apple.product-type.application";
 		};
@@ -570,7 +570,7 @@
 				"OTHER_LDFLAGS[arch=*]" = "-lstdc++";
 				PRODUCT_BUNDLE_IDENTIFIER = dev.kawaken.zashiki;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PRODUCT_MODULE_NAME = Ghostty;
+				PRODUCT_MODULE_NAME = Zashiki;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "Sources/App/macOS/zashiki-bridging-header.h";
 				SWIFT_VERSION = 5.0;
@@ -596,7 +596,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = Ghostty;
+				TEST_TARGET_NAME = Zashiki;
 			};
 			name = Debug;
 		};
@@ -619,7 +619,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = Ghostty;
+				TEST_TARGET_NAME = Zashiki;
 			};
 			name = Release;
 		};
@@ -642,7 +642,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = Ghostty;
+				TEST_TARGET_NAME = Zashiki;
 			};
 			name = ReleaseLocal;
 		};
@@ -967,7 +967,7 @@
 				"OTHER_LDFLAGS[arch=*]" = "-lstdc++";
 				PRODUCT_BUNDLE_IDENTIFIER = dev.kawaken.zashiki.debug;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PRODUCT_MODULE_NAME = Ghostty;
+				PRODUCT_MODULE_NAME = Zashiki;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "Sources/App/macOS/zashiki-bridging-header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -1022,7 +1022,7 @@
 				"OTHER_LDFLAGS[arch=*]" = "-lstdc++";
 				PRODUCT_BUNDLE_IDENTIFIER = dev.kawaken.zashiki;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PRODUCT_MODULE_NAME = Ghostty;
+				PRODUCT_MODULE_NAME = Zashiki;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "Sources/App/macOS/zashiki-bridging-header.h";
 				SWIFT_VERSION = 5.0;

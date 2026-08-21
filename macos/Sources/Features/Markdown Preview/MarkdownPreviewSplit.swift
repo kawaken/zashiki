@@ -5,10 +5,10 @@ import SwiftUI
 /// overhead); when visible it wraps `content` and the preview side-by-side
 /// using the same `SplitView` the surface inspector uses.
 ///
-/// This mirrors `Ghostty.InspectableSurface`'s if/else-around-a-`SplitView`
-/// pattern (see `macos/Sources/Ghostty/Surface View/InspectorView.swift`).
+/// This mirrors `Zashiki.InspectableSurface`'s if/else-around-a-`SplitView`
+/// pattern (see `macos/Sources/Zashiki/Surface View/InspectorView.swift`).
 struct MarkdownPreviewSplit<Content: View>: View {
-    let ghostty: Ghostty.App
+    let ghostty: Zashiki.App
 
     @ObservedObject var model: MarkdownPreviewModel
 

@@ -27,8 +27,8 @@ extension NSPasteboard.PasteboardType {
 }
 
 extension NSPasteboard {
-    /// The pasteboard to used for Ghostty selection.
-    static var ghosttySelection: NSPasteboard = {
+    /// The pasteboard to used for Zashiki selection.
+    static var zashikiSelection: NSPasteboard = {
         NSPasteboard(name: .init("dev.kawaken.zashiki.selection"))
     }()
 
@@ -42,7 +42,7 @@ extension NSPasteboard {
             if let plist = item.propertyList(forType: .fileURL),
                let fileURL = NSURL(pasteboardPropertyList: plist, ofType: .fileURL) as URL?,
                fileURL.isFileURL {
-                return Ghostty.Shell.escape(fileURL.path)
+                return Zashiki.Shell.escape(fileURL.path)
             } else {
                 return item.string(forType: .string)
             }
@@ -54,14 +54,14 @@ extension NSPasteboard {
         return strings.joined(separator: " ")
     }
 
-    /// The pasteboard for the Ghostty enum type.
+    /// The pasteboard for the Zashiki enum type.
     static func ghostty(_ clipboard: ghostty_clipboard_e) -> NSPasteboard? {
         switch clipboard {
         case GHOSTTY_CLIPBOARD_STANDARD:
             return Self.general
 
         case GHOSTTY_CLIPBOARD_SELECTION:
-            return Self.ghosttySelection
+            return Self.zashikiSelection
 
         default:
             return nil

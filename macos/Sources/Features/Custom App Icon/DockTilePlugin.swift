@@ -1,7 +1,7 @@
 import AppKit
 
 class DockTilePlugin: NSObject, NSDockTilePlugIn {
-    // WARNING: An instance of this class is alive as long as Ghostty's icon is
+    // WARNING: An instance of this class is alive as long as Zashiki's icon is
     // in the doc (running or not!), so keep any state and processing to a
     // minimum to respect resource usage.
 
@@ -19,7 +19,7 @@ class DockTilePlugin: NSObject, NSDockTilePlugIn {
 
     /// The primary NSDockTilePlugin function.
     func setDockTile(_ dockTile: NSDockTile?) {
-        // If no dock tile or no access to Ghostty defaults, we can't do anything.
+        // If no dock tile or no access to Zashiki defaults, we can't do anything.
         guard let dockTile, let zashikiUserDefaults else {
             iconChangeObserver = nil
             return
@@ -29,10 +29,10 @@ class DockTilePlugin: NSObject, NSDockTilePlugIn {
         iconDidChange(zashikiUserDefaults.appIcon, dockTile: dockTile)
 
         // Setup a new observer for when the icon changes so we can update. This message
-        // is sent by the primary Ghostty app.
+        // is sent by the primary Zashiki app.
         iconChangeObserver = DistributedNotificationCenter
             .default()
-            .publisher(for: .ghosttyIconDidChange)
+            .publisher(for: .zashikiIconDidChange)
             .map { [weak self] _ in self?.zashikiUserDefaults?.appIcon }
             .receive(on: DispatchQueue.global())
             .sink { [weak self] newIcon in self?.iconDidChange(newIcon, dockTile: dockTile) }
@@ -55,7 +55,7 @@ class DockTilePlugin: NSObject, NSDockTilePlugIn {
             // Use the `Blueprint` icon to distinguish Debug from Release builds.
             appIcon = pluginBundle.image(forResource: "BlueprintImage")!
             #else
-            // Reset to Ghostty.icon
+            // Reset to Zashiki.icon
             appIcon = nil
             #endif
         } else {

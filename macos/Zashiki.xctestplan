@@ -17,7 +17,7 @@
     "environmentVariableEntries" : [
       {
         "key" : "ZASHIKI_CONFIG_PATH",
-        "value" : "\/tmp\/Ghostty\/testing_config.ghostty"
+        "value" : "\/tmp\/Zashiki\/testing_config.ghostty"
       }
     ],
     "performanceAntipatternCheckerEnabled" : true,

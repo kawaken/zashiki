@@ -39,7 +39,7 @@ final class ZashikiThemeTests: ZashikiCustomConfigCase {
         }
     }
 
-    /// https://github.com/zashiki-org/zashiki/issues/8282
+    /// https://github.com/ghostty-org/ghostty/issues/8282
     @MainActor
     func testIssue8282() async throws {
         try updateConfig("title=\(windowTitle) \n theme=light:3024 Day,dark:3024 Night")
