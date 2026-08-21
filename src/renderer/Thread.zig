@@ -102,9 +102,6 @@ flags: packed struct {
     /// thread automatically.
     cursor_blink_visible: bool = false,
 
-    /// This is true when the inspector is active.
-    has_inspector: bool = false,
-
     /// This is true when the view is visible. This is used to determine
     /// if we should be rendering or not.
     visible: bool = true,
@@ -485,10 +482,6 @@ fn drainMailbox(self: *Thread) !void {
                 self.renderer.search_matches_dirty = true;
             },
 
-            .inspector => |v| {
-                self.flags.has_inspector = v;
-            },
-
             .macos_display_id => |v| {
                 if (@hasDecl(rendererpkg.Renderer, "setMacOSDisplayID")) {
                     try self.renderer.setMacOSDisplayID(v);
@@ -775,9 +768,7 @@ const Compression = struct {
         if (!thread.config.scrollback_compression) return;
 
         // PageList activity, rather than a generic renderer wake, restarts the
-        // idle interval. In particular, the inspector wakes the renderer every
-        // frame without changing terminal contents and must not starve this
-        // timer indefinitely.
+        // idle interval.
         if (thread.state.mutex.tryLock()) {
             defer thread.state.mutex.unlock(global.io());
             const activity = thread.state.terminal.compressionActivity();
@@ -785,7 +776,7 @@ const Compression = struct {
             self.activity = activity;
         } else if (self.completion.state() == .active) {
             // Contention doesn't prove that compression-relevant activity
-            // changed. Keep an existing deadline so frequent inspector frames
+            // changed. Keep an existing deadline so frequent renderer wakes
             // cannot postpone compression forever. The timer rechecks both the
             // activity token and lock availability before doing any work.
             return;

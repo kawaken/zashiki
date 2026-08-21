@@ -235,62 +235,6 @@ pub fn add(
         else => {},
     }
 
-    // Freetype. We always include this even if our font backend doesn't
-    // use it because Dear Imgui uses Freetype.
-    _ = b.systemIntegrationOption("freetype", .{}); // Shows it in help
-    if (b.lazyDependency("freetype", .{
-        .target = target,
-        .optimize = optimize,
-        .@"enable-libpng" = true,
-    })) |freetype_dep| {
-        step.root_module.addImport(
-            "freetype",
-            freetype_dep.module("freetype"),
-        );
-
-        if (b.systemIntegrationOption("freetype", .{})) {
-            step.root_module.linkSystemLibrary("bzip2", dynamic_link_opts);
-            step.root_module.linkSystemLibrary("freetype2", dynamic_link_opts);
-        } else {
-            step.root_module.linkLibrary(freetype_dep.artifact("freetype"));
-            try static_libs.append(
-                b.allocator,
-                freetype_dep.artifact("freetype").getEmittedBin(),
-            );
-        }
-    }
-
-    // Libpng - Ghostty doesn't actually use this directly, its only used
-    // through dependencies, so we only need to add it to our static
-    // libs list if we're not using system integration. The dependencies
-    // will handle linking it.
-    if (!b.systemIntegrationOption("libpng", .{})) {
-        if (b.lazyDependency("libpng", .{
-            .target = target,
-            .optimize = optimize,
-        })) |libpng_dep| {
-            step.root_module.linkLibrary(libpng_dep.artifact("png"));
-            try static_libs.append(
-                b.allocator,
-                libpng_dep.artifact("png").getEmittedBin(),
-            );
-        }
-    }
-
-    // Zlib - same as libpng, only used through dependencies.
-    if (!b.systemIntegrationOption("zlib", .{})) {
-        if (b.lazyDependency("zlib", .{
-            .target = target,
-            .optimize = optimize,
-        })) |zlib_dep| {
-            step.root_module.linkLibrary(zlib_dep.artifact("z"));
-            try static_libs.append(
-                b.allocator,
-                zlib_dep.artifact("z").getEmittedBin(),
-            );
-        }
-    }
-
     // Oniguruma
     if (b.lazyDependency("oniguruma", .{
         .target = target,
@@ -474,25 +418,6 @@ pub fn add(
                 libintl_dep.artifact("intl").getEmittedBin(),
             );
         }
-    }
-
-    // cimgui
-    if (b.lazyDependency("dcimgui", .{
-        .target = target,
-        .optimize = optimize,
-        .freetype = true,
-        .@"backend-metal" = target.result.os.tag.isDarwin(),
-        .@"backend-osx" = target.result.os.tag == .macos,
-        // OpenGL3 backend should only be built on non-Apple targets.
-        // Apple platforms use Metal (and macOS may also use the OSX backend).
-        .@"backend-opengl3" = !target.result.os.tag.isDarwin(),
-    })) |dep| {
-        step.root_module.addImport("dcimgui", dep.module("dcimgui"));
-        step.root_module.linkLibrary(dep.artifact("dcimgui"));
-        try static_libs.append(
-            b.allocator,
-            dep.artifact("dcimgui").getEmittedBin(),
-        );
     }
 
     // Fonts

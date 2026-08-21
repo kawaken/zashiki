@@ -9,7 +9,6 @@ const Renderer = @import("../renderer.zig").Renderer;
 const GraphicsAPI = Renderer.API;
 const Texture = GraphicsAPI.Texture;
 const CellSize = @import("size.zig").CellSize;
-const Overlay = @import("Overlay.zig");
 
 const log = std.log.scoped(.renderer_image);
 
@@ -34,16 +33,12 @@ pub const State = struct {
     /// on frame builds and are generally more expensive to handle.
     kitty_virtual: bool,
 
-    /// Overlays
-    overlay_placements: std.ArrayListUnmanaged(Placement),
-
     pub const empty: State = .{
         .images = .empty,
         .kitty_placements = .empty,
         .kitty_bg_end = 0,
         .kitty_text_end = 0,
         .kitty_virtual = false,
-        .overlay_placements = .empty,
     };
 
     pub fn deinit(self: *State, alloc: Allocator) void {
@@ -53,7 +48,6 @@ pub const State = struct {
             self.images.deinit(alloc);
         }
         self.kitty_placements.deinit(alloc);
-        self.overlay_placements.deinit(alloc);
     }
 
     /// Upload any images to the GPU that need to be uploaded,
@@ -95,7 +89,6 @@ pub const State = struct {
         kitty_below_bg,
         kitty_below_text,
         kitty_above_text,
-        overlay,
     };
 
     /// Draw the given named set of placements.
@@ -113,7 +106,6 @@ pub const State = struct {
             .kitty_below_bg => self.kitty_placements.items[0..self.kitty_bg_end],
             .kitty_below_text => self.kitty_placements.items[self.kitty_bg_end..self.kitty_text_end],
             .kitty_above_text => self.kitty_placements.items[self.kitty_text_end..],
-            .overlay => self.overlay_placements.items,
         };
 
         for (placements) |p| {
@@ -179,57 +171,6 @@ pub const State = struct {
         }
     }
 
-    /// Update our overlay state. Null value deletes any existing overlay.
-    pub fn overlayUpdate(
-        self: *State,
-        alloc: Allocator,
-        overlay_: ?Overlay,
-    ) !void {
-        const overlay = overlay_ orelse {
-            // If we don't have an overlay, remove any existing one.
-            if (self.images.getPtr(.overlay)) |data| {
-                data.image.markForUnload();
-            }
-            return;
-        };
-
-        // Overlays are always considered new content, so we take a
-        // fresh generation stamp to force replacing any existing one.
-        const generation = terminal.kitty.graphics.nextGeneration(global.io());
-
-        // Ensure we have space for our overlay placement. Do this before
-        // we upload our image so we don't have to deal with cleaning
-        // that up.
-        self.overlay_placements.clearRetainingCapacity();
-        try self.overlay_placements.ensureUnusedCapacity(alloc, 1);
-
-        // Setup our image.
-        const pending = overlay.pendingImage();
-        try self.prepImage(
-            alloc,
-            .overlay,
-            generation,
-            pending,
-        );
-        errdefer comptime unreachable;
-
-        // Setup our placement
-        self.overlay_placements.appendAssumeCapacity(.{
-            .image_id = .overlay,
-            .x = 0,
-            .y = 0,
-            .z = 0,
-            .width = pending.width,
-            .height = pending.height,
-            .cell_offset_x = 0,
-            .cell_offset_y = 0,
-            .source_x = 0,
-            .source_y = 0,
-            .source_width = pending.width,
-            .source_height = pending.height,
-        });
-    }
-
     /// Returns true if the Kitty graphics state requires an update based
     /// on the terminal state and our internal state.
     ///
@@ -280,8 +221,6 @@ pub const State = struct {
                     .kitty => |id| if (storage.imageById(id) == null) {
                         kv.value_ptr.image.markForUnload();
                     },
-
-                    .overlay => {},
                 }
             }
         }
@@ -658,30 +597,13 @@ pub const Id = union(enum) {
     /// The value is the ID assigned by the terminal.
     kitty: u32,
 
-    /// Debug overlay. This is always composited down to a single
-    /// image for now. In the future we can support layers here if we want.
-    overlay,
-
     /// Z-ordering tie-breaker for images with the same z value.
     pub fn zLessThan(lhs: Id, rhs: Id) bool {
-        // If our tags aren't the same, we sort by tag.
-        if (std.meta.activeTag(lhs) != std.meta.activeTag(rhs)) {
-            return switch (lhs) {
-                // Kitty images always sort before (lower z) non-kitty images.
-                .kitty => true,
-
-                .overlay => false,
-            };
-        }
-
         switch (lhs) {
             .kitty => |lhs_id| {
                 const rhs_id = rhs.kitty;
                 return lhs_id < rhs_id;
             },
-
-            // No sensical ordering
-            .overlay => return false,
         }
     }
 };

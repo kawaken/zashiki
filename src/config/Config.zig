@@ -6406,13 +6406,6 @@ pub const Keybinds = struct {
                 .{ .performable = true },
             );
 
-            // Inspector, matching Chromium
-            try self.set.put(
-                alloc,
-                .{ .key = .{ .unicode = 'i' }, .mods = .{ .shift = true, .ctrl = true } },
-                .{ .inspector = .toggle },
-            );
-
             // Terminal
             try self.set.put(
                 alloc,
@@ -6751,13 +6744,6 @@ pub const Keybinds = struct {
                 .{ .key = .{ .unicode = 'g' }, .mods = .{ .super = true, .shift = true } },
                 .{ .navigate_search = .previous },
                 .{ .performable = true },
-            );
-
-            // Inspector, matching Chromium
-            try self.set.put(
-                alloc,
-                .{ .key = .{ .unicode = 'i' }, .mods = .{ .alt = true, .super = true } },
-                .{ .inspector = .toggle },
             );
 
             // Alternate keybind, common to Mac programs

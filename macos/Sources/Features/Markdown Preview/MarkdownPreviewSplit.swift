@@ -3,10 +3,7 @@ import SwiftUI
 /// Wraps arbitrary terminal content with an optional Markdown preview
 /// pane. When the pane is hidden this is a pass-through (no `SplitView`
 /// overhead); when visible it wraps `content` and the preview side-by-side
-/// using the same `SplitView` the surface inspector uses.
-///
-/// This mirrors `Ghostty.InspectableSurface`'s if/else-around-a-`SplitView`
-/// pattern (see `macos/Sources/Ghostty/Surface View/InspectorView.swift`).
+/// using the same `SplitView` the terminal splits use.
 struct MarkdownPreviewSplit<Content: View>: View {
     let ghostty: Ghostty.App
 

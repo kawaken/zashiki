@@ -420,12 +420,6 @@ extension Ghostty.Notification {
     static let didReceiveInitialWindowFrame = Notification.Name("dev.kawaken.zashiki.didReceiveInitialWindowFrame")
     static let FrameKey = "dev.kawaken.zashiki.frame"
 
-    /// Notification to render the inspector for a surface
-    static let inspectorNeedsDisplay = Notification.Name("dev.kawaken.zashiki.inspectorNeedsDisplay")
-
-    /// Notification to show/hide the inspector
-    static let didControlInspector = Notification.Name("dev.kawaken.zashiki.didControlInspector")
-
     static let confirmClipboard = Notification.Name("dev.kawaken.zashiki.confirmClipboard")
     static let ConfirmClipboardStrKey = confirmClipboard.rawValue + ".str"
     static let ConfirmClipboardStateKey = confirmClipboard.rawValue + ".state"

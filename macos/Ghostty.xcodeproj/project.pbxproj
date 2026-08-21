@@ -192,7 +192,6 @@
 				Ghostty/Ghostty.MenuShortcutManager.swift,
 				Ghostty/Ghostty.Surface.swift,
 				"Ghostty/NSEvent+Extension.swift",
-				"Ghostty/Surface View/InspectorView.swift",
 				"Ghostty/Surface View/SurfaceDragSource.swift",
 				"Ghostty/Surface View/SurfaceGrabHandle.swift",
 				"Ghostty/Surface View/SurfaceScrollView.swift",

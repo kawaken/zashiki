@@ -1455,8 +1455,7 @@ class BaseTerminalController: NSWindowController,
         markdownPreview.toggle()
         if !markdownPreview.isVisible, let focusedSurface {
             // Hiding the pane can leave focus in a weird spot (the pane's
-            // own controls, if it had any). Send focus back to the
-            // terminal, mirroring how the inspector handles this.
+            // own controls, if it had any). Send focus back to the terminal.
             Ghostty.moveFocus(to: focusedSurface)
         }
     }

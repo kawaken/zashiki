@@ -186,13 +186,6 @@ pub const Action = union(Key) {
     /// surfaces should be redrawn.
     render,
 
-    /// Control whether the inspector is shown or hidden.
-    inspector: Inspector,
-
-    /// The inspector for the given target has changes and should be
-    /// rendered at the next opportunity.
-    render_inspector,
-
     /// Show a desktop notification.
     desktop_notification: DesktopNotification,
 
@@ -375,8 +368,6 @@ pub const Action = union(Key) {
         cell_size,
         scrollbar,
         render,
-        inspector,
-        render_inspector,
         desktop_notification,
         set_title,
         set_tab_title,
@@ -594,17 +585,6 @@ pub const SecureInput = enum(c_int) {
 
     test "ghostty.h SecureInput" {
         try lib.checkGhosttyHEnum(SecureInput, "GHOSTTY_SECURE_INPUT_");
-    }
-};
-
-/// The inspector mode to toggle to if we're toggling the inspector.
-pub const Inspector = enum(c_int) {
-    toggle,
-    show,
-    hide,
-
-    test "ghostty.h Inspector" {
-        try lib.checkGhosttyHEnum(Inspector, "GHOSTTY_INSPECTOR_");
     }
 };
 
