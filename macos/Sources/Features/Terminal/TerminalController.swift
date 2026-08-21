@@ -1380,7 +1380,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         }
     }
 
-    @IBAction func toggleGhosttyFullScreen(_ sender: Any?) {
+    @IBAction func toggleZashikiFullScreen(_ sender: Any?) {
         guard let surface = focusedSurface?.surface else { return }
         ghostty.toggleFullscreen(surface: surface)
     }

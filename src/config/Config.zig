@@ -543,16 +543,16 @@ language: ?[:0]const u8 = null,
 /// systems with case-sensitive filesystems. It is an error for a theme name to
 /// include path separators unless it is an absolute pathname.
 ///
-/// The first directory is the `themes` subdirectory of your Ghostty
-/// configuration directory. This is `$XDG_CONFIG_HOME/ghostty/themes` or
-/// `~/.config/ghostty/themes`.
+/// The first directory is the `themes` subdirectory of your Zashiki
+/// configuration directory. This is `$XDG_CONFIG_HOME/zashiki/themes` or
+/// `~/.config/zashiki/themes`.
 ///
-/// The second directory is the `themes` subdirectory of the Ghostty resources
-/// directory. Ghostty ships with a multitude of themes that will be installed
+/// The second directory is the `themes` subdirectory of the Zashiki resources
+/// directory. Zashiki ships with a multitude of themes that will be installed
 /// into this directory. On macOS, this list is in the
-/// `Ghostty.app/Contents/Resources/ghostty/themes` directory. On Linux, this
+/// `Zashiki.app/Contents/Resources/ghostty/themes` directory. On Linux, this
 /// list is in the `share/ghostty/themes` directory (wherever you installed the
-/// Ghostty "share" directory.
+/// Zashiki "share" directory.
 ///
 /// To see a list of available themes, run `ghostty +list-themes`.
 ///
@@ -3384,7 +3384,7 @@ keybind: Keybinds = .{},
 /// The absolute path to the custom icon file.
 /// Supported formats include PNG, JPEG, and ICNS.
 ///
-/// Defaults to `~/.config/ghostty/Ghostty.icns`
+/// Defaults to `~/.config/zashiki/Zashiki.icns`
 @"macos-custom-icon": ?[:0]const u8 = null,
 
 /// The material to use for the frame of the macOS app icon.
