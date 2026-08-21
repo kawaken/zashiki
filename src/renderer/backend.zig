@@ -1,23 +1,15 @@
 const std = @import("std");
-const WasmTarget = @import("../os/wasm/target.zig").Target;
 
 /// Possible implementations, used for build options.
+///
+/// This fork is macOS-only, so Metal is the only renderer. The enum is
+/// kept (rather than removed entirely) because it is threaded through the
+/// build options and reported in crash report tags.
 pub const Backend = enum {
-    opengl,
     metal,
-    webgl,
 
-    pub fn default(
-        target: std.Target,
-        wasm_target: WasmTarget,
-    ) Backend {
-        if (target.cpu.arch == .wasm32) {
-            return switch (wasm_target) {
-                .browser => .webgl,
-            };
-        }
-
-        if (target.os.tag.isDarwin()) return .metal;
-        return .opengl;
+    pub fn default(target: std.Target) Backend {
+        _ = target;
+        return .metal;
     }
 };

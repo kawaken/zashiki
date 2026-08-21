@@ -1,5 +1,4 @@
 const std = @import("std");
-const wasm = @import("../wasm.zig");
 
 // Use the correct implementation
 pub const log = Freestanding.log;
@@ -29,9 +28,9 @@ pub const Freestanding = struct {
         var allocated: bool = false;
         const str = nosuspend std.fmt.bufPrint(&buf, txt, args) catch str: {
             allocated = true;
-            break :str std.fmt.allocPrint(wasm.alloc, txt, args) catch return;
+            break :str std.fmt.allocPrint(std.heap.wasm_allocator, txt, args) catch return;
         };
-        defer if (allocated) wasm.alloc.free(str);
+        defer if (allocated) std.heap.wasm_allocator.free(str);
 
         // Send it over to the JS side
         JS.log(str.ptr, str.len);

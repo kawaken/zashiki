@@ -4416,14 +4416,9 @@ pub fn finalize(self: *Config) !void {
     {
         if (self.command == null or wd == .home) command: {
             // First look up the command using the SHELL env var if needed.
-            // We don't do this in flatpak because SHELL in Flatpak is always
-            // set to /bin/sh.
             if (self.command) |cmd|
                 log.info("shell src=config value={}", .{cmd})
             else shell_env: {
-                // Flatpak always gets its shell from outside the sandbox
-                if (internal_os.isFlatpak()) break :shell_env;
-
                 // If we were launched from the desktop, our SHELL env var
                 // will represent our SHELL at login time. We only want to
                 // read from SHELL if we're in a probable CLI environment.

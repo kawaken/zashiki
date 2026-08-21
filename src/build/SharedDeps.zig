@@ -260,55 +260,6 @@ pub fn add(
         }
     }
 
-    // Harfbuzz
-    _ = b.systemIntegrationOption("harfbuzz", .{}); // Shows it in help
-    if (self.config.font_backend.hasHarfbuzz()) {
-        if (b.lazyDependency("harfbuzz", .{
-            .target = target,
-            .optimize = optimize,
-            .@"enable-freetype" = self.config.font_backend.hasFreetype(),
-            .@"enable-coretext" = self.config.font_backend.hasCoretext(),
-        })) |harfbuzz_dep| {
-            step.root_module.addImport(
-                "harfbuzz",
-                harfbuzz_dep.module("harfbuzz"),
-            );
-            if (b.systemIntegrationOption("harfbuzz", .{})) {
-                step.root_module.linkSystemLibrary("harfbuzz", dynamic_link_opts);
-            } else {
-                step.root_module.linkLibrary(harfbuzz_dep.artifact("harfbuzz"));
-                try static_libs.append(
-                    b.allocator,
-                    harfbuzz_dep.artifact("harfbuzz").getEmittedBin(),
-                );
-            }
-        }
-    }
-
-    // Fontconfig
-    _ = b.systemIntegrationOption("fontconfig", .{}); // Shows it in help
-    if (self.config.font_backend.hasFontconfig()) {
-        if (b.lazyDependency("fontconfig", .{
-            .target = target,
-            .optimize = optimize,
-        })) |fontconfig_dep| {
-            step.root_module.addImport(
-                "fontconfig",
-                fontconfig_dep.module("fontconfig"),
-            );
-
-            if (b.systemIntegrationOption("fontconfig", .{})) {
-                step.root_module.linkSystemLibrary("fontconfig", dynamic_link_opts);
-            } else {
-                step.root_module.linkLibrary(fontconfig_dep.artifact("fontconfig"));
-                try static_libs.append(
-                    b.allocator,
-                    fontconfig_dep.artifact("fontconfig").getEmittedBin(),
-                );
-            }
-        }
-    }
-
     // Libpng - Ghostty doesn't actually use this directly, its only used
     // through dependencies, so we only need to add it to our static
     // libs list if we're not using system integration. The dependencies
@@ -438,21 +389,6 @@ pub fn add(
         &static_libs,
     );
 
-    // Wasm we do manually since it is such a different build.
-    if (step.rootModuleTarget().cpu.arch == .wasm32) {
-        if (b.lazyDependency("zig_js", .{
-            .target = target,
-            .optimize = optimize,
-        })) |js_dep| {
-            step.root_module.addImport(
-                "zig-js",
-                js_dep.module("zig-js"),
-            );
-        }
-
-        return static_libs;
-    }
-
     // On Linux, we need to add a couple common library paths that aren't
     // on the standard search list. i.e. GTK is often in /usr/lib/x86_64-linux-gnu
     // on x86_64.
@@ -501,9 +437,6 @@ pub fn add(
     }
 
     // Other dependencies, mostly pure Zig
-    if (b.lazyDependency("opengl", .{})) |dep| {
-        step.root_module.addImport("opengl", dep.module("opengl"));
-    }
     if (b.lazyDependency("vaxis", .{
         .target = target,
         .optimize = optimize,
@@ -566,10 +499,6 @@ pub fn add(
                 b.allocator,
                 macos_dep.artifact("macos").getEmittedBin(),
             );
-        }
-
-        if (self.config.renderer == .opengl) {
-            step.root_module.linkFramework("OpenGL", .{});
         }
 
         // Apple platforms do not include libc libintl so we bundle it.
@@ -643,47 +572,6 @@ pub fn add(
                 "nerd_fonts_symbols_only",
                 .{ .root_source_file = nf_symbols.path("SymbolsNerdFont-Regular.ttf") },
             );
-        }
-    }
-
-    // If we're building an exe then we have additional dependencies.
-    if (step.kind != .lib) {
-        // We always statically compile glad
-        step.root_module.addIncludePath(b.path("vendor/glad/include/"));
-        step.root_module.addCSourceFile(.{
-            .file = b.path("vendor/glad/src/gl.c"),
-            .flags = &.{},
-        });
-
-        // When we're targeting flatpak we ALWAYS link GTK so we
-        // get access to glib for dbus.
-        if (self.config.flatpak) {
-            step.root_module.linkSystemLibrary("gtk4", dynamic_link_opts);
-
-            // We need to translate gio headers too
-            gio_translate: {
-                // translate-c stuff
-                const translate_c = b.lazyImport(@import("../../build.zig"), "translate_c") orelse
-                    break :gio_translate;
-                const translate_c_dep = b.lazyDependency("translate_c", .{}) orelse
-                    break :gio_translate;
-                const translated: translate_c.Translator = .init(translate_c_dep, .{
-                    .c_source_file = b.addWriteFiles().add("gio_c.h",
-                        \\#include <gio/gio.h>
-                        \\#include <gio/gunixfdlist.h>
-                    ),
-                    .target = target,
-                    .optimize = optimize,
-                    .link_system_libs = &.{
-                        .{ .name = "gio-2.0", .options = dynamic_link_opts },
-                    },
-                });
-                step.root_module.addImport("gio_c", translated.mod);
-            }
-        }
-
-        switch (self.config.app_runtime) {
-            .none => {},
         }
     }
 

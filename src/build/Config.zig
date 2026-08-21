@@ -10,7 +10,6 @@ const FontBackend = @import("../font/backend.zig").Backend;
 const RendererBackend = @import("../renderer/backend.zig").Backend;
 const TerminalBuildOptions = @import("../terminal/build_options.zig").Options;
 const XCFrameworkTarget = @import("xcframework.zig").Target;
-const WasmTarget = @import("../os/wasm/target.zig").Target;
 const expandPath = @import("../os/path.zig").expand;
 
 const GitVersion = @import("GitVersion.zig");
@@ -19,18 +18,16 @@ const GitVersion = @import("GitVersion.zig");
 optimize: std.builtin.OptimizeMode,
 target: std.Build.ResolvedTarget,
 xcframework_target: XCFrameworkTarget = .universal,
-wasm_target: WasmTarget,
 
 /// Comptime interfaces
 app_runtime: ApprtRuntime = .none,
-renderer: RendererBackend = .opengl,
-font_backend: FontBackend = .freetype,
+renderer: RendererBackend = .metal,
+font_backend: FontBackend = .coretext,
 
 /// Feature flags
 sentry: bool = true,
 simd: bool = true,
 i18n: bool = true,
-wasm_shared: bool = true,
 
 /// Ghostty exe properties
 exe_entrypoint: ExeEntrypoint = .ghostty,
@@ -43,8 +40,6 @@ strip: bool = false,
 patchelf: ?PatchElf = null,
 
 /// Artifacts
-flatpak: bool = false,
-snap: bool = false,
 emit_bench: bool = false,
 emit_docs: bool = false,
 emit_exe: bool = false,
@@ -112,10 +107,6 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
     // but we may want to make this more sophisticated in the future.
     const system_package = b.graph.system_package_mode;
 
-    // This specifies our target wasm runtime. For now only one semi-usable
-    // one exists so this is hardcoded.
-    const wasm_target: WasmTarget = .browser;
-
     // Grab the environment from build state
     const env = &b.graph.environ_map;
 
@@ -123,7 +114,6 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
     var config: Config = .{
         .optimize = optimize,
         .target = target,
-        .wasm_target = wasm_target,
         .is_dep = is_dep,
         .env = env,
     };
@@ -142,7 +132,7 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
         FontBackend,
         "font-backend",
         "The font backend to use for discovery and rasterization.",
-    ) orelse FontBackend.default(target.result, wasm_target);
+    ) orelse FontBackend.default(target.result);
 
     config.app_runtime = b.option(
         ApprtRuntime,
@@ -154,22 +144,10 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
         RendererBackend,
         "renderer",
         "The app runtime to use. Not all values supported on all platforms.",
-    ) orelse RendererBackend.default(target.result, wasm_target);
+    ) orelse RendererBackend.default(target.result);
 
     //---------------------------------------------------------------
     // Feature Flags
-
-    config.flatpak = b.option(
-        bool,
-        "flatpak",
-        "Build for Flatpak (integrates with Flatpak APIs). Only has an effect targeting Linux.",
-    ) orelse false;
-
-    config.snap = b.option(
-        bool,
-        "snap",
-        "Build for Snap (do specific Snap operations). Only has an effect targeting Linux.",
-    ) orelse false;
 
     config.sentry = b.option(
         bool,
@@ -189,13 +167,7 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
         bool,
         "simd",
         "Build with SIMD-accelerated code paths. Results in significant performance improvements.",
-    ) orelse simd: {
-        // We can't build our SIMD dependencies for Wasm. Note that we may
-        // still use SIMD features in the Wasm-builds.
-        if (target.result.cpu.arch.isWasm()) break :simd false;
-
-        break :simd true;
-    };
+    ) orelse true;
 
     config.i18n = b.option(
         bool,
@@ -529,8 +501,6 @@ pub fn addPatchElf(self: *const Config, artifact: *std.Build.Step.Compile, step:
 pub fn addOptions(self: *const Config, step: *std.Build.Step.Options) !void {
     // We need to break these down individual because addOption doesn't
     // support all types.
-    step.addOption(bool, "flatpak", self.flatpak);
-    step.addOption(bool, "snap", self.snap);
     step.addOption(bool, "sentry", self.sentry);
     step.addOption(bool, "simd", self.simd);
     step.addOption(bool, "i18n", self.i18n);
@@ -538,8 +508,6 @@ pub fn addOptions(self: *const Config, step: *std.Build.Step.Options) !void {
     step.addOption(FontBackend, "font_backend", self.font_backend);
     step.addOption(RendererBackend, "renderer", self.renderer);
     step.addOption(ExeEntrypoint, "exe_entrypoint", self.exe_entrypoint);
-    step.addOption(WasmTarget, "wasm_target", self.wasm_target);
-    step.addOption(bool, "wasm_shared", self.wasm_shared);
 
     // Our version. We also add the string version so we don't need
     // to do any allocations at runtime. This has to be long enough to
@@ -623,14 +591,10 @@ pub fn fromOptions() Config {
         .env = undefined,
 
         .version = options.app_version,
-        .flatpak = options.flatpak,
         .app_runtime = std.meta.stringToEnum(ApprtRuntime, @tagName(options.app_runtime)).?,
         .font_backend = std.meta.stringToEnum(FontBackend, @tagName(options.font_backend)).?,
         .renderer = std.meta.stringToEnum(RendererBackend, @tagName(options.renderer)).?,
-        .snap = options.snap,
         .exe_entrypoint = std.meta.stringToEnum(ExeEntrypoint, @tagName(options.exe_entrypoint)).?,
-        .wasm_target = std.meta.stringToEnum(WasmTarget, @tagName(options.wasm_target)).?,
-        .wasm_shared = options.wasm_shared,
         .i18n = options.i18n,
     };
 }
@@ -688,7 +652,7 @@ pub fn genericMacOSTarget(
 }
 
 /// The possible entrypoints for the exe artifact. This has no effect on
-/// other artifact types (i.e. lib, wasm_module).
+/// other artifact types (i.e. lib).
 ///
 /// The whole existence of this enum is to workaround the fact that Zig
 /// doesn't allow the main function to be in a file in a subdirctory
