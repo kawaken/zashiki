@@ -915,7 +915,7 @@ pub const Surface = struct {
             }
 
             // Remove this so that running `ghostty` within Ghostty works.
-            _ = env.orderedRemove("GHOSTTY_MAC_LAUNCH_SOURCE");
+            _ = env.orderedRemove("ZASHIKI_MAC_LAUNCH_SOURCE");
 
             // If we were launched from the desktop then we want to
             // remove the LANGUAGE env var so that we don't inherit

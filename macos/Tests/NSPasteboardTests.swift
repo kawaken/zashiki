@@ -1,6 +1,6 @@
 //
 //  NSPasteboardTests.swift
-//  GhosttyTests
+//  ZashikiTests
 //
 //  Tests for NSPasteboard.PasteboardType MIME type conversion and
 //  NSPasteboard.getOpinionatedStringContents.
@@ -8,7 +8,7 @@
 
 import Testing
 import AppKit
-@testable import Ghostty
+@testable import Zashiki
 
 struct NSPasteboardTypeExtensionTests {
     /// Test text/plain MIME type converts to .string

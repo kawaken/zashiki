@@ -8,7 +8,7 @@ const global = @import("../global.zig");
 pub fn defaultDir(alloc: Allocator) !Dir {
     var environ_map = try global.environMap();
     defer environ_map.deinit();
-    const crash_dir = try internal_os.xdg.state(alloc, &environ_map, .{ .subdir = "ghostty/crash" });
+    const crash_dir = try internal_os.xdg.state(alloc, &environ_map, .{ .subdir = "zashiki/crash" });
     errdefer alloc.free(crash_dir);
     return .{ .path = crash_dir };
 }

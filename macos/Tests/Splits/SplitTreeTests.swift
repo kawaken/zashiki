@@ -1,6 +1,6 @@
 import AppKit
 import Testing
-@testable import Ghostty
+@testable import Zashiki
 
 class MockView: NSView, Codable, Identifiable {
     let id: UUID

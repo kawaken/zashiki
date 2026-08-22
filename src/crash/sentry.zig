@@ -122,7 +122,7 @@ fn initThread(gpa: Allocator) !void {
         break :cache_dir try internal_os.xdg.cache(
             alloc,
             &environ_map,
-            .{ .subdir = "ghostty/sentry" },
+            .{ .subdir = "zashiki/sentry" },
         );
     };
     sentry.c.sentry_options_set_database_path_n(

@@ -7,7 +7,7 @@ struct QuickTerminalRestorableState: TerminalRestorable {
         internalState.focusedSurface
     }
 
-    var surfaceTree: SplitTree<Ghostty.SurfaceView> {
+    var surfaceTree: SplitTree<Zashiki.SurfaceView> {
         internalState.surfaceTree
     }
 
@@ -15,7 +15,7 @@ struct QuickTerminalRestorableState: TerminalRestorable {
         internalState.screenStateEntries
     }
 
-    private let internalState: InternalState<Ghostty.SurfaceView>
+    private let internalState: InternalState<Zashiki.SurfaceView>
 
     init(from controller: QuickTerminalController) {
         controller.saveScreenState(exitFullscreen: true)
@@ -26,8 +26,8 @@ struct QuickTerminalRestorableState: TerminalRestorable {
         self = other
     }
 
-    var baseConfig: Ghostty.SurfaceConfiguration? {
-        var config = Ghostty.SurfaceConfiguration()
+    var baseConfig: Zashiki.SurfaceConfiguration? {
+        var config = Zashiki.SurfaceConfiguration()
         config.environmentVariables["GHOSTTY_QUICK_TERMINAL"] = "1"
         return config
     }
@@ -47,7 +47,7 @@ extension QuickTerminalRestorableState {
     }
 }
 
-extension QuickTerminalRestorableState.InternalState where ViewType == Ghostty.SurfaceView {
+extension QuickTerminalRestorableState.InternalState where ViewType == Zashiki.SurfaceView {
     init(from controller: QuickTerminalController) {
         self.init(
             focusedSurface: controller.focusedSurface?.id.uuidString,

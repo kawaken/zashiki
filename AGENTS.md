@@ -36,6 +36,13 @@ ongoing product rather than a one-off patch set:
   (`.githooks/pre-commit`). One-time setup per clone:
   `git config core.hooksPath .githooks`.
 
+## Git Worktree
+
+- 対応するPRがマージされたworktreeは削除する。ビルド生成物のみ掃除したい場合は
+  `rm -rf` を直接叩かず `make clean` を使う。worktree自体を消す場合は
+  `git worktree remove --force`（lock中なら `-f -f`）。削除前に他セッションが
+  使用中でないか（lock状態・未コミット変更）を確認する
+
 ## Xcode
 
 Building the macOS app requires Xcode, the macOS SDK, the iOS SDK, and Metal
@@ -53,7 +60,7 @@ macOS unified logging is enabled by default. View logs with:
 sudo log stream --level debug --predicate 'subsystem=="dev.kawaken.zashiki"'
 ```
 
-The `GHOSTTY_LOG` environment variable controls log destinations (`stderr`,
+The `ZASHIKI_LOG` environment variable controls log destinations (`stderr`,
 `macos`); prefix with `no-` to disable, comma-separate to combine, or use
 `true`/`false` to enable/disable all.
 

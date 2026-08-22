@@ -9,7 +9,7 @@ GitHub Releaseでの配布も`release.yml`で最小構成が動いている。�
 - `macos/Sources/Features/Update/UpdateDelegate.swift`の`feedURLString`が
   `tip.files.ghostty.org` / `release.files.ghostty.org`という**本家Ghosttyのサーバー**
   を向いたまま
-- `macos/Ghostty-Info.plist`の`SUPublicEDKey`も**本家の公開鍵**のまま
+- `macos/Zashiki-Info.plist`の`SUPublicEDKey`も**本家の公開鍵**のまま
 
 このままではSparkleのappcastが取得できても本家Ghosttyの署名検証しか通らず、Zashiki
 独自ビルドのAutoUpdateとしては機能しない。`release.yml`のコメントにも「Sparkle自動更新
@@ -40,7 +40,7 @@ GitHub Releaseでの配布も`release.yml`で最小構成が動いている。�
 - SparkleのSPM checkoutに同梱の`generate_keys`ツールを使用
   （`~/Library/Developer/Xcode/DerivedData/.../SourcePackages/checkouts/Sparkle/bin/generate_keys`、
   または`zig build`後に取得できるパス）
-- 生成された**公開鍵**で`macos/Ghostty-Info.plist`の`SUPublicEDKey`を書き換える
+- 生成された**公開鍵**で`macos/Zashiki-Info.plist`の`SUPublicEDKey`を書き換える
 - 生成された**秘密鍵**はmacOS Keychainに保存される。CIでappcast署名に使うため、ユーザー
   自身の手でKeychainからエクスポートし、GitHub Actions Secretsに登録する必要がある
   （**エージェント側では自動化不可、手動作業が必要な旨をREADMEかLOCAL_PATCH.mdに手順
@@ -78,7 +78,7 @@ GitHub Releaseでの配布も`release.yml`で最小構成が動いている。�
 
 - `generate_keys` / `generate_appcast`をローカルで試し、appcast.xmlが期待通り生成される
   か確認
-- `zig build -Demit-macos-app`でZashiki.appをビルドし、`Ghostty-Info.plist`の
+- `zig build -Demit-macos-app`でZashiki.appをビルドし、`Zashiki-Info.plist`の
   `SUPublicEDKey`が新しい鍵に更新されていることを確認
 - `feedURLString`変更後、`zig build test`（Swift側は該当なければXcodeビルドの成功で代替）
   でコンパイルが通ることを確認

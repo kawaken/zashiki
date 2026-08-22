@@ -5,7 +5,7 @@ import SwiftUI
 /// overhead); when visible it wraps `content` and the preview side-by-side
 /// using the same `SplitView` the terminal splits use.
 struct MarkdownPreviewSplit<Content: View>: View {
-    let ghostty: Ghostty.App
+    let ghostty: Zashiki.App
 
     @ObservedObject var model: MarkdownPreviewModel
 

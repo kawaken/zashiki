@@ -9,7 +9,7 @@ class AppDelegate: NSObject,
                     ObservableObject,
                     NSApplicationDelegate,
                     UNUserNotificationCenterDelegate,
-                    GhosttyAppDelegate {
+                    ZashikiAppDelegate {
     // The application logger. We should probably move this at some point to a dedicated
     // class/struct but for now it lives here! 🤷‍♂️
     static let logger = Logger(
@@ -17,7 +17,7 @@ class AppDelegate: NSObject,
         category: String(describing: AppDelegate.self)
     )
 
-    /// Various menu items so that we can programmatically sync the keyboard shortcut with the Ghostty config
+    /// Various menu items so that we can programmatically sync the keyboard shortcut with the Zashiki config
     @IBOutlet private var menuAbout: NSMenuItem?
     @IBOutlet private var menuServices: NSMenu?
     @IBOutlet private var menuCheckForUpdates: NSMenuItem?
@@ -91,11 +91,11 @@ class AppDelegate: NSObject,
     /// seconds since the process was launched.
     private var applicationLaunchTime: TimeInterval = 0
 
-    /// This is the current configuration from the Ghostty configuration that we need.
+    /// This is the current configuration from the Zashiki configuration that we need.
     private var derivedConfig: DerivedConfig = DerivedConfig()
 
     /// The ghostty global state. Only one per process.
-    let ghostty: Ghostty.App
+    let ghostty: Zashiki.App
 
     /// The global undo manager for app-level state such as window restoration.
     lazy var undoManager = ExpiringUndoManager()
@@ -160,13 +160,13 @@ class AppDelegate: NSObject,
 
     private let appIconUpdater = AppIconUpdater()
 
-    @MainActor private lazy var menuShortcutManager = Ghostty.MenuShortcutManager()
+    @MainActor private lazy var menuShortcutManager = Zashiki.MenuShortcutManager()
 
     override init() {
 #if DEBUG
-        ghostty = Ghostty.App(configPath: ProcessInfo.processInfo.environment["GHOSTTY_CONFIG_PATH"])
+        ghostty = Zashiki.App(configPath: ProcessInfo.processInfo.environment["ZASHIKI_CONFIG_PATH"])
 #else
-        ghostty = Ghostty.App()
+        ghostty = Zashiki.App()
 #endif
         super.init()
 
@@ -179,7 +179,7 @@ class AppDelegate: NSObject,
         #if DEBUG
         if
             let suite = UserDefaults.zashikiSuite,
-            let clear = ProcessInfo.processInfo.environment["GHOSTTY_CLEAR_USER_DEFAULTS"],
+            let clear = ProcessInfo.processInfo.environment["ZASHIKI_CLEAR_USER_DEFAULTS"],
             (clear as NSString).boolValue {
             UserDefaults.zashiki.removePersistentDomain(forName: suite)
         }
@@ -217,7 +217,7 @@ class AppDelegate: NSObject,
         }
 
         // Initial config loading
-        ghosttyConfigDidChange(config: ghostty.config)
+        zashikiConfigDidChange(config: ghostty.config)
 
         // Start our update checker.
         updateController.startUpdater()
@@ -225,7 +225,7 @@ class AppDelegate: NSObject,
         // Register our service provider. This must happen after everything is initialized.
         NSApp.servicesProvider = ServiceProvider()
 
-        // This registers the Ghostty => Services menu to exist.
+        // This registers the Zashiki => Services menu to exist.
         NSApp.servicesMenu = menuServices
 
         // Setup a local event monitor for app-level keyboard shortcuts. See
@@ -249,14 +249,14 @@ class AppDelegate: NSObject,
         )
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(ghosttyConfigDidChange(_:)),
-            name: .ghosttyConfigDidChange,
+            selector: #selector(zashikiConfigDidChange(_:)),
+            name: .zashikiConfigDidChange,
             object: nil
         )
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(ghosttyBellDidRing(_:)),
-            name: .ghosttyBellDidRing,
+            selector: #selector(zashikiBellDidRing(_:)),
+            name: .zashikiBellDidRing,
             object: nil
         )
         NotificationCenter.default.addObserver(
@@ -267,25 +267,25 @@ class AppDelegate: NSObject,
         )
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(ghosttyNewWindow(_:)),
-            name: Ghostty.Notification.ghosttyNewWindow,
+            selector: #selector(zashikiNewWindow(_:)),
+            name: Zashiki.Notification.zashikiNewWindow,
             object: nil)
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(ghosttyNewTab(_:)),
-            name: Ghostty.Notification.ghosttyNewTab,
+            selector: #selector(zashikiNewTab(_:)),
+            name: Zashiki.Notification.zashikiNewTab,
             object: nil)
 
         // Configure user notifications
         let actions = [
-            UNNotificationAction(identifier: Ghostty.userNotificationActionShow, title: "Show")
+            UNNotificationAction(identifier: Zashiki.userNotificationActionShow, title: "Show")
         ]
 
         let center = UNUserNotificationCenter.current()
 
         center.setNotificationCategories([
             UNNotificationCategory(
-                identifier: Ghostty.userNotificationCategory,
+                identifier: Zashiki.userNotificationCategory,
                 actions: actions,
                 intentIdentifiers: [],
                 options: [.customDismissAction]
@@ -316,7 +316,7 @@ class AppDelegate: NSObject,
         // Setup signal handlers
         setupSignals()
 
-        switch Ghostty.launchSource {
+        switch Zashiki.launchSource {
         case .app:
             // Don't have to do anything.
             break
@@ -392,7 +392,7 @@ class AppDelegate: NSObject,
 
         // If the user is shutting down, restarting, or logging out, we don't confirm quit.
         why: if let event = NSAppleEventManager.shared().currentAppleEvent {
-            // If all Ghostty windows are in the background (i.e. you Cmd-Q from the Cmd-Tab
+            // If all Zashiki windows are in the background (i.e. you Cmd-Q from the Cmd-Tab
             // view), then this is null. I don't know why (pun intended) but we have to
             // guard against it.
             guard let keyword = AEKeyword("why?") else { break why }
@@ -445,7 +445,7 @@ class AppDelegate: NSObject,
     }
 
     func application(_ sender: NSApplication, openFile filename: String) -> Bool {
-        // Ghostty will validate as well but we can avoid creating an entirely new
+        // Zashiki will validate as well but we can avoid creating an entirely new
         // surface by doing our own validation here. We can also show a useful error
         // this way.
 
@@ -457,7 +457,7 @@ class AppDelegate: NSObject,
         var requiresConfirm: Bool = false
 
         // Initialize the surface config which will be used to create the tab or window for the opened file.
-        var config = Ghostty.SurfaceConfiguration()
+        var config = Zashiki.SurfaceConfiguration()
 
         if isDirectory.boolValue {
             // When opening a directory, check the configuration to decide
@@ -476,7 +476,7 @@ class AppDelegate: NSObject,
             // profile/rc files for the shell, which is super important on macOS
             // due to things like Homebrew. Instead, we set the command to
             // `<filename>; exit` which is what Terminal and iTerm2 do.
-            config.initialInput = "\(Ghostty.Shell.quote(filename)); exit\n"
+            config.initialInput = "\(Zashiki.Shell.quote(filename)); exit\n"
 
             // For commands executed directly, we want to ensure we wait after exit
             // because in most cases scripts don't block on exit and we don't want
@@ -520,7 +520,7 @@ class AppDelegate: NSObject,
     }
 
     /// Handles `zashiki://` URLs delivered via `CFBundleURLTypes` (see
-    /// `Ghostty-Info.plist`), e.g. from a plain `open "zashiki://..."`.
+    /// `Zashiki-Info.plist`), e.g. from a plain `open "zashiki://..."`.
     /// This is this fork's own CLI entry point, not a public API, so
     /// unrecognized input is just logged and ignored rather than surfaced
     /// to the user.
@@ -580,7 +580,7 @@ class AppDelegate: NSObject,
             Self.logger.warning("zashiki URL: malformed 'surface' query item \(raw, privacy: .public)")
             return nil
         }
-        guard let controller = terminalController(forGhosttySurfaceID: id) else {
+        guard let controller = terminalController(forZashikiSurfaceID: id) else {
             Self.logger.warning("zashiki URL: no live surface for id \(raw, privacy: .public)")
             return nil
         }
@@ -635,7 +635,7 @@ class AppDelegate: NSObject,
         let sigusr2 = DispatchSource.makeSignalSource(signal: SIGUSR2, queue: .main)
         sigusr2.setEventHandler { [weak self] in
             guard let self else { return }
-            Ghostty.logger.info("reloading configuration in response to SIGUSR2")
+            Zashiki.logger.info("reloading configuration in response to SIGUSR2")
             self.ghostty.reloadConfig()
         }
 
@@ -680,17 +680,17 @@ class AppDelegate: NSObject,
 
         // If this event as-is would result in a key binding then we send it.
         if let app = ghostty.app, let config = ghostty.config.config {
-            var ghosttyEvent = event.ghosttyKeyEvent(GHOSTTY_ACTION_PRESS)
+            var zashikiEvent = event.zashikiKeyEvent(GHOSTTY_ACTION_PRESS)
             let match = (event.characters ?? "").withCString { ptr in
-                ghosttyEvent.text = ptr
-                if !ghostty_config_key_is_binding(config, ghosttyEvent) {
+                zashikiEvent.text = ptr
+                if !ghostty_config_key_is_binding(config, zashikiEvent) {
                     return false
                 }
 
-                return ghostty_app_key(app, ghosttyEvent)
+                return ghostty_app_key(app, zashikiEvent)
             }
 
-            // If the key was handled by Ghostty we stop the event chain. If
+            // If the key was handled by Zashiki we stop the event chain. If
             // the key wasn't handled then we let it fall through and continue
             // processing. This is important because some bindings may have no
             // affect at this scope.
@@ -706,15 +706,15 @@ class AppDelegate: NSObject,
         }
 
         // If we reach this point then we try to process the key event
-        // through the Ghostty key mechanism.
+        // through the Zashiki key mechanism.
 
-        // Ghostty must be loaded
+        // Zashiki must be loaded
         guard let ghostty = self.ghostty.app else { return event }
 
         // Build our event input and call ghostty
-        if ghostty_app_key(ghostty, event.ghosttyKeyEvent(GHOSTTY_ACTION_PRESS)) {
+        if ghostty_app_key(ghostty, event.zashikiKeyEvent(GHOSTTY_ACTION_PRESS)) {
             // The key was used so we want to stop it from going to our Mac app
-            Ghostty.logger.debug("local key event handled event=\(event, privacy: .public)")
+            Zashiki.logger.debug("local key event handled event=\(event, privacy: .public)")
             return nil
         }
 
@@ -730,19 +730,19 @@ class AppDelegate: NSObject,
         self.menuQuickTerminal?.state = if quickController.visible { .on } else { .off }
     }
 
-    @objc private func ghosttyConfigDidChange(_ notification: Notification) {
+    @objc private func zashikiConfigDidChange(_ notification: Notification) {
         // We only care if the configuration is a global configuration, not a surface one.
         guard notification.object == nil else { return }
 
         // Get our managed configuration object out
         guard let config = notification.userInfo?[
-            Notification.Name.GhosttyConfigChangeKey
-        ] as? Ghostty.Config else { return }
+            Notification.Name.ZashikiConfigChangeKey
+        ] as? Zashiki.Config else { return }
 
-        ghosttyConfigDidChange(config: config)
+        zashikiConfigDidChange(config: config)
     }
 
-    @objc private func ghosttyBellDidRing(_ notification: Notification) {
+    @objc private func zashikiBellDidRing(_ notification: Notification) {
         if ghostty.config.bellFeatures.contains(.system) {
             NSSound.beep()
         }
@@ -814,22 +814,22 @@ class AppDelegate: NSObject,
         }
     }
 
-    @objc private func ghosttyNewWindow(_ notification: Notification) {
-        let configAny = notification.userInfo?[Ghostty.Notification.NewSurfaceConfigKey]
-        let config = configAny as? Ghostty.SurfaceConfiguration
+    @objc private func zashikiNewWindow(_ notification: Notification) {
+        let configAny = notification.userInfo?[Zashiki.Notification.NewSurfaceConfigKey]
+        let config = configAny as? Zashiki.SurfaceConfiguration
         _ = TerminalController.newWindow(ghostty, withBaseConfig: config)
     }
 
-    @objc private func ghosttyNewTab(_ notification: Notification) {
-        guard let surfaceView = notification.object as? Ghostty.SurfaceView else { return }
+    @objc private func zashikiNewTab(_ notification: Notification) {
+        guard let surfaceView = notification.object as? Zashiki.SurfaceView else { return }
         guard let window = surfaceView.window else { return }
 
         // We only want to listen to new tabs if the focused parent is
         // a regular terminal controller.
         guard window.windowController is TerminalController else { return }
 
-        let configAny = notification.userInfo?[Ghostty.Notification.NewSurfaceConfigKey]
-        let config = configAny as? Ghostty.SurfaceConfiguration
+        let configAny = notification.userInfo?[Zashiki.Notification.NewSurfaceConfigKey]
+        let config = configAny as? Zashiki.SurfaceConfiguration
 
         _ = TerminalController.newTab(ghostty, from: window, withBaseConfig: config)
     }
@@ -844,7 +844,7 @@ class AppDelegate: NSObject,
         NSApp.dockTile.display()
     }
 
-    private func ghosttyConfigDidChange(config: Ghostty.Config) {
+    private func zashikiConfigDidChange(config: Zashiki.Config) {
         // Update the config we need to store
         self.derivedConfig = DerivedConfig(config)
 
@@ -872,7 +872,7 @@ class AppDelegate: NSObject,
                 autoUpdate == .download
             /*
              To test `auto-update` easily, uncomment the line below and
-             delete `SUEnableAutomaticChecks` in Ghostty-Info.plist.
+             delete `SUEnableAutomaticChecks` in Zashiki-Info.plist.
 
              Note: When `auto-update = download`, you may need to
              `Clean Build Folder` if a background install has already begun.
@@ -913,7 +913,7 @@ class AppDelegate: NSObject,
         }
 
         // We need to handle our global event tap depending on if there are global
-        // events that we care about in Ghostty.
+        // events that we care about in Zashiki.
         if ghostty_app_has_global_keybinds(ghostty.app!) {
             if timeSinceLaunch > 5 {
                 // If the process has been running for awhile we enable right away
@@ -935,11 +935,11 @@ class AppDelegate: NSObject,
     }
 
     /// Sync the appearance of our app with the theme specified in the config.
-    private func syncAppearance(config: Ghostty.Config) {
-        NSApplication.shared.appearance = .init(ghosttyConfig: config)
+    private func syncAppearance(config: Zashiki.Config) {
+        NSApplication.shared.appearance = .init(zashikiConfig: config)
     }
 
-    private func updateAppIcon(from config: Ghostty.Config) {
+    private func updateAppIcon(from config: Zashiki.Config) {
         Task.detached {
             await self.appIconUpdater.update(icon: AppIcon(config: config))
         }
@@ -1000,9 +1000,9 @@ class AppDelegate: NSObject,
         withCompletionHandler(options)
     }
 
-    // MARK: - GhosttyAppDelegate
+    // MARK: - ZashikiAppDelegate
 
-    func findSurface(forUUID uuid: UUID) -> Ghostty.SurfaceView? {
+    func findSurface(forUUID uuid: UUID) -> Zashiki.SurfaceView? {
         for c in TerminalController.all {
             for view in c.surfaceTree where view.id == uuid {
                 return view
@@ -1014,7 +1014,7 @@ class AppDelegate: NSObject,
 
     // MARK: - Global State
 
-    func setSecureInput(_ mode: Ghostty.SetSecureInput) {
+    func setSecureInput(_ mode: Zashiki.SetSecureInput) {
         let input = SecureInput.shared
         switch mode {
         case .on:
@@ -1066,7 +1066,7 @@ class AppDelegate: NSObject,
     }
 
     @IBAction func showHelp(_ sender: Any) {
-        guard let url = URL(string: "https://ghostty.org/docs") else { return }
+        guard let url = URL(string: "https://github.com/kawaken/zashiki") else { return }
         NSWorkspace.shared.open(url)
     }
 
@@ -1078,12 +1078,12 @@ class AppDelegate: NSObject,
         quickController.toggle()
     }
 
-    /// Toggles visibility of all Ghosty Terminal windows. When hidden, activates Ghostty as the frontmost application
+    /// Toggles visibility of all Ghosty Terminal windows. When hidden, activates Zashiki as the frontmost application
     @IBAction func toggleVisibility(_ sender: Any) {
         // If we have focus, then we hide all windows.
         if NSApp.isActive {
             // Toggle visibility doesn't do anything if the focused window is native
-            // fullscreen. This is only relevant if Ghostty is active.
+            // fullscreen. This is only relevant if Zashiki is active.
             guard let keyWindow = NSApp.keyWindow,
                   !keyWindow.styleMask.contains(.fullScreen) else { return }
 
@@ -1128,7 +1128,7 @@ class AppDelegate: NSObject,
             self.quickTerminalPosition = .top
         }
 
-        init(_ config: Ghostty.Config) {
+        init(_ config: Zashiki.Config) {
             self.initialWindow = config.initialWindow
             self.shouldQuitAfterLastWindowClosed = config.shouldQuitAfterLastWindowClosed
             self.quickTerminalPosition = config.quickTerminalPosition
@@ -1234,8 +1234,8 @@ extension AppDelegate {
         self.menuFindParent?.setImageIfDesired(systemSymbolName: "text.page.badge.magnifyingglass")
     }
 
-    /// Sync all of our menu item keyboard shortcuts with the Ghostty configuration.
-    @MainActor private func syncMenuShortcuts(_ config: Ghostty.Config) {
+    /// Sync all of our menu item keyboard shortcuts with the Zashiki configuration.
+    @MainActor private func syncMenuShortcuts(_ config: Zashiki.Config) {
         guard ghostty.readiness == .ready else { return }
 
         menuShortcutManager.reset()
@@ -1296,7 +1296,7 @@ extension AppDelegate {
         syncMenuShortcut(config, action: "toggle_secure_input", menuItem: self.menuSecureInput)
 
         // This menu item is NOT synced with the configuration because it disables macOS
-        // global fullscreen keyboard shortcut. The shortcut in the Ghostty config will continue
+        // global fullscreen keyboard shortcut. The shortcut in the Zashiki config will continue
         // to work but it won't be reflected in the menu item.
         //
         // syncMenuShortcut(config, action: "toggle_fullscreen", menuItem: self.menuToggleFullScreen)
@@ -1305,12 +1305,12 @@ extension AppDelegate {
         reloadDockMenu()
     }
 
-    @MainActor private func syncMenuShortcut(_ config: Ghostty.Config, action: String, menuItem: NSMenuItem?) {
+    @MainActor private func syncMenuShortcut(_ config: Zashiki.Config, action: String, menuItem: NSMenuItem?) {
         menuShortcutManager.syncMenuShortcut(config, action: action, menuItem: menuItem)
     }
 
-    @MainActor func performGhosttyBindingMenuKeyEquivalent(with event: NSEvent) -> Bool {
-        menuShortcutManager.performGhosttyBindingMenuKeyEquivalent(with: event)
+    @MainActor func performZashikiBindingMenuKeyEquivalent(with event: NSEvent) -> Bool {
+        menuShortcutManager.performZashikiBindingMenuKeyEquivalent(with: event)
     }
 }
 
