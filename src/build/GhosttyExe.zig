@@ -31,7 +31,7 @@ pub fn init(b: *std.Build, cfg: *const Config, deps: *const SharedDeps) !Ghostty
 
     // Add the shared dependencies. When building only lib-vt we skip
     // heavy deps so cross-compilation doesn't pull in GTK, etc.
-    if (!cfg.emit_lib_vt) _ = try deps.add(exe);
+    _ = try deps.add(exe);
 
     // Check for possible issues
     try checkNixShell(exe, cfg);

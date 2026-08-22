@@ -96,7 +96,7 @@ private struct TerminalSplitLeaf: View {
 
     var body: some View {
         GeometryReader { geometry in
-            Zashiki.InspectableSurface(
+            Zashiki.SurfaceWrapper(
                 surfaceView: surfaceView,
                 isSplit: isSplit)
             .background {

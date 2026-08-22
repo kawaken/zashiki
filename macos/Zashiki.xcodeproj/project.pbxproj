@@ -7,23 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		29C15B1D2CDC3B2900520DD4 /* bat in Resources */ = {isa = PBXBuildFile; fileRef = 29C15B1C2CDC3B2000520DD4 /* bat */; };
 		55154BE02B33911F001622DC /* ghostty in Resources */ = {isa = PBXBuildFile; fileRef = 55154BDF2B33911F001622DC /* ghostty */; };
-		552964E62B34A9B400030505 /* vim in Resources */ = {isa = PBXBuildFile; fileRef = 552964E52B34A9B400030505 /* vim */; };
 		819324582F24E78800A9ED8F /* DockTilePlugin.plugin in Copy DockTilePlugin */ = {isa = PBXBuildFile; fileRef = 8193244D2F24E6C000A9ED8F /* DockTilePlugin.plugin */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		819324642F24FF2100A9ED8F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A5B30538299BEAAB0047F10C /* Assets.xcassets */; };
-		9351BE8E3D22937F003B3499 /* nvim in Resources */ = {isa = PBXBuildFile; fileRef = 9351BE8E2D22937F003B3499 /* nvim */; };
 		A51BFC272B30F1B800E92F16 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = A51BFC262B30F1B800E92F16 /* Sparkle */; };
 		8D2A175A1F4BE6B86203CD6C /* Textual in Frameworks */ = {isa = PBXBuildFile; productRef = 1F5CE0950D1FAC97748F788F /* Textual */; };
-		A546F1142D7B68D7003B11A0 /* locale in Resources */ = {isa = PBXBuildFile; fileRef = A546F1132D7B68D7003B11A0 /* locale */; };
 		A56B880B2A840447007A0E29 /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A56B880A2A840447007A0E29 /* Carbon.framework */; };
 		A571AB1D2A206FCF00248498 /* GhosttyKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = A5D495A1299BEC7E00DD1313 /* GhosttyKit.xcframework */; };
-		A586167C2B7703CC009BDB1D /* fish in Resources */ = {isa = PBXBuildFile; fileRef = A586167B2B7703CC009BDB1D /* fish */; };
 		A5985CE62C33060F00C57AD3 /* man in Resources */ = {isa = PBXBuildFile; fileRef = A5985CE52C33060F00C57AD3 /* man */; };
 		A5A1F8852A489D6800D1E8BC /* terminfo in Resources */ = {isa = PBXBuildFile; fileRef = A5A1F8842A489D6800D1E8BC /* terminfo */; };
 		A5B30539299BEAAB0047F10C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A5B30538299BEAAB0047F10C /* Assets.xcassets */; };
-		FC5218FA2D10FFCE004C93E0 /* zsh in Resources */ = {isa = PBXBuildFile; fileRef = FC5218F92D10FFC7004C93E0 /* zsh */; };
-		FC9ABA9C2D0F53F80020D4C8 /* bash-completion in Resources */ = {isa = PBXBuildFile; fileRef = FC9ABA9B2D0F538D0020D4C8 /* bash-completion */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -65,27 +58,20 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		29C15B1C2CDC3B2000520DD4 /* bat */ = {isa = PBXFileReference; lastKnownFileType = folder; name = bat; path = "../zig-out/share/bat"; sourceTree = "<group>"; };
 		3B39CAA42B33949B00DABEB8 /* ZashikiReleaseLocal.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ZashikiReleaseLocal.entitlements; sourceTree = "<group>"; };
 		55154BDF2B33911F001622DC /* ghostty */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ghostty; path = "../zig-out/share/ghostty"; sourceTree = "<group>"; };
-		552964E52B34A9B400030505 /* vim */ = {isa = PBXFileReference; lastKnownFileType = folder; name = vim; path = "../zig-out/share/vim"; sourceTree = "<group>"; };
 		810ACC9F2E9D3301004F8F92 /* ZashikiUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZashikiUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8193244D2F24E6C000A9ED8F /* DockTilePlugin.plugin */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DockTilePlugin.plugin; sourceTree = BUILT_PRODUCTS_DIR; };
-		9351BE8E2D22937F003B3499 /* nvim */ = {isa = PBXFileReference; lastKnownFileType = folder; name = nvim; path = "../zig-out/share/nvim"; sourceTree = "<group>"; };
 		A51BFC282B30F26D00E92F16 /* ZashikiDebug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ZashikiDebug.entitlements; sourceTree = "<group>"; };
-		A546F1132D7B68D7003B11A0 /* locale */ = {isa = PBXFileReference; lastKnownFileType = folder; name = locale; path = "../zig-out/share/locale"; sourceTree = "<group>"; };
 		A54F45F32E1F047A0046BD5C /* ZashikiTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZashikiTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A56B880A2A840447007A0E29 /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = System/Library/Frameworks/Carbon.framework; sourceTree = SDKROOT; };
 		A571AB1C2A206FC600248498 /* Zashiki-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Zashiki-Info.plist"; sourceTree = "<group>"; };
-		A586167B2B7703CC009BDB1D /* fish */ = {isa = PBXFileReference; lastKnownFileType = folder; name = fish; path = "../zig-out/share/fish"; sourceTree = "<group>"; };
 		A5985CE52C33060F00C57AD3 /* man */ = {isa = PBXFileReference; lastKnownFileType = folder; name = man; path = "../zig-out/share/man"; sourceTree = "<group>"; };
 		A5A1F8842A489D6800D1E8BC /* terminfo */ = {isa = PBXFileReference; lastKnownFileType = folder; name = terminfo; path = "../zig-out/share/terminfo"; sourceTree = "<group>"; };
 		A5B30531299BEAAA0047F10C /* Zashiki.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zashiki.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A5B30538299BEAAB0047F10C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A5B3053D299BEAAB0047F10C /* Zashiki.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Zashiki.entitlements; sourceTree = "<group>"; };
 		A5D495A1299BEC7E00DD1313 /* GhosttyKit.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = GhosttyKit.xcframework; sourceTree = "<group>"; };
-		FC5218F92D10FFC7004C93E0 /* zsh */ = {isa = PBXFileReference; lastKnownFileType = folder; name = zsh; path = "../zig-out/share/zsh"; sourceTree = "<group>"; };
-		FC9ABA9B2D0F538D0020D4C8 /* bash-completion */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "bash-completion"; path = "../zig-out/share/bash-completion"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -153,16 +139,9 @@
 		A5A1F8862A489D7400D1E8BC /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				FC9ABA9B2D0F538D0020D4C8 /* bash-completion */,
-				29C15B1C2CDC3B2000520DD4 /* bat */,
-				A586167B2B7703CC009BDB1D /* fish */,
 				55154BDF2B33911F001622DC /* ghostty */,
-				A546F1132D7B68D7003B11A0 /* locale */,
 				A5985CE52C33060F00C57AD3 /* man */,
-				9351BE8E2D22937F003B3499 /* nvim */,
 				A5A1F8842A489D6800D1E8BC /* terminfo */,
-				552964E52B34A9B400030505 /* vim */,
-				FC5218F92D10FFC7004C93E0 /* zsh */,
 			);
 			name = Resources;
 			sourceTree = "<group>";
@@ -378,16 +357,9 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				FC9ABA9C2D0F53F80020D4C8 /* bash-completion in Resources */,
-				29C15B1D2CDC3B2900520DD4 /* bat in Resources */,
-				A586167C2B7703CC009BDB1D /* fish in Resources */,
 				55154BE02B33911F001622DC /* ghostty in Resources */,
-				A546F1142D7B68D7003B11A0 /* locale in Resources */,
 				A5985CE62C33060F00C57AD3 /* man in Resources */,
-				9351BE8E3D22937F003B3499 /* nvim in Resources */,
 				A5A1F8852A489D6800D1E8BC /* terminfo in Resources */,
-				552964E62B34A9B400030505 /* vim in Resources */,
-				FC5218FA2D10FFCE004C93E0 /* zsh in Resources */,
 				A5B30539299BEAAB0047F10C /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -1385,11 +1385,6 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         ghostty.toggleFullscreen(surface: surface)
     }
 
-    @IBAction func toggleTerminalInspector(_ sender: Any?) {
-        guard let surface = focusedSurface?.surface else { return }
-        ghostty.toggleTerminalInspector(surface: surface)
-    }
-
     // MARK: - TerminalViewDelegate
 
     override func focusedSurfaceDidChange(to: Zashiki.SurfaceView?) {

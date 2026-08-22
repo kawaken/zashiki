@@ -34,8 +34,6 @@ pub const Options = struct {
 
     /// Force C ABI mode on or off. If not set, then it will be set based on
     /// Options.
-    c_abi: bool,
-
     /// The version of the application.
     version: std.SemanticVersion,
 
@@ -50,7 +48,6 @@ pub const Options = struct {
     ) void {
         const opts = b.addOptions();
         opts.addOption(Artifact, "artifact", self.artifact);
-        opts.addOption(bool, "c_abi", self.c_abi);
         opts.addOption(bool, "oniguruma", self.oniguruma);
         opts.addOption(bool, "simd", self.simd);
         opts.addOption(bool, "slow_runtime_safety", self.slow_runtime_safety);

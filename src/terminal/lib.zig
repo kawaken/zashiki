@@ -3,7 +3,7 @@ const build_options = @import("terminal_options");
 const lib = @import("../lib/main.zig");
 
 /// The target for the terminal lib in particular.
-pub const target: lib.Target = if (build_options.c_abi) .c else .zig;
+pub const target: lib.Target = .zig;
 
 /// The calling convention to use for C APIs.
 ///

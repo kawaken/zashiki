@@ -13,7 +13,6 @@ const font = @import("../font/main.zig");
 const configpkg = @import("../config.zig");
 const rendererpkg = @import("../renderer.zig");
 const Renderer = rendererpkg.GenericRenderer(Metal);
-const shadertoy = @import("shadertoy.zig");
 
 const mtl = @import("metal/api.zig");
 const IOSurfaceLayer = @import("metal/IOSurfaceLayer.zig");
@@ -28,10 +27,6 @@ pub const Buffer = bufferpkg.Buffer;
 pub const Sampler = @import("metal/Sampler.zig");
 pub const Texture = @import("metal/Texture.zig");
 pub const shaders = @import("metal/shaders.zig");
-
-pub const custom_shader_target: shadertoy.Target = .msl;
-// The fragCoord for Metal shaders is +Y = down.
-pub const custom_shader_y_is_down = true;
 
 /// Triple buffering.
 pub const swap_chain_count = 3;
@@ -195,12 +190,10 @@ pub fn drawFrameEnd(self: *Metal) void {
 pub fn initShaders(
     self: *const Metal,
     alloc: Allocator,
-    custom_shaders: []const [:0]const u8,
 ) !shaders.Shaders {
     return try shaders.Shaders.init(
         alloc,
         self.device,
-        custom_shaders,
         // Using an `*_srgb` pixel format makes Metal gamma encode
         // the pixels written to it *after* blending, which means
         // we get linear alpha blending rather than gamma-incorrect

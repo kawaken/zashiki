@@ -10,7 +10,6 @@ const FontBackend = @import("../font/backend.zig").Backend;
 const RendererBackend = @import("../renderer/backend.zig").Backend;
 const TerminalBuildOptions = @import("../terminal/build_options.zig").Options;
 const XCFrameworkTarget = @import("xcframework.zig").Target;
-const WasmTarget = @import("../os/wasm/target.zig").Target;
 const expandPath = @import("../os/path.zig").expand;
 
 const GitVersion = @import("GitVersion.zig");
@@ -19,18 +18,15 @@ const GitVersion = @import("GitVersion.zig");
 optimize: std.builtin.OptimizeMode,
 target: std.Build.ResolvedTarget,
 xcframework_target: XCFrameworkTarget = .universal,
-wasm_target: WasmTarget,
 
 /// Comptime interfaces
 app_runtime: ApprtRuntime = .none,
-renderer: RendererBackend = .opengl,
-font_backend: FontBackend = .freetype,
+renderer: RendererBackend = .metal,
+font_backend: FontBackend = .coretext,
 
 /// Feature flags
 sentry: bool = true,
 simd: bool = true,
-i18n: bool = true,
-wasm_shared: bool = true,
 
 /// Ghostty exe properties
 exe_entrypoint: ExeEntrypoint = .ghostty,
@@ -43,13 +39,9 @@ strip: bool = false,
 patchelf: ?PatchElf = null,
 
 /// Artifacts
-flatpak: bool = false,
-snap: bool = false,
-emit_bench: bool = false,
 emit_docs: bool = false,
 emit_exe: bool = false,
 emit_helpgen: bool = false,
-emit_lib_vt: bool = false,
 emit_macos_app: bool = false,
 emit_terminfo: bool = false,
 emit_termcap: bool = false,
@@ -112,10 +104,6 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
     // but we may want to make this more sophisticated in the future.
     const system_package = b.graph.system_package_mode;
 
-    // This specifies our target wasm runtime. For now only one semi-usable
-    // one exists so this is hardcoded.
-    const wasm_target: WasmTarget = .browser;
-
     // Grab the environment from build state
     const env = &b.graph.environ_map;
 
@@ -123,7 +111,6 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
     var config: Config = .{
         .optimize = optimize,
         .target = target,
-        .wasm_target = wasm_target,
         .is_dep = is_dep,
         .env = env,
     };
@@ -142,7 +129,7 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
         FontBackend,
         "font-backend",
         "The font backend to use for discovery and rasterization.",
-    ) orelse FontBackend.default(target.result, wasm_target);
+    ) orelse FontBackend.default(target.result);
 
     config.app_runtime = b.option(
         ApprtRuntime,
@@ -154,22 +141,10 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
         RendererBackend,
         "renderer",
         "The app runtime to use. Not all values supported on all platforms.",
-    ) orelse RendererBackend.default(target.result, wasm_target);
+    ) orelse RendererBackend.default(target.result);
 
     //---------------------------------------------------------------
     // Feature Flags
-
-    config.flatpak = b.option(
-        bool,
-        "flatpak",
-        "Build for Flatpak (integrates with Flatpak APIs). Only has an effect targeting Linux.",
-    ) orelse false;
-
-    config.snap = b.option(
-        bool,
-        "snap",
-        "Build for Snap (do specific Snap operations). Only has an effect targeting Linux.",
-    ) orelse false;
 
     config.sentry = b.option(
         bool,
@@ -189,23 +164,7 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
         bool,
         "simd",
         "Build with SIMD-accelerated code paths. Results in significant performance improvements.",
-    ) orelse simd: {
-        // We can't build our SIMD dependencies for Wasm. Note that we may
-        // still use SIMD features in the Wasm-builds.
-        if (target.result.cpu.arch.isWasm()) break :simd false;
-
-        break :simd true;
-    };
-
-    config.i18n = b.option(
-        bool,
-        "i18n",
-        "Enables gettext-based internationalization. Enabled by default only for macOS, and other Unix-like systems like Linux and FreeBSD when using glibc.",
-    ) orelse switch (target.result.os.tag) {
-        .macos, .ios => true,
-        .linux, .freebsd => target.result.isGnuLibC(),
-        else => false,
-    };
+    ) orelse true;
 
     //---------------------------------------------------------------
     // Ghostty Exe Properties
@@ -272,12 +231,12 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
         };
     };
 
-    // libghostty-vt properties
+    // libghostty properties
 
     const lib_version_string = b.option(
         []const u8,
         "lib-version-string",
-        "A specific version string to use for the build of libghostty-vt. " ++
+        "A specific version string to use for the build of libghostty. " ++
             "If not specified, git will be used. This must be a semantic version.",
     );
 
@@ -341,17 +300,11 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
     //---------------------------------------------------------------
     // Artifacts to Emit
 
-    config.emit_lib_vt = b.option(
-        bool,
-        "emit-lib-vt",
-        "Set defaults for a libghostty-vt-only build (disables xcframework, macOS app, and docs).",
-    ) orelse false;
-
     config.emit_exe = b.option(
         bool,
         "emit-exe",
         "Build and install main executables with 'build'",
-    ) orelse !config.emit_lib_vt;
+    ) orelse true;
 
     config.emit_test_exe = b.option(
         bool,
@@ -363,12 +316,6 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
         bool,
         "emit-unicode-table-gen",
         "Build and install executables that generate unicode tables with 'build'",
-    ) orelse false;
-
-    config.emit_bench = b.option(
-        bool,
-        "emit-bench",
-        "Build and install the benchmark executables.",
     ) orelse false;
 
     config.emit_helpgen = b.option(
@@ -383,10 +330,8 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
         "Build and install auto-generated documentation (requires pandoc)",
     ) orelse emit_docs: {
         // If we are emitting any other artifacts then we default to false.
-        if (config.emit_bench or
-            config.emit_test_exe or
-            config.emit_helpgen or
-            config.emit_lib_vt) break :emit_docs false;
+        if (config.emit_test_exe or
+            config.emit_helpgen) break :emit_docs false;
 
         // We always emit docs in system package mode.
         if (system_package) break :emit_docs true;
@@ -438,17 +383,8 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
     ) orelse emit_xcfw: {
         if (!builtin.target.os.tag.isDarwin() or target.result.os.tag != .macos)
             break :emit_xcfw false;
-        if (config.emit_lib_vt) {
-            // In lib-vt mode default to whether xcodebuild is available,
-            // since xcodebuild is required to produce the XCFramework.
-            const path = expandPath(b.graph.io, b.allocator, &b.graph.environ_map, "xcodebuild") catch
-                break :emit_xcfw false;
-            defer if (path) |p| b.allocator.free(p);
-            break :emit_xcfw path != null;
-        }
         break :emit_xcfw config.app_runtime == .none and
-            (!config.emit_bench and
-                !config.emit_test_exe and
+            (!config.emit_test_exe and
                 !config.emit_helpgen);
     };
 
@@ -456,7 +392,7 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
         bool,
         "emit-macos-app",
         "Build and install the macOS app bundle.",
-    ) orelse !config.emit_lib_vt and config.emit_xcframework;
+    ) orelse config.emit_xcframework;
 
     //---------------------------------------------------------------
     // System Packages
@@ -529,17 +465,12 @@ pub fn addPatchElf(self: *const Config, artifact: *std.Build.Step.Compile, step:
 pub fn addOptions(self: *const Config, step: *std.Build.Step.Options) !void {
     // We need to break these down individual because addOption doesn't
     // support all types.
-    step.addOption(bool, "flatpak", self.flatpak);
-    step.addOption(bool, "snap", self.snap);
     step.addOption(bool, "sentry", self.sentry);
     step.addOption(bool, "simd", self.simd);
-    step.addOption(bool, "i18n", self.i18n);
     step.addOption(ApprtRuntime, "app_runtime", self.app_runtime);
     step.addOption(FontBackend, "font_backend", self.font_backend);
     step.addOption(RendererBackend, "renderer", self.renderer);
     step.addOption(ExeEntrypoint, "exe_entrypoint", self.exe_entrypoint);
-    step.addOption(WasmTarget, "wasm_target", self.wasm_target);
-    step.addOption(bool, "wasm_shared", self.wasm_shared);
 
     // Our version. We also add the string version so we don't need
     // to do any allocations at runtime. This has to be long enough to
@@ -580,7 +511,6 @@ pub fn terminalOptions(
         .artifact = artifact,
         .simd = self.simd,
         .oniguruma = true,
-        .c_abi = false,
         .version = switch (artifact) {
             .ghostty => self.version,
             .lib => self.lib_version,
@@ -623,15 +553,10 @@ pub fn fromOptions() Config {
         .env = undefined,
 
         .version = options.app_version,
-        .flatpak = options.flatpak,
         .app_runtime = std.meta.stringToEnum(ApprtRuntime, @tagName(options.app_runtime)).?,
         .font_backend = std.meta.stringToEnum(FontBackend, @tagName(options.font_backend)).?,
         .renderer = std.meta.stringToEnum(RendererBackend, @tagName(options.renderer)).?,
-        .snap = options.snap,
         .exe_entrypoint = std.meta.stringToEnum(ExeEntrypoint, @tagName(options.exe_entrypoint)).?,
-        .wasm_target = std.meta.stringToEnum(WasmTarget, @tagName(options.wasm_target)).?,
-        .wasm_shared = options.wasm_shared,
-        .i18n = options.i18n,
     };
 }
 
@@ -688,7 +613,7 @@ pub fn genericMacOSTarget(
 }
 
 /// The possible entrypoints for the exe artifact. This has no effect on
-/// other artifact types (i.e. lib, wasm_module).
+/// other artifact types (i.e. lib).
 ///
 /// The whole existence of this enum is to workaround the fact that Zig
 /// doesn't allow the main function to be in a file in a subdirctory

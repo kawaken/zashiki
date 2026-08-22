@@ -156,24 +156,6 @@ extension Zashiki {
             return ghostty_surface_id(surface)
         }
 
-        // Returns the inspector instance for this surface, or nil if the
-        // surface has been closed or no inspector is active.
-        var inspector: Zashiki.Inspector? {
-            guard let surface = self.surface else { return nil }
-            guard let cInspector = ghostty_surface_inspector(surface) else { return nil }
-            return Zashiki.Inspector(cInspector: cInspector)
-        }
-
-        // True if the inspector should be visible
-        @Published var inspectorVisible: Bool = false {
-            didSet {
-                if oldValue && !inspectorVisible {
-                    guard let surface = self.surface else { return }
-                    ghostty_inspector_free(surface)
-                }
-            }
-        }
-
         /// Returns the data model for this surface.
         ///
         /// Note: eventually, all surface access will be through this, but presently its in a transition
@@ -1607,8 +1589,6 @@ extension Zashiki {
             menu.addItem(.separator())
             item = menu.addItem(withTitle: "Reset Terminal", action: #selector(resetTerminal(_:)), keyEquivalent: "")
             item.setImageIfDesired(systemSymbolName: "arrow.trianglehead.2.clockwise")
-            item = menu.addItem(withTitle: "Toggle Terminal Inspector", action: #selector(toggleTerminalInspector(_:)), keyEquivalent: "")
-            item.setImageIfDesired(systemSymbolName: "scope")
             item = menu.addItem(withTitle: "Terminal Read-only", action: #selector(toggleReadonly(_:)), keyEquivalent: "")
             item.setImageIfDesired(systemSymbolName: "eye.fill")
             item.state = readonly ? .on : .off
@@ -1733,14 +1713,6 @@ extension Zashiki {
         @objc func resetTerminal(_ sender: Any) {
             guard let surface = self.surface else { return }
             let action = "reset"
-            if !ghostty_surface_binding_action(surface, action, UInt(action.lengthOfBytes(using: .utf8))) {
-                AppDelegate.logger.warning("action failed action=\(action, privacy: .public)")
-            }
-        }
-
-        @objc func toggleTerminalInspector(_ sender: Any) {
-            guard let surface = self.surface else { return }
-            let action = "inspector:toggle"
             if !ghostty_surface_binding_action(surface, action, UInt(action.lengthOfBytes(using: .utf8))) {
                 AppDelegate.logger.warning("action failed action=\(action, privacy: .public)")
             }

@@ -102,9 +102,6 @@ flags: packed struct {
     /// thread automatically.
     cursor_blink_visible: bool = false,
 
-    /// This is true when the inspector is active.
-    has_inspector: bool = false,
-
     /// This is true when the view is visible. This is used to determine
     /// if we should be rendering or not.
     visible: bool = true,
@@ -115,12 +112,10 @@ flags: packed struct {
 } = .{},
 
 pub const DerivedConfig = struct {
-    custom_shader_animation: configpkg.CustomShaderAnimation,
     scrollback_compression: bool,
 
     pub fn init(config: *const configpkg.Config) DerivedConfig {
         return .{
-            .custom_shader_animation = config.@"custom-shader-animation",
             .scrollback_compression = config.@"scrollback-compression",
         };
     }
@@ -311,20 +306,12 @@ fn setQosClass(self: *const Thread) void {
 
 fn syncDrawTimer(self: *Thread) void {
     skip: {
-        // If our renderer supports animations and has them, then we
-        // can apply draw timer based on custom shader animation configuration.
+        // If our renderer supports animations and has them, keep the
+        // draw timer running.
         if (@hasDecl(rendererpkg.Renderer, "hasAnimations") and
             self.renderer.hasAnimations())
         {
-            // If our config says to always animate, we do so.
-            switch (self.config.custom_shader_animation) {
-                // Always animate
-                .always => break :skip,
-                // Only when focused
-                .true => if (self.flags.focused) break :skip,
-                // Never animate
-                .false => {},
-            }
+            break :skip;
         }
 
         // We're skipping the draw timer. Stop it on the next iteration.
@@ -493,10 +480,6 @@ fn drainMailbox(self: *Thread) !void {
                 if (self.renderer.search_selected_match) |*m| m.arena.deinit();
                 self.renderer.search_selected_match = v;
                 self.renderer.search_matches_dirty = true;
-            },
-
-            .inspector => |v| {
-                self.flags.has_inspector = v;
             },
 
             .macos_display_id => |v| {
@@ -785,9 +768,7 @@ const Compression = struct {
         if (!thread.config.scrollback_compression) return;
 
         // PageList activity, rather than a generic renderer wake, restarts the
-        // idle interval. In particular, the inspector wakes the renderer every
-        // frame without changing terminal contents and must not starve this
-        // timer indefinitely.
+        // idle interval.
         if (thread.state.mutex.tryLock()) {
             defer thread.state.mutex.unlock(global.io());
             const activity = thread.state.terminal.compressionActivity();
@@ -795,7 +776,7 @@ const Compression = struct {
             self.activity = activity;
         } else if (self.completion.state() == .active) {
             // Contention doesn't prove that compression-relevant activity
-            // changed. Keep an existing deadline so frequent inspector frames
+            // changed. Keep an existing deadline so frequent renderer wakes
             // cannot postpone compression forever. The timer rechecks both the
             // activity token and lock availability before doing any work.
             return;

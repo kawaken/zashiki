@@ -4,7 +4,6 @@ const build_config = @import("build_config.zig");
 const cli = @import("cli.zig");
 const internal_os = @import("os/main.zig");
 const fontconfig = @import("fontconfig");
-const glslang = @import("glslang");
 const harfbuzz = @import("harfbuzz");
 const oni = @import("oniguruma");
 const crash = @import("crash/main.zig");
@@ -203,9 +202,6 @@ pub fn init(opts: InitOpts) !void {
     try internal_os.ensureLocale();
     syncEnviron();
 
-    // Initialize glslang for shader compilation
-    try glslang.init();
-
     // Initialize oniguruma for regex
     try oni.init(&.{oni.Encoding.utf8});
 
@@ -213,11 +209,6 @@ pub fn init(opts: InitOpts) !void {
     // hereafter can use this cached value.
     self.resources_dir = try apprt.runtime.resourcesDir(self.alloc);
     errdefer self.resources_dir.deinit(self.alloc);
-
-    // Setup i18n
-    if (self.resources_dir.app()) |v| internal_os.i18n.init(v) catch |err| {
-        std.log.warn("failed to init i18n, translations will not be available err={}", .{err});
-    };
 }
 
 /// Cleans up the global state. This doesn't _need_ to be called but

@@ -4,7 +4,6 @@ const assert = @import("../quirks.zig").inlineAssert;
 const macos = @import("macos");
 const objc = @import("objc");
 const internal_os = @import("main.zig");
-const i18n = internal_os.i18n;
 
 const log = std.log.scoped(.os_locale);
 
@@ -197,7 +196,7 @@ fn preferredLanguageFromCocoa(
 
         // Apple languages are in BCP-47 format, and we need to
         // canonicalize them to the POSIX format.
-        const canon = try i18n.canonicalizeLocale(
+        const canon = try canonicalizeLocale(
             writer.buffer[writer.end..],
             c_str,
         );
@@ -218,6 +217,65 @@ fn preferredLanguageFromCocoa(
     // reslice it with the null terminator.
     const slice = writer.buffered();
     return slice[0 .. slice.len - 1 :0];
+}
+
+/// Convert a BCP-47 language tag (what Apple reports) to the POSIX locale
+/// format that gettext-style consumers in the child process expect.
+///
+/// This used to be handled by libintl's `locale_name_canonicalize`, but this
+/// fork does not link libintl. The two transformations that matter in
+/// practice are handled here: the zh script/region special cases, and
+/// swapping the BCP-47 `-` separator for POSIX `_`.
+fn canonicalizeLocale(
+    buf: []u8,
+    locale: []const u8,
+) error{NoSpaceLeft}![:0]const u8 {
+    // Fix zh locales, which need the script subtag folded into the region.
+    if (fixZhLocale(locale)) |fixed| {
+        if (buf.len < fixed.len + 1) return error.NoSpaceLeft;
+        @memcpy(buf[0..fixed.len], fixed);
+        buf[fixed.len] = 0;
+        return buf[0..fixed.len :0];
+    }
+
+    if (buf.len < locale.len + 1) return error.NoSpaceLeft;
+    for (locale, 0..) |ch, i| buf[i] = if (ch == '-') '_' else ch;
+    buf[locale.len] = 0;
+    return buf[0..locale.len :0];
+}
+
+/// Handles some zh locales because the generic conversion above doesn't
+/// produce the right thing for them.
+fn fixZhLocale(locale: []const u8) ?[:0]const u8 {
+    var it = std.mem.splitScalar(u8, locale, '-');
+    const name = it.next() orelse return null;
+    if (!std.mem.eql(u8, name, "zh")) return null;
+
+    const script = it.next() orelse return null;
+    const region = it.next() orelse return null;
+
+    if (std.mem.eql(u8, script, "Hans")) {
+        if (std.mem.eql(u8, region, "SG")) return "zh_SG";
+        return "zh_CN";
+    }
+
+    if (std.mem.eql(u8, script, "Hant")) {
+        if (std.mem.eql(u8, region, "MO")) return "zh_MO";
+        if (std.mem.eql(u8, region, "HK")) return "zh_HK";
+        return "zh_TW";
+    }
+
+    return null;
+}
+
+test canonicalizeLocale {
+    const testing = std.testing;
+    var buf: [64]u8 = undefined;
+    try testing.expectEqualStrings("en_US", try canonicalizeLocale(&buf, "en-US"));
+    try testing.expectEqualStrings("ja", try canonicalizeLocale(&buf, "ja"));
+    try testing.expectEqualStrings("zh_CN", try canonicalizeLocale(&buf, "zh-Hans-CN"));
+    try testing.expectEqualStrings("zh_TW", try canonicalizeLocale(&buf, "zh-Hant-TW"));
+    try testing.expectEqualStrings("zh_HK", try canonicalizeLocale(&buf, "zh-Hant-HK"));
 }
 
 const c = @import("locale-c");

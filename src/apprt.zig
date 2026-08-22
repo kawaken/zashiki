@@ -3,7 +3,7 @@
 //! getting user input (mouse/keyboard), etc.
 //!
 //! This enables compile-time interfaces to be built to swap out the underlying
-//! application runtime. For example: pure macOS Cocoa, GTK+, browser, etc.
+//! application runtime. For example: pure macOS Cocoa, embedded libghostty, etc.
 //!
 //! The goal is to have different implementations share as much of the core
 //! logic as possible, and to only reach out to platform-specific implementation
@@ -14,7 +14,6 @@ const structs = @import("apprt/structs.zig");
 
 pub const action = @import("apprt/action.zig");
 pub const none = @import("apprt/none.zig");
-pub const browser = @import("apprt/browser.zig");
 pub const embedded = @import("apprt/embedded.zig");
 pub const surface = @import("apprt/surface.zig");
 
@@ -42,7 +41,6 @@ pub const runtime = switch (build_config.artifact) {
         .none => none,
     },
     .lib => embedded,
-    .wasm_module => browser,
 };
 
 pub const App = runtime.App;

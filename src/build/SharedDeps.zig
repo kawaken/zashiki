@@ -7,7 +7,6 @@ const Config = @import("Config.zig");
 const HelpStrings = @import("HelpStrings.zig");
 const MetallibStep = @import("MetallibStep.zig");
 const UnicodeTables = @import("UnicodeTables.zig");
-const GhosttyFrameData = @import("GhosttyFrameData.zig");
 
 config: *const Config,
 
@@ -15,7 +14,6 @@ options: *std.Build.Step.Options,
 help_strings: HelpStrings,
 metallib: ?*MetallibStep,
 unicode_tables: UnicodeTables,
-framedata: GhosttyFrameData,
 uucode_tables: std.Build.LazyPath,
 
 /// Singleton uucode module, instantiated once in `init` and reused
@@ -78,7 +76,6 @@ pub fn init(b: *std.Build, cfg: *const Config) !SharedDeps {
         .config = cfg,
         .help_strings = try .init(b, cfg),
         .unicode_tables = try .init(b, uucode_tables),
-        .framedata = try .init(b),
         .uucode_tables = uucode_tables,
         .uucode_mod = uucode_mod,
 
@@ -235,111 +232,6 @@ pub fn add(
         else => {},
     }
 
-    // Freetype. We always include this even if our font backend doesn't
-    // use it because Dear Imgui uses Freetype.
-    _ = b.systemIntegrationOption("freetype", .{}); // Shows it in help
-    if (b.lazyDependency("freetype", .{
-        .target = target,
-        .optimize = optimize,
-        .@"enable-libpng" = true,
-    })) |freetype_dep| {
-        step.root_module.addImport(
-            "freetype",
-            freetype_dep.module("freetype"),
-        );
-
-        if (b.systemIntegrationOption("freetype", .{})) {
-            step.root_module.linkSystemLibrary("bzip2", dynamic_link_opts);
-            step.root_module.linkSystemLibrary("freetype2", dynamic_link_opts);
-        } else {
-            step.root_module.linkLibrary(freetype_dep.artifact("freetype"));
-            try static_libs.append(
-                b.allocator,
-                freetype_dep.artifact("freetype").getEmittedBin(),
-            );
-        }
-    }
-
-    // Harfbuzz
-    _ = b.systemIntegrationOption("harfbuzz", .{}); // Shows it in help
-    if (self.config.font_backend.hasHarfbuzz()) {
-        if (b.lazyDependency("harfbuzz", .{
-            .target = target,
-            .optimize = optimize,
-            .@"enable-freetype" = self.config.font_backend.hasFreetype(),
-            .@"enable-coretext" = self.config.font_backend.hasCoretext(),
-        })) |harfbuzz_dep| {
-            step.root_module.addImport(
-                "harfbuzz",
-                harfbuzz_dep.module("harfbuzz"),
-            );
-            if (b.systemIntegrationOption("harfbuzz", .{})) {
-                step.root_module.linkSystemLibrary("harfbuzz", dynamic_link_opts);
-            } else {
-                step.root_module.linkLibrary(harfbuzz_dep.artifact("harfbuzz"));
-                try static_libs.append(
-                    b.allocator,
-                    harfbuzz_dep.artifact("harfbuzz").getEmittedBin(),
-                );
-            }
-        }
-    }
-
-    // Fontconfig
-    _ = b.systemIntegrationOption("fontconfig", .{}); // Shows it in help
-    if (self.config.font_backend.hasFontconfig()) {
-        if (b.lazyDependency("fontconfig", .{
-            .target = target,
-            .optimize = optimize,
-        })) |fontconfig_dep| {
-            step.root_module.addImport(
-                "fontconfig",
-                fontconfig_dep.module("fontconfig"),
-            );
-
-            if (b.systemIntegrationOption("fontconfig", .{})) {
-                step.root_module.linkSystemLibrary("fontconfig", dynamic_link_opts);
-            } else {
-                step.root_module.linkLibrary(fontconfig_dep.artifact("fontconfig"));
-                try static_libs.append(
-                    b.allocator,
-                    fontconfig_dep.artifact("fontconfig").getEmittedBin(),
-                );
-            }
-        }
-    }
-
-    // Libpng - Ghostty doesn't actually use this directly, its only used
-    // through dependencies, so we only need to add it to our static
-    // libs list if we're not using system integration. The dependencies
-    // will handle linking it.
-    if (!b.systemIntegrationOption("libpng", .{})) {
-        if (b.lazyDependency("libpng", .{
-            .target = target,
-            .optimize = optimize,
-        })) |libpng_dep| {
-            step.root_module.linkLibrary(libpng_dep.artifact("png"));
-            try static_libs.append(
-                b.allocator,
-                libpng_dep.artifact("png").getEmittedBin(),
-            );
-        }
-    }
-
-    // Zlib - same as libpng, only used through dependencies.
-    if (!b.systemIntegrationOption("zlib", .{})) {
-        if (b.lazyDependency("zlib", .{
-            .target = target,
-            .optimize = optimize,
-        })) |zlib_dep| {
-            step.root_module.linkLibrary(zlib_dep.artifact("z"));
-            try static_libs.append(
-                b.allocator,
-                zlib_dep.artifact("z").getEmittedBin(),
-            );
-        }
-    }
-
     // Oniguruma
     if (b.lazyDependency("oniguruma", .{
         .target = target,
@@ -356,47 +248,6 @@ pub fn add(
             try static_libs.append(
                 b.allocator,
                 oniguruma_dep.artifact("oniguruma").getEmittedBin(),
-            );
-        }
-    }
-
-    // Glslang
-    if (b.lazyDependency("glslang", .{
-        .target = target,
-        .optimize = optimize,
-    })) |glslang_dep| {
-        step.root_module.addImport("glslang", glslang_dep.module("glslang"));
-        if (b.systemIntegrationOption("glslang", .{})) {
-            step.root_module.linkSystemLibrary("glslang", dynamic_link_opts);
-            step.root_module.linkSystemLibrary(
-                "glslang-default-resource-limits",
-                dynamic_link_opts,
-            );
-        } else {
-            step.root_module.linkLibrary(glslang_dep.artifact("glslang"));
-            try static_libs.append(
-                b.allocator,
-                glslang_dep.artifact("glslang").getEmittedBin(),
-            );
-        }
-    }
-
-    // Spirv-cross
-    if (b.lazyDependency("spirv_cross", .{
-        .target = target,
-        .optimize = optimize,
-    })) |spirv_cross_dep| {
-        step.root_module.addImport(
-            "spirv_cross",
-            spirv_cross_dep.module("spirv_cross"),
-        );
-        if (b.systemIntegrationOption("spirv-cross", .{})) {
-            step.root_module.linkSystemLibrary("spirv-cross-c-shared", dynamic_link_opts);
-        } else {
-            step.root_module.linkLibrary(spirv_cross_dep.artifact("spirv_cross"));
-            try static_libs.append(
-                b.allocator,
-                spirv_cross_dep.artifact("spirv_cross").getEmittedBin(),
             );
         }
     }
@@ -437,21 +288,6 @@ pub fn add(
         step.root_module,
         &static_libs,
     );
-
-    // Wasm we do manually since it is such a different build.
-    if (step.rootModuleTarget().cpu.arch == .wasm32) {
-        if (b.lazyDependency("zig_js", .{
-            .target = target,
-            .optimize = optimize,
-        })) |js_dep| {
-            step.root_module.addImport(
-                "zig-js",
-                js_dep.module("zig-js"),
-            );
-        }
-
-        return static_libs;
-    }
 
     // On Linux, we need to add a couple common library paths that aren't
     // on the standard search list. i.e. GTK is often in /usr/lib/x86_64-linux-gnu
@@ -501,9 +337,6 @@ pub fn add(
     }
 
     // Other dependencies, mostly pure Zig
-    if (b.lazyDependency("opengl", .{})) |dep| {
-        step.root_module.addImport("opengl", dep.module("opengl"));
-    }
     if (b.lazyDependency("vaxis", .{
         .target = target,
         .optimize = optimize,
@@ -567,44 +400,6 @@ pub fn add(
                 macos_dep.artifact("macos").getEmittedBin(),
             );
         }
-
-        if (self.config.renderer == .opengl) {
-            step.root_module.linkFramework("OpenGL", .{});
-        }
-
-        // Apple platforms do not include libc libintl so we bundle it.
-        // This is LGPL but since our source code is open source we are
-        // in compliance with the LGPL since end users can modify this
-        // build script to replace the bundled libintl with their own.
-        if (b.lazyDependency("libintl", .{
-            .target = target,
-            .optimize = optimize,
-        })) |libintl_dep| {
-            step.root_module.linkLibrary(libintl_dep.artifact("intl"));
-            try static_libs.append(
-                b.allocator,
-                libintl_dep.artifact("intl").getEmittedBin(),
-            );
-        }
-    }
-
-    // cimgui
-    if (b.lazyDependency("dcimgui", .{
-        .target = target,
-        .optimize = optimize,
-        .freetype = true,
-        .@"backend-metal" = target.result.os.tag.isDarwin(),
-        .@"backend-osx" = target.result.os.tag == .macos,
-        // OpenGL3 backend should only be built on non-Apple targets.
-        // Apple platforms use Metal (and macOS may also use the OSX backend).
-        .@"backend-opengl3" = !target.result.os.tag.isDarwin(),
-    })) |dep| {
-        step.root_module.addImport("dcimgui", dep.module("dcimgui"));
-        step.root_module.linkLibrary(dep.artifact("dcimgui"));
-        try static_libs.append(
-            b.allocator,
-            dep.artifact("dcimgui").getEmittedBin(),
-        );
     }
 
     // Fonts
@@ -646,50 +441,8 @@ pub fn add(
         }
     }
 
-    // If we're building an exe then we have additional dependencies.
-    if (step.kind != .lib) {
-        // We always statically compile glad
-        step.root_module.addIncludePath(b.path("vendor/glad/include/"));
-        step.root_module.addCSourceFile(.{
-            .file = b.path("vendor/glad/src/gl.c"),
-            .flags = &.{},
-        });
-
-        // When we're targeting flatpak we ALWAYS link GTK so we
-        // get access to glib for dbus.
-        if (self.config.flatpak) {
-            step.root_module.linkSystemLibrary("gtk4", dynamic_link_opts);
-
-            // We need to translate gio headers too
-            gio_translate: {
-                // translate-c stuff
-                const translate_c = b.lazyImport(@import("../../build.zig"), "translate_c") orelse
-                    break :gio_translate;
-                const translate_c_dep = b.lazyDependency("translate_c", .{}) orelse
-                    break :gio_translate;
-                const translated: translate_c.Translator = .init(translate_c_dep, .{
-                    .c_source_file = b.addWriteFiles().add("gio_c.h",
-                        \\#include <gio/gio.h>
-                        \\#include <gio/gunixfdlist.h>
-                    ),
-                    .target = target,
-                    .optimize = optimize,
-                    .link_system_libs = &.{
-                        .{ .name = "gio-2.0", .options = dynamic_link_opts },
-                    },
-                });
-                step.root_module.addImport("gio_c", translated.mod);
-            }
-        }
-
-        switch (self.config.app_runtime) {
-            .none => {},
-        }
-    }
-
     self.help_strings.addImport(step);
     self.unicode_tables.addImport(step);
-    self.framedata.addImport(step);
 
     return static_libs;
 }

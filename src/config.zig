@@ -24,7 +24,6 @@ pub const ConfirmCloseSurface = Config.ConfirmCloseSurface;
 pub const CopyOnSelect = Config.CopyOnSelect;
 pub const RightClickAction = Config.RightClickAction;
 pub const MiddleClickAction = Config.MiddleClickAction;
-pub const CustomShaderAnimation = Config.CustomShaderAnimation;
 pub const FontSyntheticStyle = Config.FontSyntheticStyle;
 pub const FontShapingBreak = Config.FontShapingBreak;
 pub const FontStyle = Config.FontStyle;
@@ -50,7 +49,6 @@ pub const WorkingDirectory = Config.WorkingDirectory;
 
 // Alternate APIs
 pub const CApi = @import("config/CApi.zig");
-pub const Wasm = if (!builtin.target.cpu.arch.isWasm()) struct {} else @import("config/Wasm.zig");
 
 test {
     @import("std").testing.refAllDecls(@This());

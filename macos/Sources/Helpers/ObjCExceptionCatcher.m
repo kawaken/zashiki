@@ -2,7 +2,7 @@
 
 #import <AppKit/AppKit.h>
 
-BOOL GhosttyAddTabbedWindowSafely(
+BOOL ZashikiAddTabbedWindowSafely(
     id parent,
     id child,
     NSInteger ordered,

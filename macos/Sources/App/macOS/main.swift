@@ -27,7 +27,7 @@ if ghostty_init(UInt(CommandLine.argc), CommandLine.unsafeArgv) != GHOSTTY_SUCCE
 }
 
 // This will run the CLI action and exit if one was specified. A CLI
-// action is a command starting with a `+`, such as `ghostty +boo`.
+// action is a command starting with a `+`, such as `zashiki +show-config`.
 ghostty_cli_try_action()
 
 _ = NSApplicationMain(CommandLine.argc, CommandLine.unsafeArgv)

@@ -5,21 +5,17 @@
 //! The renderer is closely tied to the windowing system which usually
 //! has to prepare the window for the given renderer using system-specific
 //! APIs. The renderers in this package assume that the renderer is already
-//! setup (OpenGL has a context, Vulkan has a surface, etc.)
+//! setup (Metal has a layer and device, etc.)
 
 const build_config = @import("build_config.zig");
 
 const cursor = @import("renderer/cursor.zig");
 const message = @import("renderer/message.zig");
 const size = @import("renderer/size.zig");
-pub const shadertoy = @import("renderer/shadertoy.zig");
 pub const Backend = @import("renderer/backend.zig").Backend;
 pub const GenericRenderer = @import("renderer/generic.zig").Renderer;
 pub const Metal = @import("renderer/Metal.zig");
-pub const OpenGL = @import("renderer/OpenGL.zig");
-pub const WebGL = @import("renderer/WebGL.zig");
 pub const Options = @import("renderer/Options.zig");
-pub const Overlay = @import("renderer/Overlay.zig");
 pub const Thread = @import("renderer/Thread.zig");
 pub const State = @import("renderer/State.zig");
 pub const CursorStyle = cursor.Style;
@@ -37,8 +33,6 @@ pub const lib = @import("lib/main.zig");
 /// so that every build has exactly one renderer implementation.
 pub const Renderer = switch (build_config.renderer) {
     .metal => GenericRenderer(Metal),
-    .opengl => GenericRenderer(OpenGL),
-    .webgl => WebGL,
 };
 
 /// The health status of a renderer. These must be shared across all
@@ -59,7 +53,6 @@ test {
 
     _ = cursor;
     _ = message;
-    _ = shadertoy;
     _ = size;
     _ = Thread;
     _ = State;

@@ -2768,7 +2768,7 @@ keybind: Keybinds = .{},
 ///
 ///   * `detect` - Detect the shell based on the filename.
 ///
-///   * `bash`, `elvish`, `fish`, `nushell`, `zsh` - Use this specific shell injection scheme.
+///   * `bash`, `fish`, `zsh` - Use this specific shell injection scheme.
 ///
 /// The default value is `detect`.
 @"shell-integration": ShellIntegration = .detect,
@@ -2887,145 +2887,6 @@ keybind: Keybinds = .{},
 /// if you know you need KAM, you know. If you don't know if you
 /// need KAM, you don't need it.
 @"vt-kam-allowed": bool = false,
-
-/// Custom shaders to run after the default shaders. This is a file path
-/// to a GLSL-syntax shader for all platforms.
-///
-/// Warning: Invalid shaders can cause Ghostty to become unusable such as by
-/// causing the window to be completely black. If this happens, you can
-/// unset this configuration to disable the shader.
-///
-/// Custom shader support is based on and compatible with the Shadertoy shaders.
-/// Shaders should specify a `mainImage` function and the available uniforms
-/// largely match Shadertoy, with some caveats and Ghostty-specific extensions.
-///
-/// The uniform values available to shaders are as follows:
-///
-///  * `sampler2D iChannel0` - Input texture.
-///
-///    A texture containing the current terminal screen. If multiple custom
-///    shaders are specified, the output of previous shaders is written to
-///    this texture, to allow combining multiple effects.
-///
-///  * `vec3 iResolution` - Output texture size, `[width, height, 1]` (in px).
-///
-///  * `float iTime` - Time in seconds since first frame was rendered.
-///
-///  * `float iTimeDelta` - Time in seconds since previous frame was rendered.
-///
-///  * `float iFrameRate` - Average framerate. (NOT CURRENTLY SUPPORTED)
-///
-///  * `int iFrame` - Number of frames that have been rendered so far.
-///
-///  * `float iChannelTime[4]` - Current time for video or sound input. (N/A)
-///
-///  * `vec3 iChannelResolution[4]` - Resolutions of the 4 input samplers.
-///
-///    Currently only `iChannel0` exists, and `iChannelResolution[0]` is
-///    identical to `iResolution`.
-///
-///  * `vec4 iMouse` - Mouse input info. (NOT CURRENTLY SUPPORTED)
-///
-///  * `vec4 iDate` - Date/time info. (NOT CURRENTLY SUPPORTED)
-///
-///  * `float iSampleRate` - Sample rate for audio. (N/A)
-///
-/// Ghostty-specific extensions:
-///
-///  * `vec4 iCurrentCursor` - Info about the terminal cursor.
-///
-///    - `iCurrentCursor.xy` is the -X, +Y corner of the current cursor.
-///    - `iCurrentCursor.zw` is the width and height of the current cursor.
-///
-///  * `vec4 iPreviousCursor` - Info about the previous terminal cursor.
-///
-///  * `vec4 iCurrentCursorColor` - Color of the terminal cursor.
-///
-///  * `vec4 iPreviousCursorColor` - Color of the previous terminal cursor.
-///
-///  * `vec4 iCurrentCursorStyle` - Style of the terminal cursor
-///
-///    Macros simplified use are defined for the various cursor styles:
-///
-///    - `CURSORSTYLE_BLOCK` or `0`
-///    - `CURSORSTYLE_BLOCK_HOLLOW` or `1`
-///    - `CURSORSTYLE_BAR` or `2`
-///    - `CURSORSTYLE_UNDERLINE` or `3`
-///    - `CURSORSTYLE_LOCK` or `4`
-///
-///  * `vec4 iPreviousCursorStyle` - Style of the previous terminal cursor
-///
-///  * `vec4 iCursorVisible` - Visibility of the terminal cursor.
-///
-///  * `float iTimeCursorChange` - Timestamp of terminal cursor change.
-///
-///    When the terminal cursor changes position or color, this is set to
-///    the same time as the `iTime` uniform, allowing you to compute the
-///    time since the change by subtracting this from `iTime`.
-///
-///  * `float iTimeFocus` - Timestamp when the surface last gained iFocus.
-///
-///    When the surface gains focus, this is set to the current value of
-///    `iTime`, similar to how `iTimeCursorChange` works. This allows you
-///    to compute the time since focus was gained or lost by calculating
-///    `iTime - iTimeFocus`. Use this to create animations that restart
-///    when the terminal regains focus.
-///
-///  * `int iFocus` - Current focus state of the surface.
-///
-///    Set to 1.0 when the surface is focused, 0.0 when unfocused. This
-///    allows shaders to detect unfocused state and avoid animation artifacts
-///    from large time deltas caused by infrequent "deceptive frames"
-///    (e.g., modifier key presses, link hover events in unfocused split panes).
-///    Check `iFocus > 0` to determine if the surface is currently focused.
-///
-///  * `vec3 iPalette[256]` - The 256-color terminal palette.
-///
-///    RGB values for all 256 colors in the terminal palette, normalized
-///    to [0.0, 1.0]. Index 0-15 are the ANSI colors, 16-231 are the 6x6x6
-///    color cube, and 232-255 are the grayscale colors.
-///
-///  * `vec3 iBackgroundColor` - Terminal background color (RGB).
-///
-///  * `vec3 iForegroundColor` - Terminal foreground color (RGB).
-///
-///  * `vec3 iCursorColor` - Terminal cursor color (RGB).
-///
-///  * `vec3 iCursorText` - Terminal cursor text color (RGB).
-///
-///  * `vec3 iSelectionBackgroundColor` - Selection background color (RGB).
-///
-///  * `vec3 iSelectionForegroundColor` - Selection foreground color (RGB).
-///
-/// If the shader fails to compile, the shader will be ignored. Any errors
-/// related to shader compilation will not show up as configuration errors
-/// and only show up in the log, since shader compilation happens after
-/// configuration loading on the dedicated render thread.  For interactive
-/// development, use [shadertoy.com](https://shadertoy.com).
-///
-/// This can be repeated multiple times to load multiple shaders. The shaders
-/// will be run in the order they are specified.
-///
-/// This can be changed at runtime and will affect all open terminals.
-@"custom-shader": RepeatablePath = .{},
-
-/// If `true` (default), the focused terminal surface will run an animation
-/// loop when custom shaders are used. This uses slightly more CPU (generally
-/// less than 10%) but allows the shader to animate. This only runs if there
-/// are custom shaders and the terminal is focused.
-///
-/// If this is set to `false`, the terminal and custom shader will only render
-/// when the terminal is updated. This is more efficient but the shader will
-/// not animate.
-///
-/// This can also be set to `always`, which will always run the animation
-/// loop regardless of whether the terminal is focused or not. The animation
-/// loop will still only run when custom shaders are used. Note that this
-/// will use more CPU per terminal surface and can become quite expensive
-/// depending on the shader and your terminal usage.
-///
-/// This can be changed at runtime and will affect all open terminals.
-@"custom-shader-animation": CustomShaderAnimation = .true,
 
 /// Bell features to enable if bell support is available in your runtime. Not
 /// all features are available on all runtimes. The format of this is a list of
@@ -4416,14 +4277,9 @@ pub fn finalize(self: *Config) !void {
     {
         if (self.command == null or wd == .home) command: {
             // First look up the command using the SHELL env var if needed.
-            // We don't do this in flatpak because SHELL in Flatpak is always
-            // set to /bin/sh.
             if (self.command) |cmd|
                 log.info("shell src=config value={}", .{cmd})
             else shell_env: {
-                // Flatpak always gets its shell from outside the sandbox
-                if (internal_os.isFlatpak()) break :shell_env;
-
                 // If we were launched from the desktop, our SHELL env var
                 // will represent our SHELL at login time. We only want to
                 // read from SHELL if we're in a probable CLI environment.
@@ -5036,15 +4892,6 @@ const Replay = struct {
 /// c_int because it needs to be extern compatible
 /// If this is changed, you must also update ghostty.h
 pub const ConfirmCloseSurface = enum(c_int) {
-    false,
-    true,
-    always,
-};
-
-/// Valid values for custom-shader-animation
-/// c_int because it needs to be extern compatible
-/// If this is changed, you must also update ghostty.h
-pub const CustomShaderAnimation = enum(c_int) {
     false,
     true,
     always,
@@ -6559,13 +6406,6 @@ pub const Keybinds = struct {
                 .{ .performable = true },
             );
 
-            // Inspector, matching Chromium
-            try self.set.put(
-                alloc,
-                .{ .key = .{ .unicode = 'i' }, .mods = .{ .shift = true, .ctrl = true } },
-                .{ .inspector = .toggle },
-            );
-
             // Terminal
             try self.set.put(
                 alloc,
@@ -6904,13 +6744,6 @@ pub const Keybinds = struct {
                 .{ .key = .{ .unicode = 'g' }, .mods = .{ .super = true, .shift = true } },
                 .{ .navigate_search = .previous },
                 .{ .performable = true },
-            );
-
-            // Inspector, matching Chromium
-            try self.set.put(
-                alloc,
-                .{ .key = .{ .unicode = 'i' }, .mods = .{ .alt = true, .super = true } },
-                .{ .inspector = .toggle },
             );
 
             // Alternate keybind, common to Mac programs
@@ -8423,9 +8256,7 @@ pub const ShellIntegration = enum {
     none,
     detect,
     bash,
-    elvish,
     fish,
-    nushell,
     zsh,
 };
 

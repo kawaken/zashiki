@@ -252,13 +252,6 @@ extension Zashiki {
             }
         }
 
-        func toggleTerminalInspector(surface: ghostty_surface_t) {
-            let action = "inspector:toggle"
-            if !ghostty_surface_binding_action(surface, action, UInt(action.lengthOfBytes(using: .utf8))) {
-                logger.warning("action failed action=\(action, privacy: .public)")
-            }
-        }
-
         func resetTerminal(surface: ghostty_surface_t) {
             let action = "reset"
             if !ghostty_surface_binding_action(surface, action, UInt(action.lengthOfBytes(using: .utf8))) {
@@ -532,12 +525,6 @@ extension Zashiki {
 
             case GHOSTTY_ACTION_TOGGLE_SPLIT_ZOOM:
                 return toggleSplitZoom(app, target: target)
-
-            case GHOSTTY_ACTION_INSPECTOR:
-                controlInspector(app, target: target, mode: action.action.inspector)
-
-            case GHOSTTY_ACTION_RENDER_INSPECTOR:
-                renderInspector(app, target: target)
 
             case GHOSTTY_ACTION_DESKTOP_NOTIFICATION:
                 showDesktopNotification(app, target: target, n: action.action.desktop_notification)
@@ -1371,29 +1358,6 @@ extension Zashiki {
             }
         }
 
-        private static func controlInspector(
-            _ app: ghostty_app_t,
-            target: ghostty_target_s,
-            mode: ghostty_action_inspector_e) {
-            switch target.tag {
-            case GHOSTTY_TARGET_APP:
-                Zashiki.logger.warning("toggle inspector does nothing with an app target")
-                return
-
-            case GHOSTTY_TARGET_SURFACE:
-                guard let surface = target.target.surface else { return }
-                guard let surfaceView = self.surfaceView(from: surface) else { return }
-                NotificationCenter.default.post(
-                    name: Notification.didControlInspector,
-                    object: surfaceView,
-                    userInfo: ["mode": mode]
-                )
-
-            default:
-                assertionFailure()
-            }
-        }
-
         private static func showDesktopNotification(
             _ app: ghostty_app_t,
             target: ghostty_target_s,
@@ -1897,27 +1861,6 @@ extension Zashiki {
                     guard let surfaceView else { return }
                     surfaceView.cellSize = surfaceView.convertFromBacking(backingSize)
                 }
-
-            default:
-                assertionFailure()
-            }
-        }
-
-        private static func renderInspector(
-            _ app: ghostty_app_t,
-            target: ghostty_target_s) {
-            switch target.tag {
-            case GHOSTTY_TARGET_APP:
-                Zashiki.logger.warning("mouse over link does nothing with an app target")
-                return
-
-            case GHOSTTY_TARGET_SURFACE:
-                guard let surface = target.target.surface else { return }
-                guard let surfaceView = self.surfaceView(from: surface) else { return }
-                NotificationCenter.default.post(
-                    name: Notification.inspectorNeedsDisplay,
-                    object: surfaceView
-                )
 
             default:
                 assertionFailure()
