@@ -4,29 +4,30 @@
   <img src="macos/Assets.xcassets/AppIcon.appiconset/icon_256x256@2x.png" alt="Zashiki icon" width="128">
 </p>
 
-[@kawaken](https://github.com/kawaken)による、macOS専用の
-[Ghostty](https://github.com/ghostty-org/ghostty)フォークです。アプリ名、Bundle ID、
-CLI、設定・リソースの参照先はZashiki向けに分離しています。
+[@kawaken](https://github.com/kawaken)'s macOS-only fork of
+[Ghostty](https://github.com/ghostty-org/ghostty). The app name, bundle ID,
+CLI, configuration, and resource paths are separated for Zashiki.
 
-## Fork-specific features
+## Features
 
-- **日本語IME対応** — ATOKなどのpreeditで、変換中の文節を太い下線で表示します。
-- **Markdownプレビュー** — `Cmd+Shift+M`でSwiftUIネイティブのプレビューを開きます。
-  WebKitを使わず、ファイル変更をライブ反映します。CLIやAIエージェントからは、パスを
-  percent-encodeして次のURLを開けます:
+- Japanese IME support with thicker underlines for the currently converted
+  ATOK preedit clause.
+- Native SwiftUI Markdown preview (`Cmd+Shift+M`) with live file updates.
+  Open a file from a shell or AI agent with:
 
   ```sh
   open "zashiki://markdown-preview/open?path=<encoded-path>&surface=$ZASHIKI_SURFACE_ID"
   ```
 
-  `surface`を省略すると、直近アクティブなウィンドウが対象になります。
+  Omit `surface` to target the most recently active window.
 
-- **Sparkle更新基盤** — stable feedをGitHub Releaseで配布し、署名済みappcastを生成します。
-  自動チェックはDeveloper ID署名・notarization完了まで無効です。
+- Sparkle update infrastructure with signed appcasts published through GitHub
+  Releases. Automatic checks remain disabled until Developer ID signing and
+  notarization are available.
 
-## 開発
+## Development
 
-macOSアプリのビルドにはXcode、macOS SDK、Metal Toolchainが必要です。
+Building the macOS app requires Xcode, the macOS SDK, and the Metal Toolchain.
 
 ```sh
 zig build
@@ -34,17 +35,18 @@ zig build -Doptimize=ReleaseFast -Dxcframework-target=native -Demit-macos-app=tr
 zig build test -Dtest-filter=<test-name>
 ```
 
-生成物は`zig-out/`にインストールされます。Swift側を含むReleaseビルドはXcodeの
-`Zashiki.xcodeproj`を使用します。
+Build products are installed under `zig-out/`. Swift builds use
+`macos/Zashiki.xcodeproj`.
 
-## リリース
+## Releases
 
-Release workflowは、`v*.*.*`タグのpush、またはGitHub Actionsの手動実行で起動します。
-mainへマージしただけではReleaseは作成されません。手動実行時は`version`入力にタグ相当の
-バージョン（例: `v0.3.0`）を指定します。
+The Release workflow runs when a `v*.*.*` tag is pushed or when dispatched
+manually from GitHub Actions. Merging to `main` alone does not create a
+release. Manual runs require a `version` input such as `v0.3.0`.
 
-workflowは`Zashiki-*-macos.zip`と署名済み`appcast.xml`をGitHub Releaseへ添付します。
-前回stableのappcastを引き継ぐため、Releaseを実行する前にActions Secret
-`SPARKLE_PRIVATE_KEY`が必要です。秘密鍵はリポジトリへ保存せず、Keychain・1Passwordなどで
-バックアップしてください。現在はad-hoc署名のためnotarizationされておらず、
-`SUEnableAutomaticChecks`も`false`です。
+The workflow attaches `Zashiki-*-macos.zip` and a signed `appcast.xml` to the
+GitHub Release. The `SPARKLE_PRIVATE_KEY` Actions secret must be configured
+before releasing. Keep the private key out of the repository and retain a
+separate encrypted backup.
+
+See [README.ja.md](README.ja.md) for the Japanese version.
