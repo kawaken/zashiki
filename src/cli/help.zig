@@ -45,9 +45,11 @@ pub fn run(alloc: Allocator) !u8 {
         \\where key and value are the same format you'd put into a configuration
         \\file. For example, `--font-size=12` or `--font-family="Fira Code"`.
         \\
-        \\To see a list of all available configuration options, please see
-        \\the `src/config/Config.zig` file. A future update will allow seeing
-        \\the list of configuration options from the command line.
+        \\To see every available configuration option along with its
+        \\documentation, run `zashiki +show-config --default --docs`. To look
+        \\up a single option or keybind action, run
+        \\`zashiki +explain-config --option=font-size` or
+        \\`zashiki +explain-config --keybind=copy_to_clipboard`.
         \\
         \\A special command line argument `-e <command>` can be used to run
         \\the specific command inside the terminal emulator. For example,

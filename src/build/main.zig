@@ -7,13 +7,11 @@ pub const GitVersion = @import("GitVersion.zig");
 
 // Artifacts
 pub const GhosttyDist = @import("GhosttyDist.zig");
-pub const GhosttyDocs = @import("GhosttyDocs.zig");
 pub const GhosttyExe = @import("GhosttyExe.zig");
 pub const GhosttyLib = @import("GhosttyLib.zig");
 pub const GhosttyResources = @import("GhosttyResources.zig");
 pub const ZashikiXcodebuild = @import("ZashikiXcodebuild.zig");
 pub const GhosttyXCFramework = @import("GhosttyXCFramework.zig");
-pub const GhosttyWebdata = @import("GhosttyWebdata.zig");
 pub const HelpStrings = @import("HelpStrings.zig");
 pub const SharedDeps = @import("SharedDeps.zig");
 pub const UnicodeTables = @import("UnicodeTables.zig");
