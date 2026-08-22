@@ -9,7 +9,6 @@ pub const GitVersion = @import("GitVersion.zig");
 pub const GhosttyDist = @import("GhosttyDist.zig");
 pub const GhosttyDocs = @import("GhosttyDocs.zig");
 pub const GhosttyExe = @import("GhosttyExe.zig");
-pub const GhosttyFrameData = @import("GhosttyFrameData.zig");
 pub const GhosttyLib = @import("GhosttyLib.zig");
 pub const GhosttyResources = @import("GhosttyResources.zig");
 pub const ZashikiXcodebuild = @import("ZashikiXcodebuild.zig");

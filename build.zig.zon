@@ -59,7 +59,6 @@
         .sentry = .{ .path = "./pkg/sentry", .lazy = true },
         .simdutf = .{ .path = "./pkg/simdutf", .lazy = true },
         .wuffs = .{ .path = "./pkg/wuffs", .lazy = true },
-        .zlib = .{ .path = "./pkg/zlib", .lazy = true },
 
         // Fonts
         .jetbrains_mono = .{
