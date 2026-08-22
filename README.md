@@ -1,5 +1,16 @@
 # Zashiki
 
+## リリース更新（Sparkle）
+
+リリースworkflowはSparkle署名済みの`appcast.xml`をGitHub Releaseへ添付する。
+初回リリース前に、Sparkle 2.9.0の`generate_keys`でZashiki専用のEdDSA鍵を生成し、
+`generate_keys -x <temporary-file>`でエクスポートした秘密鍵をリポジトリのActions
+Secret `SPARKLE_PRIVATE_KEY`へ登録する。秘密鍵をリポジトリやworkflowログに保存してはならない。
+
+公開鍵は`macos/Zashiki-Info.plist`の`SUPublicEDKey`に登録済みである。`generate_appcast`
+はCI内でSecretを標準入力から受け取り、前回のstable appcastを引き継いで署名済みの
+新しいfeedを生成する。`SUEnableAutomaticChecks`はnotarization完了まで`false`のままにする。
+
 <p align="center">
   <img src="macos/Assets.xcassets/AppIcon.appiconset/icon_256x256@2x.png" alt="Zashiki icon" width="128">
 </p>

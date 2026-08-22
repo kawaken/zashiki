@@ -92,6 +92,11 @@ pub fn init(
         step.environ_map = env_map;
         step.addArgs(&.{
             "xcodebuild",
+            // An old .xcodeproj may remain as Xcode user data after a
+            // project rename. Select the repository's project explicitly
+            // instead of relying on xcodebuild's directory inference.
+            "-project",
+            "Zashiki.xcodeproj",
             "-scheme",
             "Zashiki",
             "-configuration",
@@ -141,6 +146,8 @@ pub fn init(
         step.addArgs(&.{
             "xcodebuild",
             "test",
+            "-project",
+            "Zashiki.xcodeproj",
             "-scheme",
             "Zashiki",
             "-skip-testing",
