@@ -13,11 +13,15 @@ ongoing product rather than a one-off patch set:
   input/IME (e.g. ATOK preedit styling)
 - Develops fork-specific features independently (e.g. the Markdown
   preview pane)
-- Does **not** always track upstream. Divergence from
-  `ghostty-org/ghostty`, or a change that would make a future upstream
-  merge harder, is not by itself a reason to avoid or reject a change.
-  Upstream changes are adopted selectively when useful, not
-  automatically.
+- Does **not** track upstream. Divergence from `ghostty-org/ghostty`, or
+  a change that would make a future upstream merge harder, is not by
+  itself a reason to avoid or reject a change.
+- **Never consult upstream on your own.** There is deliberately no
+  `upstream` git remote, and you must not add one. Whether to adopt an
+  upstream change is the maintainer's decision alone: they will judge it
+  and tell you what to do. Do not fetch from, diff against, browse, or
+  reason about `ghostty-org/ghostty` unless explicitly instructed to in
+  that specific task.
 
 ## Commands
 
