@@ -42,6 +42,13 @@ ongoing product rather than a one-off patch set:
 
 ## Git Worktree
 
+- `main`は常に読み取り専用として扱い、実装・ドキュメント・plan/historyを含む変更を
+  直接行わない。複数セッションが同じリポジトリを利用するため、作業開始時に必ず
+  専用worktreeと作業ブランチを作成する
+- ブランチ名には`codex/`接頭辞を付けない。既存のworktreeや他セッションの変更を
+  使用・編集せず、作業対象のworktreeだけを変更する
+- 変更は専用ブランチからPRとして提出し、mainへの反映はPRのマージで行う。例外的に
+  mainへ直接コミット・pushしない
 - 対応するPRがマージされたworktreeは削除する。ビルド生成物のみ掃除したい場合は
   `rm -rf` を直接叩かず `make clean` を使う。worktree自体を消す場合は
   `git worktree remove --force`（lock中なら `-f -f`）。削除前に他セッションが
