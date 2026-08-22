@@ -67,21 +67,6 @@ pub fn build(b: *std.Build) !void {
     // Ghostty executable, the actual runnable Ghostty program.
     const exe = try buildpkg.GhosttyExe.init(b, &config, &deps);
 
-    // Ghostty docs
-    const docs = try buildpkg.GhosttyDocs.init(b, &deps);
-    if (config.emit_docs) {
-        docs.install();
-    } else if (config.target.result.os.tag.isDarwin()) {
-        // If we aren't emitting docs we need to emit a placeholder so
-        // our macOS xcodeproject builds since it expects the `share/man`
-        // directory to exist to copy into the app bundle.
-        docs.installDummy(b.getInstallStep());
-    }
-
-    // Ghostty webdata
-    const webdata = try buildpkg.GhosttyWebdata.init(b, &deps);
-    if (config.emit_webdata) webdata.install();
-
     // Ghostty dist tarball
     const dist = try buildpkg.GhosttyDist.init(b, &config);
     {
@@ -149,7 +134,6 @@ pub fn build(b: *std.Build) !void {
             &config,
             .{
                 .xcframework = &xcframework,
-                .docs = &docs,
                 .resources = &resources,
             },
         );
@@ -194,7 +178,6 @@ pub fn build(b: *std.Build) !void {
                 &config,
                 .{
                     .xcframework = &xcframework_native,
-                    .docs = &docs,
                     .resources = &resources,
                 },
             );

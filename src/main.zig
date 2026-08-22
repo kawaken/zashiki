@@ -5,11 +5,6 @@ const build_config = @import("build_config.zig");
 const entrypoint = switch (build_config.exe_entrypoint) {
     .ghostty => @import("main_ghostty.zig"),
     .helpgen => @import("helpgen.zig"),
-    .mdgen_ghostty_1 => @import("build/mdgen/main_ghostty_1.zig"),
-    .mdgen_ghostty_5 => @import("build/mdgen/main_ghostty_5.zig"),
-    .webgen_config => @import("build/webgen/main_config.zig"),
-    .webgen_actions => @import("build/webgen/main_actions.zig"),
-    .webgen_commands => @import("build/webgen/main_commands.zig"),
 };
 
 /// The main entrypoint for the program.

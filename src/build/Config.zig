@@ -39,7 +39,6 @@ strip: bool = false,
 patchelf: ?PatchElf = null,
 
 /// Artifacts
-emit_docs: bool = false,
 emit_exe: bool = false,
 emit_helpgen: bool = false,
 emit_macos_app: bool = false,
@@ -48,7 +47,6 @@ emit_termcap: bool = false,
 emit_test_exe: bool = false,
 emit_themes: bool = false,
 emit_xcframework: bool = false,
-emit_webdata: bool = false,
 emit_unicode_table_gen: bool = false,
 
 /// True when Ghostty is being built as a dependency of another project
@@ -324,25 +322,6 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
         "Build and install the helpgen executable.",
     ) orelse false;
 
-    config.emit_docs = b.option(
-        bool,
-        "emit-docs",
-        "Build and install auto-generated documentation (requires pandoc)",
-    ) orelse emit_docs: {
-        // If we are emitting any other artifacts then we default to false.
-        if (config.emit_test_exe or
-            config.emit_helpgen) break :emit_docs false;
-
-        // We always emit docs in system package mode.
-        if (system_package) break :emit_docs true;
-
-        // We only default to true if we can find pandoc.
-        const path = expandPath(b.graph.io, b.allocator, &b.graph.environ_map, "pandoc") catch
-            break :emit_docs false;
-        defer if (path) |p| b.allocator.free(p);
-        break :emit_docs path != null;
-    };
-
     config.emit_terminfo = b.option(
         bool,
         "emit-terminfo",
@@ -369,12 +348,6 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
         "emit-themes",
         "Install bundled iTerm2-Color-Schemes Zashiki themes",
     ) orelse true;
-
-    config.emit_webdata = b.option(
-        bool,
-        "emit-webdata",
-        "Build the website data for the website.",
-    ) orelse false;
 
     config.emit_xcframework = b.option(
         bool,
@@ -624,11 +597,6 @@ pub fn genericMacOSTarget(
 pub const ExeEntrypoint = enum {
     ghostty,
     helpgen,
-    mdgen_ghostty_1,
-    mdgen_ghostty_5,
-    webgen_config,
-    webgen_actions,
-    webgen_commands,
 };
 
 /// The release channel for the build.
