@@ -1,34 +1,50 @@
 # Zashiki
 
-## リリース更新（Sparkle）
-
-リリースworkflowはSparkle署名済みの`appcast.xml`をGitHub Releaseへ添付する。
-初回リリース前に、Sparkle 2.9.0の`generate_keys`でZashiki専用のEdDSA鍵を生成し、
-`generate_keys -x <temporary-file>`でエクスポートした秘密鍵をリポジトリのActions
-Secret `SPARKLE_PRIVATE_KEY`へ登録する。秘密鍵をリポジトリやworkflowログに保存してはならない。
-
-公開鍵は`macos/Zashiki-Info.plist`の`SUPublicEDKey`に登録済みである。`generate_appcast`
-はCI内でSecretを標準入力から受け取り、前回のstable appcastを引き継いで署名済みの
-新しいfeedを生成する。`SUEnableAutomaticChecks`はnotarization完了まで`false`のままにする。
-
 <p align="center">
   <img src="macos/Assets.xcassets/AppIcon.appiconset/icon_256x256@2x.png" alt="Zashiki icon" width="128">
 </p>
 
-[@kawaken](https://github.com/kawaken)'s private, macOS-only fork of
-[Ghostty](https://github.com/ghostty-org/ghostty).
+[@kawaken](https://github.com/kawaken)による、macOS専用の
+[Ghostty](https://github.com/ghostty-org/ghostty)フォークです。アプリ名、Bundle ID、
+CLI、設定・リソースの参照先はZashiki向けに分離しています。
 
 ## Fork-specific features
 
-- **ATOK / Japanese IME preedit styling** — the clause currently being
-  converted gets a thicker underline than the rest of the preedit text,
-  matching how ATOK itself distinguishes it.
-- **Markdown preview pane** — toggle a preview pane (`Cmd+Shift+M`) that
-  renders Markdown natively in SwiftUI (no WebKit). Open a file from the
-  CLI via a custom `zashiki://` URL scheme (e.g. `open "zashiki://markdown-preview/open?path=<path>&surface=$ZASHIKI_SURFACE_ID"`,
-  with `<path>` percent-encoded); the pane live-updates as the file
-  changes. The optional `surface` query item (a surface's
-  `ZASHIKI_SURFACE_ID` environment variable) targets the exact window
-  the request came from; omit it to target the most-recently-active
-  window instead. Handy for previewing files an agent like Claude Code
-  is writing to.
+- **日本語IME対応** — ATOKなどのpreeditで、変換中の文節を太い下線で表示します。
+- **Markdownプレビュー** — `Cmd+Shift+M`でSwiftUIネイティブのプレビューを開きます。
+  WebKitを使わず、ファイル変更をライブ反映します。CLIやAIエージェントからは、パスを
+  percent-encodeして次のURLを開けます:
+
+  ```sh
+  open "zashiki://markdown-preview/open?path=<encoded-path>&surface=$ZASHIKI_SURFACE_ID"
+  ```
+
+  `surface`を省略すると、直近アクティブなウィンドウが対象になります。
+
+- **Sparkle更新基盤** — stable feedをGitHub Releaseで配布し、署名済みappcastを生成します。
+  自動チェックはDeveloper ID署名・notarization完了まで無効です。
+
+## 開発
+
+macOSアプリのビルドにはXcode、macOS SDK、Metal Toolchainが必要です。
+
+```sh
+zig build
+zig build -Doptimize=ReleaseFast -Dxcframework-target=native -Demit-macos-app=true
+zig build test -Dtest-filter=<test-name>
+```
+
+生成物は`zig-out/`にインストールされます。Swift側を含むReleaseビルドはXcodeの
+`Zashiki.xcodeproj`を使用します。
+
+## リリース
+
+Release workflowは、`v*.*.*`タグのpush、またはGitHub Actionsの手動実行で起動します。
+mainへマージしただけではReleaseは作成されません。手動実行時は`version`入力にタグ相当の
+バージョン（例: `v0.3.0`）を指定します。
+
+workflowは`Zashiki-*-macos.zip`と署名済み`appcast.xml`をGitHub Releaseへ添付します。
+前回stableのappcastを引き継ぐため、Releaseを実行する前にActions Secret
+`SPARKLE_PRIVATE_KEY`が必要です。秘密鍵はリポジトリへ保存せず、Keychain・1Passwordなどで
+バックアップしてください。現在はad-hoc署名のためnotarizationされておらず、
+`SUEnableAutomaticChecks`も`false`です。
