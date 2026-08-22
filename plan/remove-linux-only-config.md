@@ -104,9 +104,24 @@ pub const getGObjectType = switch (build_config.app_runtime) {
 "unknown field"）になり、起動時の設定エラーウィンドウに表示される。クラッシュ
 はしないが、ユーザーがそのキーを書いていると毎回警告が出る。
 
-**確認済み**: `~/.config/ghostty/config` と `~/.config/ghostty/local` を
-grepしたところ、A の13件はいずれも使われていない。したがって今削除しても
-実害はない。
+**確認済み**: A の13件はいずれもユーザーの設定ファイルで使われていない。
+確認対象は現在の探索パス（`src/config/file_load.zig`）:
+
+| 種別 | パス |
+|---|---|
+| XDG（新） | `$XDG_CONFIG_HOME/zashiki/config.ghostty` |
+| XDG（旧・後方互換） | `$XDG_CONFIG_HOME/zashiki/config` |
+| App Support（新） | `~/Library/Application Support/dev.kawaken.zashiki/config.ghostty` |
+| App Support（旧・後方互換） | `~/Library/Application Support/dev.kawaken.zashiki/config` |
+
+に加えて、リブランド前のパスに残っている実ファイル
+（`~/dotfiles/ghostty/config`、`~/.config/ghostty/local`）も確認した。
+
+> **注意（このプランの対象外）**: 上記の探索パスはいずれも実在せず、
+> `zashiki +show-config` の出力はシステム由来のデフォルト4件のみだった。
+> つまり**現在ユーザーの設定ファイルは1つも読み込まれていない**。
+> `~/.config/ghostty/config`（`~/dotfiles/ghostty/config` へのシンボリック
+> リンク）がリブランドで宙に浮いている。設定の移行は別途対応が必要。
 
 ## 実施順序
 
