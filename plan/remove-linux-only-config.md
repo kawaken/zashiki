@@ -114,15 +114,6 @@ pub const getGObjectType = switch (build_config.app_runtime) {
 | App Support（新） | `~/Library/Application Support/dev.kawaken.zashiki/config.ghostty` |
 | App Support（旧・後方互換） | `~/Library/Application Support/dev.kawaken.zashiki/config` |
 
-に加えて、リブランド前のパスに残っている実ファイル
-（`~/dotfiles/ghostty/config`、`~/.config/ghostty/local`）も確認した。
-
-> **注意（このプランの対象外）**: 上記の探索パスはいずれも実在せず、
-> `zashiki +show-config` の出力はシステム由来のデフォルト4件のみだった。
-> つまり**現在ユーザーの設定ファイルは1つも読み込まれていない**。
-> `~/.config/ghostty/config`（`~/dotfiles/ghostty/config` へのシンボリック
-> リンク）がリブランドで宙に浮いている。設定の移行は別途対応が必要。
-
 ## 実施順序
 
 1. **A（13件の削除）** — 挙動不変。付随する型（`AsyncBackend`, `LinuxCgroup`）
@@ -134,6 +125,6 @@ pub const getGObjectType = switch (build_config.app_runtime) {
 
 - `zig build` / `zig build test` が成功する
 - `zashiki +show-config --default --docs` の先頭が `language` でなくなる
-- `zashiki +validate-config` が既存の `~/.config/ghostty/config` で通る
+- `zashiki +validate-config` が既存の設定ファイルで通る
 - 削除した設定を書いた設定ファイルで "unknown field" 診断が出ることを確認
   （＝意図通りエラーとして扱われる）

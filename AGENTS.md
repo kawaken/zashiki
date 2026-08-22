@@ -47,6 +47,25 @@ ongoing product rather than a one-off patch set:
   `git worktree remove --force`（lock中なら `-f -f`）。削除前に他セッションが
   使用中でないか（lock状態・未コミット変更）を確認する
 
+## Public-Facing Work (PRs, Commits, Issues)
+
+This repo is public on GitHub. Anything written into a PR body, commit
+message, or issue — including plan docs committed to the repo — is visible
+to anyone, not just the maintainer.
+
+- **Never publish details about the maintainer's personal environment or
+  config state.** This includes: paths outside the repo (e.g. dotfiles
+  locations, home-directory layout), the actual contents of their config
+  file (theme, fonts, keybinds, etc.), or observations like "your config
+  isn't currently loaded" / "this file doesn't exist on your machine".
+  Findings phrased in the first person about the maintainer's own machine
+  belong in chat, not in anything pushed to GitHub.
+- This applies even when the finding is directly relevant to the task
+  (e.g. "config search paths changed after rebrand") — describe the
+  _code's_ behavior generically, not the maintainer's specific setup.
+- If in doubt whether something is personal, ask before including it in
+  a PR/commit rather than publishing and asking forgiveness.
+
 ## Xcode
 
 Building the macOS app requires Xcode, the macOS SDK, the iOS SDK, and Metal
