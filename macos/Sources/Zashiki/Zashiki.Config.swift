@@ -897,12 +897,11 @@ extension Zashiki.Config {
     enum WindowDecoration: String {
         case none
         case client
-        case server
         case auto
 
         func enabled() -> Bool {
             switch self {
-            case .client, .server, .auto: return true
+            case .client, .auto: return true
             case .none: return false
             }
         }
