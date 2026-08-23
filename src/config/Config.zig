@@ -101,10 +101,9 @@ pub const compatibility = std.StaticStringMap(
 /// font. This is particularly useful for multiple languages, symbolic fonts,
 /// etc.
 ///
-/// Notes on emoji specifically: On macOS, Ghostty by default will always use
-/// Apple Color Emoji and on Linux will always use Noto Emoji. You can
-/// override this behavior by specifying a font family here that contains
-/// emoji glyphs.
+/// Notes on emoji specifically: Ghostty by default will always use Apple
+/// Color Emoji. You can override this behavior by specifying a font family
+/// here that contains emoji glyphs.
 ///
 /// The specific styles (bold, italic, bold italic) do not need to be
 /// explicitly set. If a style is not set, then the regular style (font-family)
@@ -229,9 +228,6 @@ pub const compatibility = std.StaticStringMap(
 /// Otherwise, the font size of existing terminals will be updated on
 /// reload.
 ///
-/// On Linux with GTK, font size is scaled according to both display-wide and
-/// text-specific scaling factors, which are often managed by your desktop
-/// environment (e.g. the GNOME display scale and large text settings).
 @"font-size": f32 = switch (builtin.os.tag) {
     // On macOS we default a little bigger since this tends to look better. This
     // is purely subjective but this is easy to modify.
@@ -350,13 +346,12 @@ pub const compatibility = std.StaticStringMap(
 /// This affects the appearance of text and of any images with transparency.
 /// Additionally, custom shaders will receive colors in the configured space.
 ///
-/// On macOS the default is `native`, on all other platforms the default is
-/// `linear-corrected`.
+/// The default is `native`.
 ///
 /// Valid values:
 ///
 /// * `native` - Perform alpha blending in the native color space for the OS.
-///   On macOS this corresponds to Display P3, and on Linux it's sRGB.
+///   On macOS this corresponds to Display P3.
 ///
 /// * `linear` - Perform alpha blending in linear space. This will eliminate
 ///   the darkening artifacts around the edges of text that are very visible
@@ -529,10 +524,7 @@ pub const compatibility = std.StaticStringMap(
 ///
 /// The second directory is the `themes` subdirectory of the Zashiki resources
 /// directory. Zashiki ships with a multitude of themes that will be installed
-/// into this directory. On macOS, this list is in the
-/// `Zashiki.app/Contents/Resources/ghostty/themes` directory. On Linux, this
-/// list is in the `share/ghostty/themes` directory (wherever you installed the
-/// Zashiki "share" directory.
+/// into this directory, at `Zashiki.app/Contents/Resources/ghostty/themes`.
 ///
 /// To see a list of available themes, run `ghostty +list-themes`.
 ///
@@ -1005,19 +997,6 @@ palette: Palette = .{},
 ///
 ///   * `macos-glass-regular` - Standard glass effect with some opacity
 ///   * `macos-glass-clear` - Highly transparent glass effect
-///
-/// If the macOS values are set, then this implies `background-blur = true`
-/// on non-macOS platforms.
-///
-/// On Linux, the exact blur intensity is ignored and any positive integer
-/// or `true` value will enable background blur. On Wayland, Ghostty uses
-/// the [`ext-background-effect-v1`](https://wayland.app/protocols/ext-background-effect-v1)
-/// protocol to enable the blur effect, but this is not always supported
-/// on all compositors. Check the documentation of your compositor or
-/// desktop environment for blur support and how to configure it.
-///
-/// On X11, blur can only be enabled when using the KWin compositor
-/// as a part of KDE Plasma.
 @"background-blur": BackgroundBlur = .false,
 
 /// The opacity level (opposite of transparency) of an unfocused split.
@@ -1166,10 +1145,6 @@ command: ?Command = null,
 /// enabled, or that your shell sends OSC 133 escape sequences to mark the start
 /// and end of commands.
 ///
-/// On GTK, there is a context menu item that will enable command finished
-/// notifications for a single command, overriding the `never` and `unfocused`
-/// options.
-///
 /// Available since 1.3.0.
 @"notify-on-command-finish": NotifyOnCommandFinish = .never,
 
@@ -1317,9 +1292,8 @@ input: RepeatableReadableIO = .{},
 /// to be abnormal. This is used to show an error message when the process exits
 /// too quickly.
 ///
-/// On Linux, this must be paired with a non-zero exit code. On macOS, we allow
-/// any exit code because of the way shell processes are launched via the login
-/// command.
+/// We allow any exit code to trigger this because of the way shell processes
+/// are launched via the login command.
 @"abnormal-command-exit-runtime": u32 = 250,
 
 /// The size of the scrollback buffer in bytes. This also includes the active
@@ -1425,9 +1399,8 @@ scrollbar: Scrollbar = .system,
 /// TODO: This can't currently be set!
 link: RepeatableLink = .{},
 
-/// Enable URL matching. URLs are matched on hover with control (Linux) or
-/// command (macOS) pressed and open using the default system application for
-/// the linked URL.
+/// Enable URL matching. URLs are matched on hover with command pressed and
+/// open using the default system application for the linked URL.
 ///
 /// The URL matcher is always lowest priority of any configured links (see
 /// `link`). If you want to customize URL matching, use `link` and disable this.
@@ -1500,10 +1473,9 @@ title: ?[:0]const u8 = null,
 /// setting will be used. Typically, this setting is used only for the first
 /// window.
 ///
-/// The default is `inherit` except in special scenarios listed next. On macOS,
-/// if Ghostty can detect it is launched from launchd (double-clicked) or
-/// `open`, then it defaults to `home`. On Linux with GTK, if Ghostty can detect
-/// it was launched from a desktop launcher, then it defaults to `home`.
+/// The default is `inherit` except in special scenarios listed next. If
+/// Ghostty can detect it is launched from launchd (double-clicked) or
+/// `open`, then it defaults to `home`.
 ///
 /// The value of this must be an absolute path, a path prefixed with `~/`
 /// (the tilde will be expanded to the user's home directory), or
@@ -1687,7 +1659,7 @@ title: ?[:0]const u8 = null,
 ///    Note: this does not work in all environments; see the additional notes
 ///    below for more information.
 ///
-///    Available since: 1.0.0 on macOS, 1.2.0 on GTK
+///    Available since: 1.0.0
 ///
 ///  * `unconsumed:`
 ///
@@ -1729,33 +1701,12 @@ title: ?[:0]const u8 = null,
 /// `global:unconsumed:ctrl+a=reload_config` will make the keybind global
 /// and not consume the input to reload the config.
 ///
-/// Note: `global:` is only supported on macOS and certain Linux platforms.
-///
-/// On macOS, this feature requires accessibility permissions to be granted
-/// to Ghostty. When a `global:` keybind is specified and Ghostty is launched
-/// or reloaded, Ghostty will attempt to request these permissions.
-/// If the permissions are not granted, the keybind will not work. On macOS,
-/// you can find these permissions in System Preferences -> Privacy & Security
-/// -> Accessibility.
-///
-/// On Linux, you need a desktop environment that implements the
-/// [Global Shortcuts](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.GlobalShortcuts.html)
-/// protocol as a part of its XDG desktop protocol implementation.
-/// Desktop environments that are known to support (or not support)
-/// global shortcuts include:
-///
-///  - Users using KDE Plasma (since [5.27](https://kde.org/announcements/plasma/5/5.27.0/#wayland))
-///    and GNOME (since [48](https://release.gnome.org/48/#and-thats-not-all)) should be able
-///    to use global shortcuts with little to no configuration.
-///
-///  - Some manual configuration is required on Hyprland. Consult the steps
-///    outlined on the [Hyprland Wiki](https://wiki.hyprland.org/Configuring/Binds/#dbus-global-shortcuts)
-///    to set up global shortcuts correctly.
-///    (Important: [`xdg-desktop-portal-hyprland`](https://wiki.hyprland.org/Hypr-Ecosystem/xdg-desktop-portal-hyprland/)
-///    must also be installed!)
-///
-///  - Notably, global shortcuts have not been implemented on wlroots-based
-///    compositors like Sway (see [upstream issue](https://github.com/emersion/xdg-desktop-portal-wlr/issues/240)).
+/// Note: This feature requires accessibility permissions to be granted to
+/// Ghostty. When a `global:` keybind is specified and Ghostty is launched or
+/// reloaded, Ghostty will attempt to request these permissions. If the
+/// permissions are not granted, the keybind will not work. You can find
+/// these permissions in System Preferences -> Privacy & Security ->
+/// Accessibility.
 ///
 /// ## Chained Actions
 ///
@@ -2038,26 +1989,11 @@ keybind: Keybinds = .{},
 ///
 ///    Available since: 1.1.0
 ///
-///  * `server`
-///
-///    Prefer server-side decorations. This is only relevant on Linux with GTK,
-///    either on X11, or Wayland on a compositor that supports the
-///    `org_kde_kwin_server_decoration` protocol (e.g. KDE Plasma, but almost
-///    any non-GNOME desktop supports this protocol).
-///
-///    If `server` is set but the environment doesn't support server-side
-///    decorations, client-side decorations will be used instead.
-///
-///    Available since: 1.1.0
-///
 /// The default value is `auto`.
 ///
 /// For the sake of backwards compatibility and convenience, this setting also
 /// accepts boolean true and false values. If set to `true`, this is equivalent
 /// to `auto`. If set to `false`, this is equivalent to `none`.
-/// This is convenient for users who live primarily on systems that don't
-/// differentiate between client and server-side decorations (e.g. macOS and
-/// Windows).
 ///
 /// The "toggle_window_decorations" keybind action can be used to create
 /// a keybinding to toggle this setting at runtime.
@@ -2073,7 +2009,7 @@ keybind: Keybinds = .{},
 /// Note: any font available on the system may be used, this font is not
 /// required to be a fixed-width font.
 ///
-/// Available since: 1.0.0 on macOS, 1.1.0 on GTK
+/// Available since: 1.0.0
 @"window-title-font-family": ?[:0]const u8 = null,
 
 /// The theme to use for the windows. Valid values:
@@ -2088,12 +2024,10 @@ keybind: Keybinds = .{},
 ///   * `ghostty` - Use the background and foreground colors specified in the
 ///     Ghostty configuration. This is only supported on Linux builds.
 ///
-/// On macOS, if `macos-titlebar-style` is `tabs` or `transparent`, the window theme will be
+/// If `macos-titlebar-style` is `tabs` or `transparent`, the window theme will be
 /// automatically set based on the luminosity of the terminal background color.
 /// This only applies to terminal windows. This setting will still apply to
 /// non-terminal windows within Ghostty.
-///
-/// This is currently only supported on macOS and Linux.
 @"window-theme": WindowTheme = .auto,
 
 /// The color space to use when interpreting terminal colors. "Terminal colors"
@@ -2129,11 +2063,6 @@ keybind: Keybinds = .{},
 /// value will not affect the size of the window after it has been created. This
 /// is only used for the initial size.
 ///
-/// BUG: On Linux with GTK, the calculated window size will not properly take
-/// into account window decorations. As a result, the grid dimensions will not
-/// exactly match this configuration. If window decorations are disabled (see
-/// `window-decoration`), then this will work as expected.
-///
 /// Windows smaller than 10 wide by 4 high are not allowed.
 @"window-height": u32 = 0,
 @"window-width": u32 = 0,
@@ -2158,9 +2087,6 @@ keybind: Keybinds = .{},
 /// the visible screen area. This means that if the menu bar is visible, the
 /// window will be placed below the menu bar.
 ///
-/// Note: this is only supported on macOS. The GTK runtime does not support
-/// setting the window position, as windows are only allowed position
-/// themselves in X11 and not Wayland.
 @"window-position-x": ?i16 = null,
 @"window-position-y": ?i16 = null,
 
@@ -2193,7 +2119,6 @@ keybind: Keybinds = .{},
 ///
 /// The default value is `default`.
 ///
-/// This is currently only supported on macOS. This has no effect on Linux.
 @"window-save-state": WindowSaveState = .default,
 
 /// Resize the window in discrete increments of the focused surface's cell size.
@@ -2342,7 +2267,7 @@ keybind: Keybinds = .{},
 /// selection clipboard); with `clipboard` it reads from the system
 /// clipboard.
 ///
-/// The default value is true on Linux and macOS.
+/// The default value is true.
 @"copy-on-select": CopyOnSelect = switch (builtin.os.tag) {
     .linux => .true,
     .macos => .true,
@@ -2430,13 +2355,12 @@ keybind: Keybinds = .{},
 
 /// Whether or not to quit after the last surface is closed.
 ///
-/// This defaults to `false` on macOS since that is standard behavior for
-/// a macOS application. On Linux, this defaults to `true` since that is
-/// generally expected behavior.
+/// This defaults to `false` since that is standard behavior for a macOS
+/// application.
 @"quit-after-last-window-closed": bool = builtin.os.tag == .linux,
 
 /// This controls whether an initial window is created when Ghostty
-/// is run. Only implemented on Linux and macOS.
+/// is run.
 @"initial-window": bool = true,
 
 /// The duration that undo operations remain available. After this
@@ -2479,10 +2403,6 @@ keybind: Keybinds = .{},
 /// Units can be repeated and will be added together. This means that
 /// `1h1h` is equivalent to `2h`. This is confusing and should be avoided.
 /// A future update may disallow this.
-///
-/// This configuration is only supported on macOS. Linux doesn't
-/// support undo operations at all so this configuration has no
-/// effect.
 ///
 /// Available since: 1.2.0
 @"undo-timeout": Duration = .{ .duration = 5 * std.time.ns_per_s },
@@ -2548,13 +2468,7 @@ keybind: Keybinds = .{},
 /// The default value is `main` because this is the recommended screen
 /// by the operating system.
 ///
-/// On macOS, `macos-menu-bar` uses the screen containing the menu bar.
-/// On Linux/Wayland, `macos-menu-bar` is treated as equivalent to `main`.
-///
-/// Note: On Linux, there is no universal concept of a "primary" monitor.
-/// Ghostty uses the compositor-reported primary output when available and
-/// falls back to the first monitor reported by GDK if no primary output can
-/// be resolved.
+/// `macos-menu-bar` uses the screen containing the menu bar.
 @"quick-terminal-screen": QuickTerminalScreen = .main,
 
 /// Duration (in seconds) of the quick terminal enter and exit animation.
@@ -2567,11 +2481,7 @@ keybind: Keybinds = .{},
 /// Automatically hide the quick terminal when focus shifts to another window.
 /// Set it to false for the quick terminal to remain open even when it loses focus.
 ///
-/// Defaults to true on macOS and on false on Linux/BSD. This is because global
-/// shortcuts on Linux require system configuration and are considerably less
-/// accessible than on macOS, meaning that it is more preferable to keep the
-/// quick terminal open until the user has completed their task.
-/// This default may change in the future.
+/// Defaults to true. This default may change in the future.
 @"quick-terminal-autohide": bool = switch (builtin.os.tag) {
     .linux => false,
     .macos => true,
@@ -2593,9 +2503,6 @@ keybind: Keybinds = .{},
 ///    space.
 ///
 /// The default value is `move`.
-///
-/// Only implemented on macOS.
-/// On Linux the behavior is always equivalent to `move`.
 ///
 /// Available since: 1.1.0
 @"quick-terminal-space-behavior": QuickTerminalSpaceBehavior = .move,
@@ -2751,33 +2658,17 @@ keybind: Keybinds = .{},
 ///  * `system`
 ///
 ///    Instruct the system to notify the user using built-in system functions.
-///    This could result in an audiovisual effect, a notification, or something
-///    else entirely. Changing these effects require altering system settings:
-///    for instance under the "Sound > Alert Sound" setting in GNOME,
-///    or the "Accessibility > System Bell" settings in KDE Plasma.
-///
-///    On macOS, this plays the system alert sound.
+///    This plays the system alert sound. Changing this requires altering
+///    system settings.
 ///
 ///  * `audio`
 ///
-///    Play a custom sound. (Available since 1.3.0 on macOS)
+///    Play a custom sound. (Available since 1.3.0)
 ///
 ///  * `attention` *(enabled by default)*
 ///
 ///    Request the user's attention when Ghostty is unfocused, until it has
-///    received focus again. On macOS, this will bounce the app icon in the
-///    dock once. On Linux, the behavior depends on the desktop environment
-///    and/or the window manager/compositor:
-///
-///    - On KDE, the background of the desktop icon in the task bar would be
-///      highlighted;
-///
-///    - On GNOME, you may receive a notification that, when clicked, would
-///      bring the Ghostty window into focus;
-///
-///    - On Sway, the window may be decorated with a distinctly colored border;
-///
-///    - On other systems this may have no effect at all.
+///    received focus again. This will bounce the app icon in the dock once.
 ///
 ///  * `title` *(enabled by default)*
 ///
@@ -2789,7 +2680,7 @@ keybind: Keybinds = .{},
 ///    Display a border around the alerted surface until the terminal is
 ///    re-focused or interacted with (such as on keyboard input).
 ///
-///    Available since: 1.2.0 on GTK, 1.2.1 on macOS
+///    Available since: 1.2.1
 ///
 /// Example: `audio`, `no-audio`, `system`, `no-system`
 ///
@@ -2802,14 +2693,14 @@ keybind: Keybinds = .{},
 /// directory if this is used as a CLI flag. The path may be prefixed with `~/`
 /// to reference the user's home directory.
 ///
-/// Available since: 1.2.0 on GTK, 1.3.0 on macOS.
+/// Available since: 1.3.0.
 @"bell-audio-path": ?Path = null,
 
 /// If `audio` is an enabled bell feature, this is the volume to play the audio
 /// file at (relative to the system volume). This is a floating point number
 /// ranging from 0.0 (silence) to 1.0 (as loud as possible). The default is 0.5.
 ///
-/// Available since: 1.2.0 on GTK, 1.3.0 on macOS.
+/// Available since: 1.3.0.
 @"bell-audio-volume": f64 = 0.5,
 
 /// If anything other than false, fullscreen mode on macOS will not use the
@@ -3176,9 +3067,7 @@ term: []const u8 = "xterm-ghostty",
 /// running. Defaults to an empty string if not set.
 @"enquiry-response": []const u8 = "",
 
-/// Control the auto-update functionality of Ghostty. This is only supported
-/// on macOS currently, since Linux builds are distributed via package
-/// managers that are not centrally controlled by Ghostty.
+/// Control the auto-update functionality of Ghostty.
 ///
 /// Checking or downloading an update does not send any information to
 /// the project beyond standard network information mandated by the
@@ -8998,7 +8887,6 @@ pub const BackgroundBlur = union(enum) {
 pub const WindowDecoration = enum(c_int) {
     auto,
     client,
-    server,
     none,
 
     pub fn parseCLI(input_: ?[]const u8) !WindowDecoration {
@@ -9026,10 +8914,6 @@ pub const WindowDecoration = enum(c_int) {
         {
             const v = try WindowDecoration.parseCLI("false");
             try testing.expectEqual(WindowDecoration.none, v);
-        }
-        {
-            const v = try WindowDecoration.parseCLI("server");
-            try testing.expectEqual(WindowDecoration.server, v);
         }
         {
             const v = try WindowDecoration.parseCLI("client");
