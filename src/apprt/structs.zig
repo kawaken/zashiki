@@ -43,11 +43,6 @@ pub const Clipboard = enum(Backing) {
     // Our backing isn't is as small as we can in Zig, but a full
     // C int if we're binding to C APIs.
     const Backing = u2;
-
-    /// Make this a valid gobject if we're in a GTK environment.
-    pub const getGObjectType = switch (build_config.app_runtime) {
-        .none => void,
-    };
 };
 
 pub const ClipboardContent = struct {
@@ -72,11 +67,6 @@ pub const ClipboardRequest = union(ClipboardRequestType) {
 
     /// A request to write clipboard contents via OSC 52.
     osc_52_write: Clipboard,
-
-    /// Make this a valid gobject if we're in a GTK environment.
-    pub const getGObjectType = switch (build_config.app_runtime) {
-        .none => void,
-    };
 };
 
 /// The color scheme in use (light vs dark).
