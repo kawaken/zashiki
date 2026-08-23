@@ -90,26 +90,6 @@ pub const compatibility = std.StaticStringMap(
     .{ "scrollback-limit", cli.compatibilityRenamed(Config, "scrollback-limit-bytes") },
 });
 
-/// Set Ghostty's graphical user interface language to a language other than the
-/// system default language. For example:
-///
-///     language = de
-///
-/// will force the strings in Ghostty's graphical user interface to be in German
-/// rather than the system default.
-///
-/// This will not affect the language used by programs run _within_ Ghostty.
-/// Those will continue to use the default system language. There are also many
-/// non-GUI elements in Ghostty that are not translated - this setting will have
-/// no effect on those.
-///
-/// Warning: This setting cannot be reloaded at runtime. To change the language
-/// you must fully restart Ghostty.
-///
-/// GTK only.
-/// Available since 1.3.0.
-language: ?[:0]const u8 = null,
-
 /// The font families to use.
 ///
 /// You can generate the list of valid values using the CLI:
@@ -1161,8 +1141,7 @@ command: ?Command = null,
 ///     the `ghostty -e` command).
 ///
 ///   * `quit-after-last-window-closed=true` - This ensures that the Ghostty
-///     process will exit when the command exits. Additionally, the
-///     `quit-after-last-window-closed-delay` is unset.
+///     process will exit when the command exits.
 ///
 ///   * `shell-integration=detect` (if not `none`) - This prevents forcibly
 ///     injecting any configured shell integration into the command's
@@ -2097,17 +2076,6 @@ keybind: Keybinds = .{},
 /// Available since: 1.0.0 on macOS, 1.1.0 on GTK
 @"window-title-font-family": ?[:0]const u8 = null,
 
-/// The text that will be displayed in the subtitle of the window. Valid values:
-///
-///   * `false` - Disable the subtitle.
-///   * `working-directory` - Set the subtitle to the working directory of the
-///      surface.
-///
-/// This feature is only supported on GTK.
-///
-/// Available since: 1.1.0
-@"window-subtitle": WindowSubtitle = .false,
-
 /// The theme to use for the windows. Valid values:
 ///
 ///   * `auto` - Determine the theme based on the configured terminal
@@ -2240,43 +2208,6 @@ keybind: Keybinds = .{},
 ///
 ///   * `end` - Insert the new tab at the end of the tab list.
 @"window-new-tab-position": WindowNewTabPosition = .current,
-
-/// Whether to show the tab bar.
-///
-/// Valid values:
-///
-///  - `always`
-///
-///    Always display the tab bar, even when there's only one tab.
-///
-///    Available since: 1.2.0
-///
-///  - `auto` *(default)*
-///
-///    Automatically show and hide the tab bar. The tab bar is only
-///    shown when there are two or more tabs present.
-///
-///  - `never`
-///
-///    Never show the tab bar. Tabs are only accessible via the tab
-///    overview or by keybind actions.
-///
-/// Currently only supported on Linux (GTK).
-@"window-show-tab-bar": WindowShowTabBar = .auto,
-
-/// Background color for the window titlebar. This only takes effect if
-/// window-theme is set to ghostty. Currently only supported in the GTK app
-/// runtime.
-///
-/// Specified as either hex (`#RRGGBB` or `RRGGBB`) or a named X11 color.
-@"window-titlebar-background": ?Color = null,
-
-/// Foreground color for the window titlebar. This only takes effect if
-/// window-theme is set to ghostty. Currently only supported in the GTK app
-/// runtime.
-///
-/// Specified as either hex (`#RRGGBB` or `RRGGBB`) or a named X11 color.
-@"window-titlebar-foreground": ?Color = null,
 
 /// This controls when resize overlays are shown. Resize overlays are a
 /// transient popup that shows the size of the terminal while the surfaces are
@@ -2502,58 +2433,10 @@ keybind: Keybinds = .{},
 /// This defaults to `false` on macOS since that is standard behavior for
 /// a macOS application. On Linux, this defaults to `true` since that is
 /// generally expected behavior.
-///
-/// On Linux, if this is `true`, Ghostty can delay quitting fully until a
-/// configurable amount of time has passed after the last window is closed.
-/// See the documentation of `quit-after-last-window-closed-delay`.
 @"quit-after-last-window-closed": bool = builtin.os.tag == .linux,
 
-/// Controls how long Ghostty will stay running after the last open surface has
-/// been closed. This only has an effect if `quit-after-last-window-closed` is
-/// also set to `true`.
-///
-/// The minimum value for this configuration is `1s`. Any values lower than
-/// this will be clamped to `1s`.
-///
-/// The duration is specified as a series of numbers followed by time units.
-/// Whitespace is allowed between numbers and units. Each number and unit will
-/// be added together to form the total duration.
-///
-/// The allowed time units are as follows:
-///
-///   * `y` - 365 SI days, or 8760 hours, or 31536000 seconds. No adjustments
-///     are made for leap years or leap seconds.
-///   * `d` - one SI day, or 86400 seconds.
-///   * `h` - one hour, or 3600 seconds.
-///   * `m` - one minute, or 60 seconds.
-///   * `s` - one second.
-///   * `ms` - one millisecond, or 0.001 second.
-///   * `us` or `µs` - one microsecond, or 0.000001 second.
-///   * `ns` - one nanosecond, or 0.000000001 second.
-///
-/// Examples:
-///   * `1h30m`
-///   * `45s`
-///
-/// Units can be repeated and will be added together. This means that
-/// `1h1h` is equivalent to `2h`. This is confusing and should be avoided.
-/// A future update may disallow this.
-///
-/// The maximum value is `584y 49w 23h 34m 33s 709ms 551µs 615ns`. Any
-/// value larger than this will be clamped to the maximum value.
-///
-/// By default `quit-after-last-window-closed-delay` is unset and
-/// Ghostty will quit immediately after the last window is closed if
-/// `quit-after-last-window-closed` is `true`.
-///
-/// Only implemented on Linux.
-@"quit-after-last-window-closed-delay": ?Duration = null,
-
 /// This controls whether an initial window is created when Ghostty
-/// is run. Note that if `quit-after-last-window-closed` is `true` and
-/// `quit-after-last-window-closed-delay` is set, setting `initial-window` to
-/// `false` will mean that Ghostty will quit after the configured delay if no
-/// window is ever created. Only implemented on Linux and macOS.
+/// is run. Only implemented on Linux and macOS.
 @"initial-window": bool = true,
 
 /// The duration that undo operations remain available. After this
@@ -2716,36 +2599,6 @@ keybind: Keybinds = .{},
 ///
 /// Available since: 1.1.0
 @"quick-terminal-space-behavior": QuickTerminalSpaceBehavior = .move,
-
-/// Determines under which circumstances that the quick terminal should receive
-/// keyboard input. See the corresponding [Wayland documentation](https://wayland.app/protocols/wlr-layer-shell-unstable-v1#zwlr_layer_surface_v1:enum:keyboard_interactivity)
-/// for a more detailed explanation of the behavior of each option.
-///
-/// > [!NOTE]
-/// > The exact behavior of each option may differ significantly across
-/// > compositors -- experiment with them on your system to find one that
-/// > suits your liking!
-///
-/// Valid values are:
-///
-///  * `none`
-///
-///    The quick terminal will not receive any keyboard input.
-///
-///  * `on-demand` (default)
-///
-///    The quick terminal would only receive keyboard input when it is focused.
-///
-///  * `exclusive`
-///
-///    The quick terminal will always receive keyboard input, even when another
-///    window is currently focused.
-///
-/// Only has an effect on Linux Wayland.
-/// On macOS the behavior is always equivalent to `on-demand`.
-///
-/// Available since: 1.2.0
-@"quick-terminal-keyboard-interactivity": QuickTerminalKeyboardInteractivity = .@"on-demand",
 
 /// Whether to enable shell integration auto-injection or not. Shell integration
 /// greatly enhances the terminal experience by enabling a number of features:
@@ -2958,35 +2811,6 @@ keybind: Keybinds = .{},
 ///
 /// Available since: 1.2.0 on GTK, 1.3.0 on macOS.
 @"bell-audio-volume": f64 = 0.5,
-
-/// Control the in-app notifications that Ghostty shows.
-///
-/// On Linux (GTK), in-app notifications show up as toasts. Toasts appear
-/// overlaid on top of the terminal window. They are used to show information
-/// that is not critical but may be important.
-///
-/// Possible notifications are:
-///
-///   - `clipboard-copy` (default: true) - Show a notification when text is copied
-///     to the clipboard.
-///   - `config-reload` (default: true) - Show a notification when
-///     the configuration is reloaded.
-///
-/// To specify a notification to enable, specify the name of the notification.
-/// To specify a notification to disable, prefix the name with `no-`. For
-/// example, to disable `clipboard-copy`, set this configuration to
-/// `no-clipboard-copy`. To enable it, set this configuration to `clipboard-copy`.
-///
-/// Multiple notifications can be enabled or disabled by separating them
-/// with a comma.
-///
-/// A value of "false" will disable all notifications. A value of "true" will
-/// enable all notifications.
-///
-/// This configuration only applies to GTK.
-///
-/// Available since: 1.1.0
-@"app-notifications": AppNotifications = .{},
 
 /// If anything other than false, fullscreen mode on macOS will not use the
 /// native fullscreen, but make the window fullscreen without animations and
@@ -3305,79 +3129,6 @@ keybind: Keybinds = .{},
 /// Available since: 1.2.0
 @"macos-shortcuts": MacShortcuts = .ask,
 
-/// Put every surface (tab, split, window) into a transient `systemd` scope.
-///
-/// This allows per-surface resource management. For example, if a shell program
-/// is using too much memory, only that shell will be killed by the oom monitor
-/// instead of the entire Ghostty process. Similarly, if a shell program is
-/// using too much CPU, only that surface will be CPU-throttled.
-///
-/// This will cause startup times to be slower (a hundred milliseconds or so),
-/// so the default value is "single-instance." In single-instance mode, only
-/// one instance of Ghostty is running so the startup time is a one-time
-/// cost. Additionally, single instance Ghostty is much
-/// more likely to have many windows, tabs, etc. so cgroup isolation is a
-/// big benefit.
-///
-/// This feature requires `systemd`. If `systemd` is unavailable, cgroup
-/// initialization will fail. By default, this will not prevent Ghostty from
-/// working (see `linux-cgroup-hard-fail`).
-///
-/// Changing this value and reloading the config will not affect existing
-/// surfaces.
-///
-/// Valid values are:
-///
-///   * `never` - Never use cgroups.
-///   * `always` - Always use cgroups.
-///   * `single-instance` - Enable cgroups only for Ghostty instances launched
-///     as single-instance applications.
-@"linux-cgroup": LinuxCgroup = if (builtin.os.tag == .linux)
-    .@"single-instance"
-else
-    .never,
-
-/// Memory limit for any individual terminal process (tab, split, window,
-/// etc.) in bytes. If this is unset then no memory limit will be set.
-///
-/// Note that this sets the `MemoryHigh` setting on the transient `systemd`
-/// scope, which is a soft limit. You should configure something like
-/// `systemd-oom` to handle killing processes that have too much memory
-/// pressure.
-///
-/// Changing this value and reloading the config will not affect existing
-/// surfaces.
-///
-/// See the `systemd.resource-control` manual page for more information:
-/// https://www.freedesktop.org/software/systemd/man/latest/systemd.resource-control.html
-@"linux-cgroup-memory-limit": ?u64 = null,
-
-/// Number of processes limit for any individual terminal process (tab, split,
-/// window, etc.). If this is unset then no limit will be set.
-///
-/// Note that this sets the `TasksMax` setting on the transient `systemd` scope,
-/// which is a hard limit.
-///
-/// Changing this value and reloading the config will not affect existing
-/// surfaces.
-///
-/// See the `systemd.resource-control` manual page for more information:
-/// https://www.freedesktop.org/software/systemd/man/latest/systemd.resource-control.html
-@"linux-cgroup-processes-limit": ?u64 = null,
-
-/// If this is false, then creating a transient `systemd` scope (for
-/// `linux-cgroup`) will be allowed to fail and the failure is ignored. This is
-/// useful if you view cgroup isolation as a "nice to have" and not a critical
-/// resource management feature, because surface creation will not fail if
-/// `systemd` APIs fail.
-///
-/// If this is true, then any transient `systemd` scope creation failure will
-/// cause surface creation to fail.
-///
-/// Changing this value and reloading the config will not affect existing
-/// surfaces.
-@"linux-cgroup-hard-fail": bool = false,
-
 /// If `true` (default), applications running in the terminal can show desktop
 /// notifications using certain escape sequences such as OSC 9 or OSC 777.
 @"desktop-notifications": bool = true,
@@ -3424,36 +3175,6 @@ term: []const u8 = "xterm-ghostty",
 /// String to send when we receive `ENQ` (`0x05`) from the command that we are
 /// running. Defaults to an empty string if not set.
 @"enquiry-response": []const u8 = "",
-
-/// Configures the low-level API to use for async IO, eventing, etc.
-///
-/// Most users should leave this set to `auto`. This will automatically detect
-/// scenarios where APIs may not be available (for example `io_uring` on
-/// certain hardened kernels) and fall back to a different API. However, if
-/// you want to force a specific backend for any reason, you can set this
-/// here.
-///
-/// Based on various benchmarks, we haven't found a statistically significant
-/// difference between the backends with regards to memory, CPU, or latency.
-/// The choice of backend is more about compatibility and features.
-///
-/// Available options:
-///
-///   * `auto` - Automatically choose the best backend for the platform
-///     based on available options.
-///   * `epoll` - Use the `epoll` API
-///   * `io_uring` - Use the `io_uring` API
-///
-/// If the selected backend is not available on the platform, Ghostty will
-/// fall back to an automatically chosen backend that is available.
-///
-/// Changing this value requires a full application restart to take effect.
-///
-/// This is only supported on Linux, since this is the only platform
-/// where we have multiple options. On macOS, we always use `kqueue`.
-///
-/// Available since: 1.2.0
-@"async-backend": AsyncBackend = .auto,
 
 /// Control the auto-update functionality of Ghostty. This is only supported
 /// on macOS currently, since Linux builds are distributed via package
@@ -4378,18 +4099,6 @@ pub fn finalize(self: *Config) !void {
     // always the URL matcher.
     if (!self.@"link-url") self.link.links.items = self.link.links.items[1..];
 
-    // We warn when the quit-after-last-window-closed-delay is set to a very
-    // short value because it can cause Ghostty to quit before the first
-    // window is even shown.
-    if (self.@"quit-after-last-window-closed-delay") |duration| {
-        if (duration.duration < 5 * std.time.ns_per_s) {
-            log.warn(
-                "quit-after-last-window-closed-delay is set to a very short value ({f}), which might cause problems",
-                .{duration},
-            );
-        }
-    }
-
     // We can't set this as a struct default because our config is
     // loaded in environments where a build config isn't available.
     if (self.@"auto-update-channel" == null) {
@@ -4444,7 +4153,6 @@ pub fn parseManuallyHook(
         // See "command" docs for the implied configurations and why.
         self.@"initial-command" = .{ .direct = command.items };
         self.@"quit-after-last-window-closed" = true;
-        self.@"quit-after-last-window-closed-delay" = null;
         if (self.@"shell-integration" != .none) {
             self.@"shell-integration" = .detect;
         }
@@ -4922,11 +4630,6 @@ pub const WindowPaddingColor = enum {
     background,
     extend,
     @"extend-always",
-};
-
-pub const WindowSubtitle = enum {
-    false,
-    @"working-directory",
 };
 
 pub const LinkPreviews = enum {
@@ -8636,12 +8339,6 @@ pub const MacShortcuts = enum {
     ask,
 };
 
-/// See app-notifications
-pub const AppNotifications = packed struct {
-    @"clipboard-copy": bool = true,
-    @"config-reload": bool = true,
-};
-
 /// See bell-features
 pub const BellFeatures = packed struct {
     system: bool = false,
@@ -8785,13 +8482,6 @@ pub const WindowNewTabPosition = enum {
 pub const MacOSDockDropBehavior = enum {
     @"new-tab",
     @"new-window",
-};
-
-/// See window-show-tab-bar
-pub const WindowShowTabBar = enum {
-    always,
-    auto,
-    never,
 };
 
 /// See resize-overlay
@@ -9127,13 +8817,6 @@ pub const QuickTerminalSpaceBehavior = enum {
     move,
 };
 
-/// See quick-terminal-keyboard-interactivity
-pub const QuickTerminalKeyboardInteractivity = enum {
-    none,
-    @"on-demand",
-    exclusive,
-};
-
 /// See grapheme-width-method
 pub const GraphemeWidthMethod = enum {
     legacy,
@@ -9189,20 +8872,6 @@ pub const FreetypeLoadFlags = packed struct {
     monochrome: bool = false,
     autohint: bool = true,
     light: bool = true,
-};
-
-/// See linux-cgroup
-pub const LinuxCgroup = enum {
-    never,
-    always,
-    @"single-instance",
-};
-
-/// See async-backend
-pub const AsyncBackend = enum {
-    auto,
-    epoll,
-    io_uring,
 };
 
 /// See auto-updates
@@ -9331,11 +9000,6 @@ pub const WindowDecoration = enum(c_int) {
     client,
     server,
     none,
-
-    /// Make this a valid gobject if we're in a GTK environment.
-    pub const getGObjectType = switch (build_config.app_runtime) {
-        .none => void,
-    };
 
     pub fn parseCLI(input_: ?[]const u8) !WindowDecoration {
         const input = input_ orelse return .auto;

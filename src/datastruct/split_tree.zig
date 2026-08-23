@@ -1310,11 +1310,6 @@ pub fn SplitTree(comptime V: type) type {
                 else => @compileError("invalid view unref function"),
             }
         }
-
-        /// Make this a valid gobject if we're in a GTK environment.
-        pub const getGObjectType = switch (build_config.app_runtime) {
-            .none => void,
-        };
     };
 }
 
