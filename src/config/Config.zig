@@ -473,37 +473,6 @@ pub const compatibility = std.StaticStringMap(
 /// terminals. Only new terminals will use the new configuration.
 @"grapheme-width-method": GraphemeWidthMethod = .unicode,
 
-/// FreeType load flags to enable. The format of this is a list of flags to
-/// enable separated by commas. If you prefix a flag with `no-` then it is
-/// disabled. If you omit a flag, its default value is used, so you must
-/// explicitly disable flags you don't want. You can also use `true` or `false`
-/// to turn all flags on or off.
-///
-/// This configuration only applies to Ghostty builds that use FreeType.
-/// This is usually the case only for Linux builds. macOS uses CoreText
-/// and does not have an equivalent configuration.
-///
-/// Available flags:
-///
-///   * `hinting` - Enable or disable hinting. Enabled by default.
-///
-///   * `force-autohint` - Always use the freetype auto-hinter instead of
-///     the font's native hinter. Disabled by default.
-///
-///   * `monochrome` - Instructs renderer to use 1-bit monochrome rendering.
-///     This will disable anti-aliasing, and probably not look very good unless
-///     you're using a pixel font. Disabled by default.
-///
-///   * `autohint` - Enable the freetype auto-hinter. Enabled by default.
-///
-///   * `light` - Use a light hinting style, better preserving glyph shapes.
-///     This is the most common setting in GTK apps and therefore also Ghostty's
-///     default. This has no effect if `monochrome` is enabled. Enabled by
-///     default.
-///
-/// Example: `hinting`, `no-hinting`, `force-autohint`, `no-force-autohint`
-@"freetype-load-flags": FreetypeLoadFlags = .{},
-
 /// A theme to use. This can be a built-in theme name, a custom theme
 /// name, or an absolute path to a custom theme file. Ghostty also supports
 /// specifying a different theme to use for light and dark mode. Each
@@ -2021,8 +1990,6 @@ keybind: Keybinds = .{},
 ///   * `system` - Use the system theme.
 ///   * `light` - Use the light theme regardless of system theme.
 ///   * `dark` - Use the dark theme regardless of system theme.
-///   * `ghostty` - Use the background and foreground colors specified in the
-///     Ghostty configuration. This is only supported on Linux builds.
 ///
 /// If `macos-titlebar-style` is `tabs` or `transparent`, the window theme will be
 /// automatically set based on the luminosity of the terminal background color.
@@ -8159,7 +8126,6 @@ pub const WindowTheme = enum {
     system,
     light,
     dark,
-    ghostty,
 };
 
 /// See window-colorspace
@@ -8746,21 +8712,6 @@ pub const BackgroundImageFit = enum {
     cover,
     stretch,
     none,
-};
-
-/// See freetype-load-flag
-pub const FreetypeLoadFlags = packed struct {
-    // The defaults here at the time of writing this match the defaults
-    // for Freetype itself. Ghostty hasn't made any opinionated changes
-    // to these defaults. (Strictly speaking, `light` isn't FreeType's
-    // own default, but appears to be the effective default with most
-    // Fontconfig-aware software using FreeType, so until Ghostty
-    // implements Fontconfig support we default to `light`.)
-    hinting: bool = true,
-    @"force-autohint": bool = false,
-    monochrome: bool = false,
-    autohint: bool = true,
-    light: bool = true,
 };
 
 /// See auto-updates

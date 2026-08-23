@@ -128,3 +128,35 @@ pub const getGObjectType = switch (build_config.app_runtime) {
 - `zashiki +validate-config` が既存の設定ファイルで通る
 - 削除した設定を書いた設定ファイルで "unknown field" 診断が出ることを確認
   （＝意図通りエラーとして扱われる）
+
+## 実施結果
+
+A・B・Cを3PRに分けて実施した:
+
+- A + C（設定13件の削除 + `getGObjectType`削除）: [#45](https://github.com/kawaken/zashiki/pull/45)
+- B（生きている設定のドキュメント整理29件 + `window-decoration`の`server`値削除）: [#47](https://github.com/kawaken/zashiki/pull/47)
+
+Bの実装中に、スコープ外の新規発見が2件あった。プラン外だったためBのPRには含めず、
+別PRで対応した:
+
+1. **`freetype-load-flags`が完全に死んでいた。** このフォークのフォントバックエンドは
+   CoreTextのみ（`font.Backend`は`.coretext`しか存在しない）で、`hasFreetype()`が
+   常に`false`を返すため、`freetype-load-flags`設定は元からパースされるだけで
+   一切効果を持たなかった。設定フィールドとFreeType読み込みフラグの`packed struct`を
+   削除し、`font/face.zig`の`FreetypeLoadFlags`型を`void`に固定した。
+   `Collection.zig`/`SharedGridSet.zig`側の`freetype_load_flags`フィールド自体は
+   （既に常に`void`型で実質ゼロコストなことと、`font.Backend`のような他の
+   1択に潰れた抽象化層を維持する既存方針に合わせて）そのまま残した。
+
+2. **`window-theme`の`ghostty`値もmacOSで無効だった。** ドキュメントには
+   「Linux buildsのみ対応」と明記されており、Swift側の`NSAppearance`拡張
+   （`NSAppearance+Extension.swift`）は`"dark"`/`"light"`/`"auto"`しか処理せず
+   `ghostty`は`default: return nil`に落ちていた。enumから値を削除した
+   （Swift側には元々`ghostty`ケースは存在しなかった）。
+
+検証: 両設定を書いた設定ファイルで診断が出ることを確認した。
+
+```
+freetype-load-flags: unknown field
+window-theme: invalid value "ghostty", valid values are: auto, system, light, dark
+```
