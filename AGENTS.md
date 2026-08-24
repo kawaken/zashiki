@@ -45,7 +45,9 @@ ongoing product rather than a one-off patch set:
 - `main`は常に読み取り専用として扱い、実装・ドキュメント・plan/historyを含む変更を
   直接行わない。複数セッションが同じリポジトリを利用するため、作業開始時に必ず
   専用worktreeと作業ブランチを作成する
-- ブランチ名には`codex/`接頭辞を付けない。既存のworktreeや他セッションの変更を
+- ブランチ名は用途が分かるフラットな名前にする。`codex/`や`kawaken/`のような
+  接頭辞・名前空間は付けず、スラッシュで階層化しない（例：
+  `markdown-preview`、`fix-ime-preedit`）。既存のworktreeや他セッションの変更を
   使用・編集せず、作業対象のworktreeだけを変更する
 - 変更は専用ブランチからPRとして提出し、mainへの反映はPRのマージで行う。例外的に
   mainへ直接コミット・pushしない
