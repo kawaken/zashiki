@@ -92,17 +92,32 @@ Zashikiは`NSTextInputClient`を実装しているが、この読み取り経路
 なら以降のフェーズは全て無駄になる。
 
 - `attributedSubstring(forProposedRange:actualRange:)`、`selectedRange()`、
-  `characterIndex(for:)`、`hasMarkedText()`に一時的な`Ghostty.logger.debug`を
-  追加する（:1937に既にコメントアウトされたログの残骸がある）
+  `characterIndex(for:)`、`hasMarkedText()`に一時的な`Zashiki.logger.debug`を
+  追加する（:1937に既にコメントアウトされたログの残骸がある）→ **実施済み**
+  （`ime-observe:`プレフィックス、`worktree-ime-surrounding-text`ブランチの
+  コミット`4160f7525`）
 - `attributedString()`（optional）にもスタブ＋ログを置いて、呼ばれるかを見る
-- `sudo log stream --level debug --predicate 'subsystem=="dev.kawaken.zashiki"'`
-  で観測。ATOKで日本語入力し、以下を記録する:
+  → **実施済み**（未実装だったので新規追加）
+- 観測はユーザーが目視するのではなく、`sudo log stream --level debug
+  --predicate 'subsystem=="dev.kawaken.zashiki"' > <file> 2>&1` でログを
+  ファイルにリダイレクトし、Claudeが後から読んで解析する。ATOKとことえりで
+  別ファイルに記録し、以下を確認する:
   - どのメソッドがどんな`range`で呼ばれるか
   - `nil`を返したときの後続の挙動（諦めるか、別のrangeで再問い合わせするか）
   - `selectedRange()`が返した`{0,0}`を基準に問い合わせてきているか
+  - `attributedString()`が呼ばれるかどうか
 - 比較対象としてことえり（日本語IM）でも同じ観測を行い、ATOK固有かを切り分ける
 - **判断ポイント**: ここで「ATOKは周辺文字列を要求していない」と判明したら、
   この計画は破棄してplan/から削除する
+
+**現状（2026-08-25）**: ログ計装のコード変更は完了しコミット済みだが、実機観測に
+必要なZashiki.appのビルドが別要因でブロックされている。`zig build`が呼ぶ
+xcodebuildで、Textual SPMパッケージの依存（`SwiftUIMath`/`ConcurrencyExtras`）が
+explicit module buildで解決できずに失敗する（DerivedData削除・SPM再解決を
+試したが解消せず）。IMEの変更内容とは無関係の環境問題で、
+`plan/ci-swift-build-verification-gap.md` / `plan/xcodebuild-test-flakiness.md`
+が指すSwiftビルド周りの不安定さと根が同じ可能性がある。CI改善側の対応を待ってから
+実機観測を再開する。
 
 ### フェーズ1: コア側に入力行取得APIを足す
 
