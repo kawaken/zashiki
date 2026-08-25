@@ -1858,7 +1858,9 @@ extension Zashiki {
 
 extension Zashiki.SurfaceView: NSTextInputClient {
     func hasMarkedText() -> Bool {
-        return markedText.length > 0
+        let result = markedText.length > 0
+        Zashiki.logger.debug("ime-observe: hasMarkedText result=\(result, privacy: .public)")
+        return result
     }
 
     func markedRange() -> NSRange {
@@ -1867,15 +1869,28 @@ extension Zashiki.SurfaceView: NSTextInputClient {
     }
 
     func selectedRange() -> NSRange {
-        guard let surface = self.surface else { return NSRange() }
+        guard let surface = self.surface else {
+            Zashiki.logger.debug("ime-observe: selectedRange no surface, returning empty")
+            return NSRange()
+        }
 
         // Get our range from the Zashiki API. There is a race condition between getting the
         // range and actually using it since our selection may change but there isn't a good
         // way I can think of to solve this for AppKit.
         var text = ghostty_text_s()
-        guard ghostty_surface_read_selection(surface, &text) else { return NSRange() }
+        guard ghostty_surface_read_selection(surface, &text) else {
+            Zashiki.logger.debug("ime-observe: selectedRange no selection, returning empty")
+            return NSRange()
+        }
         defer { ghostty_surface_free_text(surface, &text) }
-        return NSRange(location: Int(text.offset_start), length: Int(text.offset_len))
+        let result = NSRange(location: Int(text.offset_start), length: Int(text.offset_len))
+        Zashiki.logger.debug("ime-observe: selectedRange result=\(NSStringFromRange(result), privacy: .public)")
+        return result
+    }
+
+    func attributedString() -> NSAttributedString? {
+        Zashiki.logger.debug("ime-observe: attributedString() called (unimplemented, returning nil)")
+        return nil
     }
 
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
@@ -1914,11 +1929,17 @@ extension Zashiki.SurfaceView: NSTextInputClient {
     }
 
     func attributedSubstring(forProposedRange range: NSRange, actualRange: NSRangePointer?) -> NSAttributedString? {
-        // Zashiki.logger.warning("pressure substring range=\(range) selectedRange=\(self.selectedRange())")
-        guard let surface = self.surface else { return nil }
+        Zashiki.logger.debug("ime-observe: attributedSubstring range=\(NSStringFromRange(range), privacy: .public) hasActualRangePointer=\(actualRange != nil, privacy: .public)")
+        guard let surface = self.surface else {
+            Zashiki.logger.debug("ime-observe: attributedSubstring no surface, returning nil")
+            return nil
+        }
 
         // If the range is empty then we don't need to return anything
-        guard range.length > 0 else { return nil }
+        guard range.length > 0 else {
+            Zashiki.logger.debug("ime-observe: attributedSubstring empty range requested, returning nil")
+            return nil
+        }
 
         // I used to do a bunch of testing here that the range requested matches the
         // selection range or contains it but a lot of macOS system behaviors request
@@ -1927,8 +1948,12 @@ extension Zashiki.SurfaceView: NSTextInputClient {
 
         // Get our selection text
         var text = ghostty_text_s()
-        guard ghostty_surface_read_selection(surface, &text) else { return nil }
+        guard ghostty_surface_read_selection(surface, &text) else {
+            Zashiki.logger.debug("ime-observe: attributedSubstring no selection, returning nil")
+            return nil
+        }
         defer { ghostty_surface_free_text(surface, &text) }
+        Zashiki.logger.debug("ime-observe: attributedSubstring returning text len=\(text.text_len, privacy: .public)")
 
         // If we can get a font then we use the font. This should always work
         // since we always have a primary font. The only scenario this doesn't
@@ -1948,6 +1973,7 @@ extension Zashiki.SurfaceView: NSTextInputClient {
     }
 
     func characterIndex(for point: NSPoint) -> Int {
+        Zashiki.logger.debug("ime-observe: characterIndex point=\(NSStringFromPoint(point), privacy: .public) (stub, returning 0)")
         return 0
     }
 
