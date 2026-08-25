@@ -42,19 +42,46 @@ ongoing product rather than a one-off patch set:
 
 ## Git Worktree
 
-- `main`は常に読み取り専用として扱い、実装・ドキュメント・plan/historyを含む変更を
-  直接行わない。複数セッションが同じリポジトリを利用するため、作業開始時に必ず
-  専用worktreeと作業ブランチを作成する
-- ブランチ名は用途が分かるフラットな名前にする。`codex/`や`kawaken/`のような
-  接頭辞・名前空間は付けず、スラッシュで階層化しない（例：
-  `markdown-preview`、`fix-ime-preedit`）。既存のworktreeや他セッションの変更を
-  使用・編集せず、作業対象のworktreeだけを変更する
-- 変更は専用ブランチからPRとして提出し、mainへの反映はPRのマージで行う。例外的に
-  mainへ直接コミット・pushしない
-- 対応するPRがマージされたworktreeは削除する。ビルド生成物のみ掃除したい場合は
-  `rm -rf` を直接叩かず `make clean` を使う。worktree自体を消す場合は
-  `git worktree remove --force`（lock中なら `-f -f`）。削除前に他セッションが
-  使用中でないか（lock状態・未コミット変更）を確認する
+This repository supports multiple agents and tasks running in parallel. Use the
+following rule: `1 task = 1 branch = 1 worktree`.
+
+- Start each task from the latest `origin/main`. When creating a work environment
+  from the primary checkout, run `git fetch origin` first, then create the branch
+  and worktree from `origin/main`. Do not use a stale local `main` as the base
+- Do not share a branch or worktree between tasks or agents
+
+### Worktree checks at task start
+
+At the start of a task, determine whether the current directory is the primary
+checkout or a task-specific worktree.
+
+- If already inside a task-specific worktree, use it as-is. When the execution
+  environment has created the worktree, do not create another worktree or nest a
+  worktree inside it
+- If in the primary checkout, do not begin making changes there. Run
+  `git fetch origin`, create a task-specific branch and worktree from the latest
+  `origin/main`, and perform all subsequent editing, testing, and commits in the
+  new worktree
+- Do not check out a branch that is already in use by another worktree, or modify
+  or remove a worktree used by another agent
+
+If it is unclear whether the current worktree or branch is safe to use for the
+task, inspect its state before modifying existing work.
+
+- Treat `main` as read-only. Do not make implementation, documentation, plan, or
+  history changes directly on it. Each task must use its own worktree and branch
+- Use a flat, descriptive branch name without prefixes or namespaces such as
+  `codex/` or `kawaken/`; do not use slash-separated branch hierarchies. Examples:
+  `markdown-preview` and `fix-ime-preedit`. Do not use or edit existing worktrees
+  or changes belonging to another session; modify only the worktree assigned to
+  the current task
+- Submit changes from the dedicated branch as a PR and merge them into `main`
+  through the PR. Do not commit or push directly to `main`
+- Remove a worktree after its corresponding PR has been merged. To clean only
+  build artifacts, use `make clean` rather than invoking `rm -rf` directly. To
+  remove a worktree, use `git worktree remove --force` (`-f -f` if it is locked).
+  Before removing it, confirm that no other session is using it and that it has
+  no uncommitted changes
 
 ## Public-Facing Work (PRs, Commits, Issues)
 
