@@ -41,21 +41,21 @@ GTK / Wayland / X11 / Linux / FreeBSD / KDE / GNOME / Plasma に言及してい�
 Zig側・Swift側ともに**参照が1件も無い**もの。設定はパースされるが、値を読む
 コードがどこにも存在しない。
 
-| 設定 | ドキュメント上の記述 |
-|---|---|
-| `language` | GTK only |
-| `window-subtitle` | This feature is only supported on GTK |
-| `window-show-tab-bar` | Currently only supported on Linux (GTK) |
-| `window-titlebar-background` | Currently only supported in the GTK app |
-| `window-titlebar-foreground` | Currently only supported in the GTK app |
-| `quit-after-last-window-closed-delay` | Only implemented on Linux |
-| `quick-terminal-keyboard-interactivity` | Only has an effect on Linux Wayland |
-| `async-backend` | This is only supported on Linux |
-| `app-notifications` | This configuration only applies to GTK |
-| `linux-cgroup` | cgroup分離（Linux専用） |
-| `linux-cgroup-memory-limit` | 同上 |
-| `linux-cgroup-processes-limit` | 同上 |
-| `linux-cgroup-hard-fail` | 同上 |
+| 設定                                    | ドキュメント上の記述                    |
+| --------------------------------------- | --------------------------------------- |
+| `language`                              | GTK only                                |
+| `window-subtitle`                       | This feature is only supported on GTK   |
+| `window-show-tab-bar`                   | Currently only supported on Linux (GTK) |
+| `window-titlebar-background`            | Currently only supported in the GTK app |
+| `window-titlebar-foreground`            | Currently only supported in the GTK app |
+| `quit-after-last-window-closed-delay`   | Only implemented on Linux               |
+| `quick-terminal-keyboard-interactivity` | Only has an effect on Linux Wayland     |
+| `async-backend`                         | This is only supported on Linux         |
+| `app-notifications`                     | This configuration only applies to GTK  |
+| `linux-cgroup`                          | cgroup分離（Linux専用）                 |
+| `linux-cgroup-memory-limit`             | 同上                                    |
+| `linux-cgroup-processes-limit`          | 同上                                    |
+| `linux-cgroup-hard-fail`                | 同上                                    |
 
 付随して、これらの設定でしか使われていない型（`AsyncBackend`、`LinuxCgroup`
 など）も削除できる。`AsyncBackend` は `Config.zig` 外での参照ゼロを確認済み。
@@ -107,12 +107,12 @@ pub const getGObjectType = switch (build_config.app_runtime) {
 **確認済み**: A の13件はいずれもユーザーの設定ファイルで使われていない。
 確認対象は現在の探索パス（`src/config/file_load.zig`）:
 
-| 種別 | パス |
-|---|---|
-| XDG（新） | `$XDG_CONFIG_HOME/zashiki/config.ghostty` |
-| XDG（旧・後方互換） | `$XDG_CONFIG_HOME/zashiki/config` |
-| App Support（新） | `~/Library/Application Support/dev.kawaken.zashiki/config.ghostty` |
-| App Support（旧・後方互換） | `~/Library/Application Support/dev.kawaken.zashiki/config` |
+| 種別                        | パス                                                               |
+| --------------------------- | ------------------------------------------------------------------ |
+| XDG（新）                   | `$XDG_CONFIG_HOME/zashiki/config.ghostty`                          |
+| XDG（旧・後方互換）         | `$XDG_CONFIG_HOME/zashiki/config`                                  |
+| App Support（新）           | `~/Library/Application Support/dev.kawaken.zashiki/config.ghostty` |
+| App Support（旧・後方互換） | `~/Library/Application Support/dev.kawaken.zashiki/config`         |
 
 ## 実施順序
 
