@@ -99,14 +99,13 @@ jobs:
           version: ${{ steps.zig.outputs.version }}
 
       - name: zig build test
-        # -Demit-macos-app=falseだけではxcodebuild testが暗黙のtest_step依存
-        # (build.zigのemit_xcframeworkデフォルト値経由)から外れないため、
-        # -Demit-xcframework=falseも明示する。これによりmacOSアプリの
-        # xcodebuild test(実測で全体の1分半ほど、かつローカル環境でも
-        # 「複数destinationにマッチ」でfailed command扱いになっており
-        # 実効性が疑わしい)をスキップし、Zigコアのテストのみ実行する。
-        # macOSアプリを含むフルテストはリリース時(release.yml)に回す想定。
-        run: zig build test -Demit-macos-app=false -Demit-xcframework=false
+        # -Dmacos-app-xctest=falseにより、Zigコアのテストに加えてmacOSアプリの
+        # Swiftコンパイル(xcodebuild build)は実行しつつ、XCTest
+        # (xcodebuild test)はスキップする。xcodebuild testは実行時間や
+        # macOSランナーのコストが大きいため、フルテストはリリース時
+        # (release.yml)に回す想定。Swiftのコンパイルエラーはこのジョブで
+        # 検出できる。
+        run: zig build test -Dmacos-app-xctest=false
 
   build:
     name: zig build (macOS app)

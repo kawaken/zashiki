@@ -49,6 +49,10 @@ emit_themes: bool = false,
 emit_xcframework: bool = false,
 emit_unicode_table_gen: bool = false,
 
+/// Whether `zig build test` includes the macOS app's XCTest suite (in
+/// addition to Swift compilation). See `-Dmacos-app-xctest` below.
+macos_app_xctest: bool = true,
+
 /// True when Ghostty is being built as a dependency of another project
 /// rather than as the root project.
 is_dep: bool = false,
@@ -366,6 +370,14 @@ pub fn init(b: *std.Build, appVersion: []const u8, libVersion: []const u8) !Conf
         "emit-macos-app",
         "Build and install the macOS app bundle.",
     ) orelse config.emit_xcframework;
+
+    config.macos_app_xctest = b.option(
+        bool,
+        "macos-app-xctest",
+        "Include the macOS app's XCTest suite in `zig build test` (in " ++
+            "addition to Swift compilation). When false, only the Xcode " ++
+            "build (Swift compile) is exercised and XCTest is skipped.",
+    ) orelse true;
 
     //---------------------------------------------------------------
     // System Packages

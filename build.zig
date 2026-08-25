@@ -187,7 +187,14 @@ pub fn build(b: *std.Build) !void {
 
             // If we have no test filters, install the tests too
             if (test_filters.len == 0) {
-                macos_app_native_only.addTestStepDependencies(test_step);
+                if (config.macos_app_xctest) {
+                    macos_app_native_only.addTestStepDependencies(test_step);
+                } else {
+                    // XCTestは実行せず、Swiftコンパイル(xcodebuild build)
+                    // だけをtest_stepに含める。PR CIでのコンパイルエラー
+                    // 検出用(-Dmacos-app-xctest=false)。
+                    test_step.dependOn(&macos_app_native_only.build.step);
+                }
             }
         }
     }

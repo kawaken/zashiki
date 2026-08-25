@@ -10,9 +10,10 @@ name: Release
 # Sparkleの署名付きappcastはGitHub Releaseへ公開する。ただしApple Developer
 # Program登録・notarization前は更新の自動チェックを有効化しない。
 #
-# test.yml(push/PR)はCI時間短縮のため-Demit-xcframework=falseで
-# xcodebuild test(macOSアプリ側のテスト)を除外している。その分の
-# 品質保証はここ(タグpush時のフルテスト)で担保する。
+# test.yml(push/PR)はCI時間短縮のため-Dmacos-app-xctest=falseで
+# xcodebuild test(macOSアプリ側のXCTest)を除外し、Swiftコンパイルの検証
+# (xcodebuild build)のみ行っている。XCTestを含む品質保証はここ
+# (タグpush時のフルテスト)で担保する。
 
 on:
   push:
