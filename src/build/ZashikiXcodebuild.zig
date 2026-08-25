@@ -149,13 +149,27 @@ pub fn init(
             "Zashiki",
             "-skip-testing",
             "ZashikiUITests",
+            // Without an explicit destination, xcodebuild matches multiple
+            // destinations on a Mac that can run both native and
+            // Rosetta-translated binaries (native arch + x86_64 + "Any
+            // Mac"), which prints a "using the first of multiple matching
+            // destinations" warning and leaves the actual destination up to
+            // xcodebuild's own tie-breaking. `-destination` and `-arch` are
+            // mutually exclusive (xcodebuild errors if both are given), so
+            // we encode the architecture into the destination string below
+            // instead of also passing a separate `-arch` flag (unlike the
+            // `build` step above, which has no such conflict).
+            "-destination",
+            if (xc_arch) |arch|
+                b.fmt("platform=macOS,arch={s}", .{arch})
+            else
+                "platform=macOS",
             // See the comment on the equivalent flag in the `build` step
             // above: keeps output location deterministic across machines.
             // Must be absolute for the same reason noted there.
             b.fmt("SYMROOT={s}", .{b.pathFromRoot("macos/build")}),
             marketing_version_arg,
         });
-        if (xc_arch) |arch| step.addArgs(&.{ "-arch", arch });
 
         // We need the xcframework
         deps.xcframework.addStepDependencies(&step.step);
