@@ -11,5 +11,7 @@
 
 - Japanese IME support with thicker underlines for the currently converted ATOK preedit clause.
 - Native SwiftUI Markdown preview (`Cmd+Shift+M`) with live file updates.
+  Markdown files can also be opened from the CLI with
+  `zashiki +markdown-preview <file>`, targeting the originating terminal window.
 
 See [README.ja.md](README.ja.md) for the Japanese version.
