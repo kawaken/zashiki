@@ -110,14 +110,14 @@ Zashikiは`NSTextInputClient`を実装しているが、この読み取り経路
 - **判断ポイント**: ここで「ATOKは周辺文字列を要求していない」と判明したら、
   この計画は破棄してplan/から削除する
 
-**現状（2026-08-25）**: ログ計装のコード変更は完了しコミット済みだが、実機観測に
-必要なZashiki.appのビルドが別要因でブロックされている。`zig build`が呼ぶ
-xcodebuildで、Textual SPMパッケージの依存（`SwiftUIMath`/`ConcurrencyExtras`）が
-explicit module buildで解決できずに失敗する（DerivedData削除・SPM再解決を
-試したが解消せず）。IMEの変更内容とは無関係の環境問題で、
-`plan/ci-swift-build-verification-gap.md` / `plan/xcodebuild-test-flakiness.md`
-が指すSwiftビルド周りの不安定さと根が同じ可能性がある。CI改善側の対応を待ってから
-実機観測を再開する。
+**現状（2026-08-26）**: ビルドをブロックしていたXcode 26のexplicit module build
+既知バグはPR #58（`SWIFT_ENABLE_EXPLICIT_MODULES=NO`追加）で解決済み。
+リベース後、ビルドが実際に`Zashiki.app`まで到達したことで、それまで
+Textual依存解決エラーに隠れて発見できていなかった別の実バグ
+（`attributedString()`スタブの戻り値optionalityがプロトコル定義と不一致）も
+見つかり修正した。ビルドは`zig build`で成功する状態。次は実機での観測
+（ATOK/ことえりで入力しつつ`sudo log stream`をファイルに記録→Claudeが解析）
+に進める。
 
 ### フェーズ1: コア側に入力行取得APIを足す
 
