@@ -127,6 +127,15 @@ pub fn init(
             marketing_version_arg,
             "-destination",
             xc_destination,
+            // Swift's "explicit module build" (the default since Xcode 26)
+            // has a known bug where it fails to resolve a package's
+            // transitive SPM dependencies (again Textual ->
+            // SwiftUIMath/ConcurrencyExtras) with "unable to resolve
+            // module dependency", even though the absolute SYMROOT above
+            // is set correctly. Disabling it falls back to the older
+            // implicit module build, which doesn't have this bug.
+            // See https://forums.swift.org/t/xcode-26-unable-to-find-module-dependency/80516
+            "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
         });
 
         // We need the xcframework
@@ -167,6 +176,9 @@ pub fn init(
             // Must be absolute for the same reason noted there.
             b.fmt("SYMROOT={s}", .{b.pathFromRoot("macos/build")}),
             marketing_version_arg,
+            // See the comment on the equivalent flag in the `build` step
+            // above.
+            "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
         });
 
         // We need the xcframework
