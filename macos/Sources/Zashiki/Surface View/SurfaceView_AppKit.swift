@@ -1888,9 +1888,9 @@ extension Zashiki.SurfaceView: NSTextInputClient {
         return result
     }
 
-    func attributedString() -> NSAttributedString? {
-        Zashiki.logger.debug("ime-observe: attributedString() called (unimplemented, returning nil)")
-        return nil
+    func attributedString() -> NSAttributedString {
+        Zashiki.logger.debug("ime-observe: attributedString() called (unimplemented, returning empty string)")
+        return NSAttributedString()
     }
 
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
