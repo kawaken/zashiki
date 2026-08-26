@@ -139,39 +139,60 @@ Textual依存解決エラーに隠れて発見できていなかった別の実�
 この計画は破棄せず、フェーズ1（`selectedRange()`を正しいカーソル位置に
 直す）に進み、その後で改めてATOKの挙動を観測する方針とした。
 
-### フェーズ1: コア側に入力行取得APIを足す
+### フェーズ1: コア側に入力行取得APIを足す — 実施済み（2026-08-27）
 
-`src/Surface.zig`に、カーソル位置の入力行とカーソルオフセットを返す関数を追加:
+上記の原案には実装前に致命的なバグが見つかったため、以下の内容に変更して
+実装した（コミット`6ccba0498`）:
 
-- カーソルの`page_pin`を取得（`imePoint()` :2107 と同じ経路）
-- そのセルの`semantic_content`が`.input`でなければ失敗を返す
-  （＝shell integration無し、または出力表示中）
-- `screens.active.selectLine(.{ .pin = cursor_pin, .semantic_prompt_boundary = true })`
-  で入力範囲の`Selection`を得る
-- `dumpTextLocked`でテキスト化
-- **同時に、返す文字列先頭からカーソル位置までのUTF-16コードユニット数**を計算して
-  返す。既存の`offset_start`（セルグリッド線形位置）は使わない。ここが障害1への対処で、
-  本フェーズの本質的な作業。文字列を実際に走査してオフセットを出す
-- C ABI: `ghostty_surface_read_input_line(ghostty_surface_t, ghostty_text_s*, uint32_t* cursor_utf16_offset)`
-  を`src/apprt/embedded.zig`と`include/ghostty.h`に追加
-- Zig側のテストを`zig build test -Dtest-filter=...`で追加する。特に全角文字・
-  ソフトラップ・絵文字（サロゲートペア）でオフセットが合うこと
+- **原案のバグ**: 「カーソル位置のセルの`semantic_content`が`.input`か」だけを
+  見ると、ユーザーが文字を打った直後（カーソルが次の未書込セルに進んだ状態、
+  一番肝心なタイミング）で毎回失敗する。`Screen.promptClickMove`と同じ
+  `cursor.semantic_content == .input or cursor.page_cell.semantic_content == .input`
+  というOR条件に変更した
+- **`cursor_utf16_offset`パラメータを廃止**。「返す文字列は常にカーソル位置で
+  終わる」という設計にし、呼び出し側（Swift）は`(text as NSString).length`を
+  そのままカーソルのUTF-16オフセットとして使えるようにした。Zig側はUTF-16を
+  一切扱わない
+- `Screen.inputLineTextBeforeCursor`（`src/terminal/Screen.zig`、
+  `promptClickMove`の直後）: `selectLine`+`selectionString`（`map`オプションで
+  バイトインデックス→Pinのマッピングを取得）→カーソルPinに`Pin.eql`で一致する
+  バイト位置で文字列を切り詰める、という実装
+- `Surface.inputLineBeforeCursor`/`Locked`（`dumpText`/`dumpTextLocked`と
+  同じロック規約）
+- C ABI: `ghostty_surface_read_input_line(ghostty_surface_t, ghostty_text_s*)`
+  （`cursor_utf16_offset`パラメータは無し、既存の`ghostty_text_s`を再利用）
+- `zig build test -Dtest-filter=inputLineTextBeforeCursor`で12ケース・77件
+  全てgreen（基本、OSC133非対応、プロンプト/出力上のカーソル、空入力、全角、
+  ソフトラップ、絵文字サロゲートペア、グラフェンクラスタ、行途中カーソル、
+  ソフトラップ跨ぎ行途中、画面最初）
 
-### フェーズ2: Swift側の配線
+### フェーズ2: Swift側の配線 — 実施済み（2026-08-27）
 
-`SurfaceView_AppKit.swift`の`NSTextInputClient` extension:
+`SurfaceView_AppKit.swift`の`NSTextInputClient` extension（コミット`832b3bdea`）:
 
-- 入力行テキストとカーソルUTF-16オフセットを保持するキャッシュを持つ
-  （`CachedValue`の既存パターンを使う。ただしIMEの応答性が要るので
-  durationは`cachedScreenContents`の500msより短く。フェーズ0の観測で
-  呼び出し頻度を見てから決める）
-- `selectedRange()`: `hasMarkedText()`が`true`のときだけ
-  `NSRange(location: cursorUTF16Offset, length: 0)`を返す。それ以外は現状維持
-- `attributedSubstring(forProposedRange:actualRange:)`:
-  `hasMarkedText()`が`true`のとき、入力行テキストから要求rangeとの共通部分を
-  切り出して返し、**`actualRange`に実際に返した範囲を書き戻す**。
-  それ以外は現状のQuickLook向け実装を維持
-- `characterIndex(for:)`: 優先度低。フェーズ0でATOKが呼んでいなければ触らない
+- `cachedInputLineBeforeCursor: CachedValue<String>`をduration
+  `.milliseconds(50)`で追加（`cachedScreenContents`の500msより短く。ATOKが
+  `attributedString()`を3回連続で呼ぶ既知の挙動を1回のロック取得に潰す狙い。
+  実機観測後に調整前提の暫定値）
+- **`attributedString()`**: ゲート条件なしで実装。ファイル内でこのメソッドを
+  呼んでいるのはIMEだけ（QuickLook・Accessibilityは無関係）と確認済みなので
+  回帰リスクはゼロ。フェーズ0で観測された「preedit開始直前に3回連続で呼ばれる」
+  という挙動に直接効く
+- **`selectedRange()`**: 既存のマウス選択パス（`ghostty_surface_read_selection`）
+  は変更せず、失敗時のフォールバックとして`hasMarkedText()==true`のときだけ
+  `NSRange(location: (inputLine as NSString).length, length: 0)`を返す
+- **`attributedSubstring(forProposedRange:actualRange:)`**: 同様に既存の
+  マウス選択パスを保持し、フォールバックとして`hasMarkedText()==true`のとき
+  だけ入力行テキストを`NSIntersectionRange`で切り出し`actualRange`に書き戻す
+- `characterIndex(for:)`は変更なし（フェーズ0でATOKが呼んでいないことを確認済み）
+- `zig build` / `swiftlint lint --strict` いずれも成功
+
+**未実施（次にユーザーが起きてから）**:
+- `attributedString()`単体、および`selectedRange()`/`attributedSubstring()`の
+  IME分岐が入った状態での実機観測（ATOKでの変換候補の変化を確認）
+- **回帰確認必須**: マウス選択→QuickLook（3本指タップ/`⌃⌘D`）、VoiceOverでの
+  選択テキスト読み上げが従来通り動くか
+- キャッシュduration（50ms暫定値）の調整要否を実機の呼び出し頻度から判断
 
 ### フェーズ3: フォールバックと設定
 
