@@ -19,6 +19,7 @@ const explain_config = @import("explain_config.zig");
 const validate_config = @import("validate_config.zig");
 const crash_report = @import("crash_report.zig");
 const show_face = @import("show_face.zig");
+const markdown_preview = @import("markdown_preview.zig");
 const global = @import("../global.zig");
 
 /// Special commands that can be invoked via CLI flags. These are all
@@ -69,6 +70,9 @@ pub const Action = enum {
 
     // List, (eventually) view, and (eventually) send crash reports.
     @"crash-report",
+
+    // Open a Markdown file in the Zashiki preview pane.
+    @"markdown-preview",
 
     pub fn detectSpecialCase(arg: []const u8) ?SpecialCase(Action) {
         // If we see a "-e" and we haven't seen a command yet, then
@@ -151,6 +155,7 @@ pub const Action = enum {
             .@"validate-config" => try validate_config.run(alloc),
             .@"crash-report" => try crash_report.run(alloc),
             .@"show-face" => try show_face.run(alloc),
+            .@"markdown-preview" => try markdown_preview.run(alloc),
         };
     }
 
@@ -190,6 +195,7 @@ pub const Action = enum {
                 .@"validate-config" => validate_config.Options,
                 .@"crash-report" => crash_report.Options,
                 .@"show-face" => show_face.Options,
+                .@"markdown-preview" => markdown_preview.Options,
             };
         }
     }
@@ -276,6 +282,19 @@ test "parse action plus" {
         const action = try actionpkg.detectIter(Action, &iter);
         try testing.expect(action.? == .version);
     }
+}
+
+test "parse action markdown preview" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+
+    var iter = try std.process.Args.IteratorGeneral(.{}).init(
+        alloc,
+        "+markdown-preview README.md",
+    );
+    defer iter.deinit();
+    const action = try actionpkg.detectIter(Action, &iter);
+    try testing.expect(action.? == .@"markdown-preview");
 }
 
 test "parse action plus ignores -e" {
