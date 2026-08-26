@@ -66,23 +66,35 @@ import ConcurrencyExtras
 現象と整合する。**ローカルのXcode 26.6でexplicit module buildに関する回帰が
 入っている可能性が高い**というのが現時点の最有力仮説。
 
-## 次の調査候補
+## 原因（判明）
 
-- ~~CIで実際に使われているXcodeのマイナーバージョンを確認する~~ → 確認済み（上記）
-- Xcode 26.3相当の旧バージョンをローカルに追加インストールして再現するか確認する
-  （容量が大きいツールなので、実施前にユーザーに確認する）
-- Apple Developer Forums / Feedback AssistantでXcode 26.4〜26.6の
-  explicit module build回帰が報告されていないか確認する
-- Textual / SwiftUIMath / swift-concurrency-extras のGitHubリポジトリで
-  Xcode 26.6 + explicit module buildに関する既知issueがないか確認する
-- `xcodebuild`の`-showBuildTimingSummary`や`-verbose`でモジュールスキャンの
-  詳細ログを取り、`SwiftUIMath.swiftmodule`の実際の出力パスと`Textual`側が
-  探索しているパスの不一致を確認する
+Swift Forumsに同一の問題を報告するスレッドがあった:
+[Xcode 26: Unable to find module dependency](https://forums.swift.org/t/xcode-26-unable-to-find-module-dependency/80516)。
+Xcode 26でデフォルト有効になった「Swift explicit modules」が、SPMパッケージが
+別のSPMパッケージに依存する構成（今回で言うTextual -> SwiftUIMath/
+ConcurrencyExtras）でモジュール解決に失敗する既知のバグで、将来のXcodeで
+修正される見込みとされている。「試したが直らなかったこと」に書いた
+`SWIFT_ENABLE_EXPLICIT_MODULES=NO`は、当時`xcframework`が未生成の状態で
+別エラー（`GhosttyKit.xcframework`が見つからない）に隠れて正しく検証できて
+いなかっただけで、実際には有効な回避策だった。
+
+## 対応（実施済み）
+
+`src/build/ZashikiXcodebuild.zig`の`build`/`xctest`両ステップに
+`SWIFT_ENABLE_EXPLICIT_MODULES=NO`を追加し、実装時代のimplicit module
+buildにフォールバックするようにした（コミット`491b515e6`、worktree
+`xcodebuild-explicit-module-resolution`）。Debug/Release両方の
+`xcodebuild`単体実行と、`make clean`からの`zig build`フルビルドで
+`Zashiki.app`が生成されることを確認済み。
 
 ## 影響
 
-- ローカルでのZashiki.appビルド・実機確認ができない状態。IME周辺文字列対応
-  （`plan/ime-surrounding-text.md`）のフェーズ0はこれにブロックされて保留中
+- ローカルでのZashiki.appビルド・実機確認ができない状態だった。IME周辺文字列
+  対応（`plan/ime-surrounding-text.md`）のフェーズ0はこれにブロックされて
+  保留していたが、この修正で再開できる
 - CIは`zig build test -Demit-macos-app=false ...`ではなく通常のSwiftビルドを
-  行っており（`plan/ci-macos-build-and-test-verification.md`参照）、少なくとも
-  最近のCI実行では成功している。ローカル固有の問題である可能性が高い
+  行っており（`plan/ci-macos-build-and-test-verification.md`参照）、CIの
+  Xcode 26.3では問題が起きていなかった（ローカルのXcode 26.6固有の回帰）。
+  `SWIFT_ENABLE_EXPLICIT_MODULES=NO`はCI環境にも適用されるが、単に旧来の
+  ビルド方式に戻すだけなので副作用は想定していない。次回CI実行で問題なく
+  通ることを確認する
