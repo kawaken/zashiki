@@ -36,13 +36,26 @@ pub fn init(
         .universal => null,
 
         // Native we need to override the architecture in the Xcode
-        // project with the -arch flag.
+        // project, which we do via `-destination` below.
         .native => switch (builtin.cpu.arch) {
             .aarch64 => "arm64",
             .x86_64 => "x86_64",
             else => @panic("unsupported macOS arch"),
         },
     };
+
+    // Without an explicit destination, xcodebuild matches multiple
+    // destinations on a Mac that can run both native and
+    // Rosetta-translated binaries (native arch + x86_64 + "Any Mac"),
+    // which prints a "using the first of multiple matching destinations"
+    // warning and leaves the actual destination up to xcodebuild's own
+    // tie-breaking. `-destination` and `-arch` are mutually exclusive
+    // (xcodebuild errors if both are given), so every step below passes
+    // this instead of a separate `-arch` flag.
+    const xc_destination = if (xc_arch) |arch|
+        b.fmt("platform=macOS,arch={s}", .{arch})
+    else
+        "platform=macOS";
 
     const env = b.graph.environ_map;
     const app_path = b.fmt("macos/build/{s}/Zashiki.app", .{xc_config});
@@ -112,11 +125,9 @@ pub fn init(
             // "unable to resolve module dependency" errors.
             b.fmt("SYMROOT={s}", .{b.pathFromRoot("macos/build")}),
             marketing_version_arg,
+            "-destination",
+            xc_destination,
         });
-
-        // If we have a specific architecture, we need to pass it
-        // to xcodebuild.
-        if (xc_arch) |arch| step.addArgs(&.{ "-arch", arch });
 
         // We need the xcframework
         deps.xcframework.addStepDependencies(&step.step);
@@ -149,21 +160,8 @@ pub fn init(
             "Zashiki",
             "-skip-testing",
             "ZashikiUITests",
-            // Without an explicit destination, xcodebuild matches multiple
-            // destinations on a Mac that can run both native and
-            // Rosetta-translated binaries (native arch + x86_64 + "Any
-            // Mac"), which prints a "using the first of multiple matching
-            // destinations" warning and leaves the actual destination up to
-            // xcodebuild's own tie-breaking. `-destination` and `-arch` are
-            // mutually exclusive (xcodebuild errors if both are given), so
-            // we encode the architecture into the destination string below
-            // instead of also passing a separate `-arch` flag (unlike the
-            // `build` step above, which has no such conflict).
             "-destination",
-            if (xc_arch) |arch|
-                b.fmt("platform=macOS,arch={s}", .{arch})
-            else
-                "platform=macOS",
+            xc_destination,
             // See the comment on the equivalent flag in the `build` step
             // above: keeps output location deterministic across machines.
             // Must be absolute for the same reason noted there.
