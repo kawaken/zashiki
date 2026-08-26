@@ -203,6 +203,14 @@ extension Zashiki {
         private(set) var cachedScreenContents: CachedValue<String>
         private(set) var cachedVisibleContents: CachedValue<String>
 
+        // The cached input line text before the cursor, used to give IMEs
+        // (e.g. ATOK) surrounding text context. See NSTextInputClient
+        // extension below. Duration is much shorter than the other caches
+        // above since IME responsiveness matters and ATOK is known to call
+        // attributedString() three times in a row right before starting a
+        // preedit session.
+        private(set) var cachedInputLineBeforeCursor: CachedValue<String>
+
         /// Event monitor (see individual events for why)
         private var eventMonitor: Any?
 
@@ -224,6 +232,7 @@ extension Zashiki {
             // fix at some point.
             self.cachedScreenContents = .init(duration: .milliseconds(500)) { "" }
             self.cachedVisibleContents = self.cachedScreenContents
+            self.cachedInputLineBeforeCursor = .init(duration: .milliseconds(50)) { "" }
 
             // Initialize with some default frame size. The important thing is that this
             // is non-zero so that our layer bounds are non-zero so that our renderer
@@ -268,6 +277,13 @@ extension Zashiki {
                         y: 0),
                     rectangle: false)
                 guard ghostty_surface_read_text(surface, sel, &text) else { return "" }
+                defer { ghostty_surface_free_text(surface, &text) }
+                return String(cString: text.text)
+            }
+            cachedInputLineBeforeCursor = .init(duration: .milliseconds(50)) { [weak self] in
+                guard let self, let surface = self.surface else { return "" }
+                var text = ghostty_text_s()
+                guard ghostty_surface_read_input_line(surface, &text) else { return "" }
                 defer { ghostty_surface_free_text(surface, &text) }
                 return String(cString: text.text)
             }
@@ -1878,19 +1894,41 @@ extension Zashiki.SurfaceView: NSTextInputClient {
         // range and actually using it since our selection may change but there isn't a good
         // way I can think of to solve this for AppKit.
         var text = ghostty_text_s()
-        guard ghostty_surface_read_selection(surface, &text) else {
+        if ghostty_surface_read_selection(surface, &text) {
+            defer { ghostty_surface_free_text(surface, &text) }
+            let result = NSRange(location: Int(text.offset_start), length: Int(text.offset_len))
+            Zashiki.logger.debug("ime-observe: selectedRange result=\(NSStringFromRange(result), privacy: .public)")
+            return result
+        }
+
+        // No mouse selection. Only report the IME cursor position while
+        // actively composing: accessibilitySelectedTextRange() and
+        // firstRect()'s QuickLook detection both key off this method too,
+        // and they interpret it against cachedScreenContents' whole-screen
+        // coordinate space, which is incompatible with our input-line-
+        // relative offset below. Gating on hasMarkedText() keeps those
+        // call sites unaffected.
+        guard hasMarkedText() else {
             Zashiki.logger.debug("ime-observe: selectedRange no selection, returning empty")
             return NSRange()
         }
-        defer { ghostty_surface_free_text(surface, &text) }
-        let result = NSRange(location: Int(text.offset_start), length: Int(text.offset_len))
-        Zashiki.logger.debug("ime-observe: selectedRange result=\(NSStringFromRange(result), privacy: .public)")
+        let inputLine = cachedInputLineBeforeCursor.get()
+        let result = NSRange(location: (inputLine as NSString).length, length: 0)
+        Zashiki.logger.debug("ime-observe: selectedRange (IME) result=\(NSStringFromRange(result), privacy: .public)")
         return result
     }
 
     func attributedString() -> NSAttributedString {
-        Zashiki.logger.debug("ime-observe: attributedString() called (unimplemented, returning empty string)")
-        return NSAttributedString()
+        // Unlike selectedRange()/attributedSubstring() below, this method
+        // is only ever called by IMEs -- QuickLook and Accessibility don't
+        // reference it -- so it's safe to always return real content with
+        // no hasMarkedText() gate. This also matters because ATOK has been
+        // observed calling this three times in a row *before* starting a
+        // preedit session (hasMarkedText() becomes true only afterward).
+        let inputLine = cachedInputLineBeforeCursor.get()
+        Zashiki.logger.debug("ime-observe: attributedString() returning len=\(inputLine.utf16.count, privacy: .public)")
+        guard !inputLine.isEmpty else { return NSAttributedString() }
+        return NSAttributedString(string: inputLine)
     }
 
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
@@ -1948,28 +1986,43 @@ extension Zashiki.SurfaceView: NSTextInputClient {
 
         // Get our selection text
         var text = ghostty_text_s()
-        guard ghostty_surface_read_selection(surface, &text) else {
+        if ghostty_surface_read_selection(surface, &text) {
+            defer { ghostty_surface_free_text(surface, &text) }
+            Zashiki.logger.debug("ime-observe: attributedSubstring returning text len=\(text.text_len, privacy: .public)")
+
+            // If we can get a font then we use the font. This should always work
+            // since we always have a primary font. The only scenario this doesn't
+            // work is if someone is using a non-CoreText build which would be
+            // unofficial.
+            var attributes: [ NSAttributedString.Key: Any ] = [:]
+            if let fontRaw = ghostty_surface_quicklook_font(surface) {
+                // Memory management here is wonky: ghostty_surface_quicklook_font
+                // will create a copy of a CTFont, Swift will auto-retain the
+                // unretained value passed into the dict, so we release the original.
+                let font = Unmanaged<CTFont>.fromOpaque(fontRaw)
+                attributes[.font] = font.takeUnretainedValue()
+                font.release()
+            }
+
+            return .init(string: String(cString: text.text), attributes: attributes)
+        }
+
+        // No mouse selection. Only fall back to the IME input line while
+        // actively composing (see selectedRange() above for why this is
+        // gated on hasMarkedText()).
+        guard hasMarkedText() else {
             Zashiki.logger.debug("ime-observe: attributedSubstring no selection, returning nil")
             return nil
         }
-        defer { ghostty_surface_free_text(surface, &text) }
-        Zashiki.logger.debug("ime-observe: attributedSubstring returning text len=\(text.text_len, privacy: .public)")
-
-        // If we can get a font then we use the font. This should always work
-        // since we always have a primary font. The only scenario this doesn't
-        // work is if someone is using a non-CoreText build which would be
-        // unofficial.
-        var attributes: [ NSAttributedString.Key: Any ] = [:]
-        if let fontRaw = ghostty_surface_quicklook_font(surface) {
-            // Memory management here is wonky: ghostty_surface_quicklook_font
-            // will create a copy of a CTFont, Swift will auto-retain the
-            // unretained value passed into the dict, so we release the original.
-            let font = Unmanaged<CTFont>.fromOpaque(fontRaw)
-            attributes[.font] = font.takeUnretainedValue()
-            font.release()
+        let ns = cachedInputLineBeforeCursor.get() as NSString
+        let clamped = NSIntersectionRange(range, NSRange(location: 0, length: ns.length))
+        guard clamped.length > 0 else {
+            Zashiki.logger.debug("ime-observe: attributedSubstring (IME) range out of bounds, returning nil")
+            return nil
         }
-
-        return .init(string: String(cString: text.text), attributes: attributes)
+        actualRange?.pointee = clamped
+        Zashiki.logger.debug("ime-observe: attributedSubstring (IME) returning range=\(NSStringFromRange(clamped), privacy: .public)")
+        return .init(string: ns.substring(with: clamped))
     }
 
     func characterIndex(for point: NSPoint) -> Int {
