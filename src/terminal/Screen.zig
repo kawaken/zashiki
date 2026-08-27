@@ -3561,6 +3561,89 @@ fn promptClickLine(self: *Screen, click_pin: Pin) PromptClickMove {
     return .{ .left = count, .right = 0 };
 }
 
+/// Returns the text of the input line before the cursor, if the cursor
+/// is currently positioned within a shell-integrated (OSC 133) input
+/// region. This is intended to give input methods "surrounding text"
+/// context (see NSTextInputClient on macOS).
+///
+/// Returns null if:
+///  - No semantic prompt info is available (unsupported shell, or the
+///    shell hasn't emitted OSC 133 B for this line yet), or
+///  - The cursor is on a prompt or within command output rather than
+///    input.
+///
+/// The returned text always ends exactly at the cursor: any text after
+/// the cursor (e.g. after the user moved the cursor left) is
+/// intentionally omitted. By construction, the caller can treat the
+/// string's own length as the cursor's offset within it -- there is no
+/// separate coordinate to keep in sync.
+///
+/// This is expensive (walks the whole logical input line and builds a
+/// byte<->cell map) so callers should cache and throttle calls.
+pub fn inputLineTextBeforeCursor(
+    self: *Screen,
+    alloc: Allocator,
+) Allocator.Error!?[:0]const u8 {
+    // Same check as promptClickMove: the pen state covers the common
+    // case of a not-yet-written cell right after the last typed
+    // character; the cell's own content covers the case where the
+    // cursor has been moved onto previously-typed input (e.g. via
+    // arrow keys).
+    const pen_is_input = self.cursor.semantic_content == .input;
+    const cell_is_input = self.cursor.page_cell.semantic_content == .input;
+    if (!pen_is_input and !cell_is_input) return null;
+
+    const cursor_pin = self.cursor.page_pin.*;
+
+    // selectLine determines the semantic run to select from the
+    // content of the given pin's own cell, not from the cursor pen
+    // state. If the cursor sits on a not-yet-written cell we must
+    // anchor on the preceding cell instead, or selectLine would
+    // compute the boundary using .output (or fail to find .input at
+    // all).
+    const anchor_pin: Pin = if (cell_is_input) cursor_pin else anchor: {
+        var it = cursor_pin.cellIterator(.left_up, null);
+        _ = it.next(); // cursor_pin itself
+        const prev = it.next() orelse
+            return try alloc.dupeZ(u8, ""); // nothing before the cursor at all
+        if (prev.rowAndCell().cell.semantic_content != .input) {
+            // Nothing typed yet this input session (prev cell is the
+            // prompt, or stale content).
+            return try alloc.dupeZ(u8, "");
+        }
+        break :anchor prev;
+    };
+
+    const line_sel = self.selectLine(.{
+        .pin = anchor_pin,
+        .whitespace = null, // don't trim: we want exactly what was typed
+        .semantic_prompt_boundary = true,
+    }) orelse return null;
+
+    var map: StringMap = undefined;
+    const full_text = try self.selectionString(alloc, .{
+        .sel = line_sel,
+        .trim = false,
+        .map = &map,
+    });
+    defer alloc.free(full_text);
+    defer map.deinit(alloc);
+
+    // Find where the cursor falls within full_text. In the common case
+    // (cell_is_input == false) cursor_pin was never part of the
+    // selection, so this naturally falls through to full_text.len --
+    // no truncation needed. In the "cursor moved onto existing input"
+    // case, this truncates before whatever comes at/after the cursor.
+    const cut: usize = cut: {
+        for (map.map, 0..) |pin, i| {
+            if (pin.eql(cursor_pin)) break :cut i;
+        }
+        break :cut full_text.len;
+    };
+
+    return try alloc.dupeZ(u8, full_text[0..cut]);
+}
+
 /// Dump the screen to a string. The writer given should be buffered;
 /// this function does not attempt to efficiently write and generally writes
 /// one byte at a time.
@@ -12001,4 +12084,263 @@ test "Screen: promptClickMove click right of input cursor on last char" {
 
     try testing.expectEqual(@as(usize, 1), result.right);
     try testing.expectEqual(@as(usize, 0), result.left);
+}
+
+test "Screen: inputLineTextBeforeCursor basic" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    const io = testing.io;
+
+    var s = try init(io, alloc, .{ .cols = 20, .rows = 5, .max_scrollback_bytes = 0 });
+    defer s.deinit();
+
+    s.cursorSetSemanticContent(.{ .prompt = .initial });
+    try s.testWriteString("> ");
+    s.cursorSetSemanticContent(.{ .input = .clear_explicit });
+    try s.testWriteString("hello");
+
+    const result = try s.inputLineTextBeforeCursor(alloc);
+    defer if (result) |r| alloc.free(r);
+    try testing.expectEqualStrings("hello", result.?);
+}
+
+test "Screen: inputLineTextBeforeCursor no semantic prompt" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    const io = testing.io;
+
+    var s = try init(io, alloc, .{ .cols = 20, .rows = 5, .max_scrollback_bytes = 0 });
+    defer s.deinit();
+
+    // No OSC 133 at all -- unsupported shell.
+    try s.testWriteString("hello");
+
+    const result = try s.inputLineTextBeforeCursor(alloc);
+    try testing.expect(result == null);
+}
+
+test "Screen: inputLineTextBeforeCursor cursor on prompt" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    const io = testing.io;
+
+    var s = try init(io, alloc, .{ .cols = 20, .rows = 5, .max_scrollback_bytes = 0 });
+    defer s.deinit();
+
+    s.cursorSetSemanticContent(.{ .prompt = .initial });
+    try s.testWriteString("> ");
+    s.cursorSetSemanticContent(.{ .input = .clear_explicit });
+    try s.testWriteString("hello");
+    // Reset the pen state, matching the existing promptClickMove tests'
+    // pattern for "cursor moved somewhere the pen state doesn't match".
+    s.cursorSetSemanticContent(.output);
+
+    // Move cursor back to the prompt itself (column 0, the '>').
+    s.cursorAbsolute(0, 0);
+
+    const result = try s.inputLineTextBeforeCursor(alloc);
+    try testing.expect(result == null);
+}
+
+test "Screen: inputLineTextBeforeCursor cursor on output" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    const io = testing.io;
+
+    var s = try init(io, alloc, .{ .cols = 20, .rows = 5, .max_scrollback_bytes = 0 });
+    defer s.deinit();
+
+    s.cursorSetSemanticContent(.{ .prompt = .initial });
+    try s.testWriteString("> ");
+    s.cursorSetSemanticContent(.{ .input = .clear_explicit });
+    try s.testWriteString("hello\n");
+    s.cursorSetSemanticContent(.output);
+    try s.testWriteString("some output");
+
+    const result = try s.inputLineTextBeforeCursor(alloc);
+    try testing.expect(result == null);
+}
+
+test "Screen: inputLineTextBeforeCursor empty input" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    const io = testing.io;
+
+    var s = try init(io, alloc, .{ .cols = 20, .rows = 5, .max_scrollback_bytes = 0 });
+    defer s.deinit();
+
+    s.cursorSetSemanticContent(.{ .prompt = .initial });
+    try s.testWriteString("> ");
+    s.cursorSetSemanticContent(.{ .input = .clear_explicit });
+    // Nothing typed yet this input session.
+
+    const result = try s.inputLineTextBeforeCursor(alloc);
+    defer if (result) |r| alloc.free(r);
+    try testing.expectEqualStrings("", result.?);
+}
+
+test "Screen: inputLineTextBeforeCursor wide chars" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    const io = testing.io;
+
+    var s = try init(io, alloc, .{ .cols = 20, .rows = 5, .max_scrollback_bytes = 0 });
+    defer s.deinit();
+
+    s.cursorSetSemanticContent(.{ .prompt = .initial });
+    try s.testWriteString("> ");
+    s.cursorSetSemanticContent(.{ .input = .clear_explicit });
+    try s.testWriteString("あいう");
+
+    const result = try s.inputLineTextBeforeCursor(alloc);
+    defer if (result) |r| alloc.free(r);
+    try testing.expectEqualStrings("あいう", result.?);
+}
+
+test "Screen: inputLineTextBeforeCursor soft wrap" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    const io = testing.io;
+
+    var s = try init(io, alloc, .{ .cols = 10, .rows = 5, .max_scrollback_bytes = 0 });
+    defer s.deinit();
+
+    s.cursorSetSemanticContent(.{ .prompt = .initial });
+    try s.testWriteString("> ");
+    s.cursorSetSemanticContent(.{ .input = .clear_explicit });
+    try s.testWriteString("0123456789abcdefg");
+
+    const result = try s.inputLineTextBeforeCursor(alloc);
+    defer if (result) |r| alloc.free(r);
+    try testing.expectEqualStrings("0123456789abcdefg", result.?);
+}
+
+test "Screen: inputLineTextBeforeCursor surrogate pair emoji" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    const io = testing.io;
+
+    var s = try init(io, alloc, .{ .cols = 20, .rows = 5, .max_scrollback_bytes = 0 });
+    defer s.deinit();
+
+    s.cursorSetSemanticContent(.{ .prompt = .initial });
+    try s.testWriteString("> ");
+    s.cursorSetSemanticContent(.{ .input = .clear_explicit });
+    try s.testWriteString("hi🎉bye");
+
+    const result = try s.inputLineTextBeforeCursor(alloc);
+    defer if (result) |r| alloc.free(r);
+    try testing.expectEqualStrings("hi🎉bye", result.?);
+
+    // Sanity check: the UTF-16 length includes the surrogate pair as 2
+    // units. This function itself never computes UTF-16 -- callers
+    // (Swift/NSString) get this for free from the string's own length
+    // -- but we verify it here so a future encoding regression would
+    // be caught.
+    const utf16_len = try std.unicode.calcUtf16LeLen(result.?);
+    try testing.expectEqual(@as(usize, 7), utf16_len); // "hi"(2) + emoji(2) + "bye"(3)
+}
+
+test "Screen: inputLineTextBeforeCursor mid-input cursor truncates" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    const io = testing.io;
+
+    var s = try init(io, alloc, .{ .cols = 20, .rows = 5, .max_scrollback_bytes = 0 });
+    defer s.deinit();
+
+    s.cursorSetSemanticContent(.{ .prompt = .initial });
+    try s.testWriteString("> ");
+    s.cursorSetSemanticContent(.{ .input = .clear_explicit });
+    try s.testWriteString("hello");
+
+    // Move cursor back to the first 'l' (column 4: '>'=0, ' '=1, h=2, e=3, l=4).
+    s.cursorAbsolute(4, 0);
+
+    const result = try s.inputLineTextBeforeCursor(alloc);
+    defer if (result) |r| alloc.free(r);
+    try testing.expectEqualStrings("he", result.?);
+}
+
+test "Screen: inputLineTextBeforeCursor at very start of screen" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    const io = testing.io;
+
+    var s = try init(io, alloc, .{ .cols = 20, .rows = 5, .max_scrollback_bytes = 0 });
+    defer s.deinit();
+
+    // Cursor is at (0, 0) with no prior content whatsoever.
+    s.cursorSetSemanticContent(.{ .input = .clear_explicit });
+
+    const result = try s.inputLineTextBeforeCursor(alloc);
+    defer if (result) |r| alloc.free(r);
+    try testing.expectEqualStrings("", result.?);
+}
+
+test "Screen: inputLineTextBeforeCursor grapheme cluster" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    const io = testing.io;
+
+    var s = try init(io, alloc, .{ .cols = 20, .rows = 5, .max_scrollback_bytes = 0 });
+    defer s.deinit();
+
+    s.cursorSetSemanticContent(.{ .prompt = .initial });
+    try s.testWriteString("> ");
+    s.cursorSetSemanticContent(.{ .input = .clear_explicit });
+    // Family emoji: a single grapheme cluster made of several ZWJ-joined
+    // codepoints, occupying one cell.
+    try s.testWriteString("hi👨‍👩‍👧‍👦bye");
+
+    const result = try s.inputLineTextBeforeCursor(alloc);
+    defer if (result) |r| alloc.free(r);
+    try testing.expectEqualStrings("hi👨‍👩‍👧‍👦bye", result.?);
+}
+
+test "Screen: inputLineTextBeforeCursor cursor after grapheme cluster" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    const io = testing.io;
+
+    var s = try init(io, alloc, .{ .cols = 20, .rows = 5, .max_scrollback_bytes = 0 });
+    defer s.deinit();
+
+    s.cursorSetSemanticContent(.{ .prompt = .initial });
+    try s.testWriteString("> ");
+    s.cursorSetSemanticContent(.{ .input = .clear_explicit });
+    try s.testWriteString("hi👨‍👩‍👧‍👦");
+    // Record the cursor position right after the grapheme cluster,
+    // whatever its cell width turns out to be, instead of assuming it.
+    const after_emoji = s.cursor.page_pin.*;
+    try s.testWriteString("bye");
+
+    s.cursorAbsolute(after_emoji.x, after_emoji.y);
+
+    const result = try s.inputLineTextBeforeCursor(alloc);
+    defer if (result) |r| alloc.free(r);
+    try testing.expectEqualStrings("hi👨‍👩‍👧‍👦", result.?);
+}
+
+test "Screen: inputLineTextBeforeCursor mid-input across soft wrap" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    const io = testing.io;
+
+    var s = try init(io, alloc, .{ .cols = 10, .rows = 5, .max_scrollback_bytes = 0 });
+    defer s.deinit();
+
+    s.cursorSetSemanticContent(.{ .prompt = .initial });
+    try s.testWriteString("> ");
+    s.cursorSetSemanticContent(.{ .input = .clear_explicit });
+    // Row0 (10 cols): "> " + "01234567" (8 chars fill the rest of the row).
+    // Row1 (soft wrap, 10 cols): "89abcdefg" (remaining 9 chars).
+    try s.testWriteString("0123456789abcdefg");
+
+    // Move cursor to row1 col 2 (the 'a': '8'=0, '9'=1, 'a'=2 on row1).
+    s.cursorAbsolute(2, 1);
+
+    const result = try s.inputLineTextBeforeCursor(alloc);
+    defer if (result) |r| alloc.free(r);
+    try testing.expectEqualStrings("0123456789", result.?);
 }

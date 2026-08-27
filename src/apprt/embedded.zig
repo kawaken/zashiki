@@ -1330,6 +1330,40 @@ pub const CAPI = struct {
         return readTextLocked(surface, core_sel, result);
     }
 
+    /// Read the confirmed input line text before the cursor, for input
+    /// methods requesting "surrounding text" context (see
+    /// NSTextInputClient on macOS). Returns false if the cursor isn't
+    /// currently within a shell-integrated (OSC 133) input region --
+    /// callers should treat this the same as "no context available"
+    /// and not regress existing behavior.
+    ///
+    /// The returned text always ends exactly at the cursor.
+    export fn ghostty_surface_read_input_line(
+        surface: *Surface,
+        result: *Text,
+    ) bool {
+        const core_surface = &surface.core_surface;
+        core_surface.renderer_state.mutex.lockUncancelable(global.io());
+        defer core_surface.renderer_state.mutex.unlock(global.io());
+
+        const text = core_surface.inputLineBeforeCursorLocked(
+            global.alloc(),
+        ) catch |err| {
+            log.warn("error reading input line err={}", .{err});
+            return false;
+        } orelse return false;
+
+        result.* = .{
+            .tl_px_x = -1,
+            .tl_px_y = -1,
+            .offset_start = 0,
+            .offset_len = 0,
+            .text = text.ptr,
+            .text_len = text.len,
+        };
+        return true;
+    }
+
     fn readTextLocked(
         surface: *Surface,
         core_sel: terminal.Selection,

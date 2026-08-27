@@ -2116,6 +2116,29 @@ pub fn imePoint(self: *const Surface) apprt.IMEPos {
     };
 }
 
+/// Returns the text of the input line before the cursor, if the cursor
+/// is currently positioned within a shell-integrated (OSC 133) input
+/// region. See `terminal.Screen.inputLineTextBeforeCursor` for details.
+///
+/// The returned value is allocated and must be freed by the caller.
+pub fn inputLineBeforeCursor(
+    self: *Surface,
+    alloc: Allocator,
+) Allocator.Error!?[:0]const u8 {
+    self.renderer_state.mutex.lockUncancelable(global.io());
+    defer self.renderer_state.mutex.unlock(global.io());
+    return self.inputLineBeforeCursorLocked(alloc);
+}
+
+/// Same as `inputLineBeforeCursor` but assumes the renderer state mutex
+/// is already held.
+pub fn inputLineBeforeCursorLocked(
+    self: *Surface,
+    alloc: Allocator,
+) Allocator.Error!?[:0]const u8 {
+    return self.io.terminal.screens.active.inputLineTextBeforeCursor(alloc);
+}
+
 fn clipboardWrite(self: *const Surface, data: []const u8, loc: apprt.Clipboard) !void {
     if (self.config.clipboard_write == .deny) {
         log.info("application attempted to write clipboard, but 'clipboard-write' is set to deny", .{});

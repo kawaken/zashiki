@@ -92,81 +92,164 @@ Zashikiは`NSTextInputClient`を実装しているが、この読み取り経路
 なら以降のフェーズは全て無駄になる。
 
 - `attributedSubstring(forProposedRange:actualRange:)`、`selectedRange()`、
-  `characterIndex(for:)`、`hasMarkedText()`に一時的な`Ghostty.logger.debug`を
-  追加する（:1937に既にコメントアウトされたログの残骸がある）
+  `characterIndex(for:)`、`hasMarkedText()`に一時的な`Zashiki.logger.debug`を
+  追加する（:1937に既にコメントアウトされたログの残骸がある）→ **実施済み**
+  （`ime-observe:`プレフィックス、`worktree-ime-surrounding-text`ブランチの
+  コミット`4160f7525`）
 - `attributedString()`（optional）にもスタブ＋ログを置いて、呼ばれるかを見る
-- `sudo log stream --level debug --predicate 'subsystem=="dev.kawaken.zashiki"'`
-  で観測。ATOKで日本語入力し、以下を記録する:
+  → **実施済み**（未実装だったので新規追加）
+- 観測はユーザーが目視するのではなく、`sudo log stream --level debug
+  --predicate 'subsystem=="dev.kawaken.zashiki"' > <file> 2>&1` でログを
+  ファイルにリダイレクトし、Claudeが後から読んで解析する。ATOKとことえりで
+  別ファイルに記録し、以下を確認する:
   - どのメソッドがどんな`range`で呼ばれるか
   - `nil`を返したときの後続の挙動（諦めるか、別のrangeで再問い合わせするか）
   - `selectedRange()`が返した`{0,0}`を基準に問い合わせてきているか
+  - `attributedString()`が呼ばれるかどうか
 - 比較対象としてことえり（日本語IM）でも同じ観測を行い、ATOK固有かを切り分ける
 - **判断ポイント**: ここで「ATOKは周辺文字列を要求していない」と判明したら、
   この計画は破棄してplan/から削除する
 
-### フェーズ1: コア側に入力行取得APIを足す
+**現状（2026-08-26）**: ビルドをブロックしていたXcode 26のexplicit module build
+既知バグはPR #58（`SWIFT_ENABLE_EXPLICIT_MODULES=NO`追加）で解決済み。
+リベース後、ビルドが実際に`Zashiki.app`まで到達したことで、それまで
+Textual依存解決エラーに隠れて発見できていなかった別の実バグ
+（`attributedString()`スタブの戻り値optionalityがプロトコル定義と不一致）も
+見つかり修正した。ビルドは`zig build`で成功する状態。
 
-`src/Surface.zig`に、カーソル位置の入力行とカーソルオフセットを返す関数を追加:
+**観測結果（2026-08-27）**: ATOKで3回、ことえりで1回、実機観測を実施した
+（`sudo log stream`をファイルにリダイレクトしClaudeが解析する方式）。
 
-- カーソルの`page_pin`を取得（`imePoint()` :2107 と同じ経路）
-- そのセルの`semantic_content`が`.input`でなければ失敗を返す
-  （＝shell integration無し、または出力表示中）
-- `screens.active.selectLine(.{ .pin = cursor_pin, .semantic_prompt_boundary = true })`
-  で入力範囲の`Selection`を得る
-- `dumpTextLocked`でテキスト化
-- **同時に、返す文字列先頭からカーソル位置までのUTF-16コードユニット数**を計算して
-  返す。既存の`offset_start`（セルグリッド線形位置）は使わない。ここが障害1への対処で、
-  本フェーズの本質的な作業。文字列を実際に走査してオフセットを出す
-- C ABI: `ghostty_surface_read_input_line(ghostty_surface_t, ghostty_text_s*, uint32_t* cursor_utf16_offset)`
-  を`src/apprt/embedded.zig`と`include/ghostty.h`に追加
-- Zig側のテストを`zig build test -Dtest-filter=...`で追加する。特に全角文字・
-  ソフトラップ・絵文字（サロゲートペア）でオフセットが合うこと
+- `attributedString()`（画面全体取得）は**ATOKでは3回のテスト全てで
+  0回**。一方**ことえりでは1回のテストで5回呼ばれた**
+- ATOKの`attributedSubstring(forProposedRange:actualRange:)`が要求する
+  `range`は、常に**0起点の相対位置**で、現在入力中のmarkedText文字列の
+  範囲内に完全に収まっていた。「あいうえお」を確定した直後に独立した
+  新規入力で「きく」を変換しても、rangeは`{0,2}`のようにmarkedText内で
+  完結し、直前の確定済みテキスト（周辺文字列）への到達は一度も確認
+  できなかった
+- `selectedRange()`は常に「no selection」（空のNSRange）を返しており、
+  正しいカーソル位置を一切提供できていない
+- `characterIndex(for:)`は一度も呼ばれなかった
 
-### フェーズ2: Swift側の配線
+**結論（判断ポイントの判定）**: 「ATOKは周辺文字列を要求していない」と
+断定するのは早計と判断した。むしろ「`selectedRange()`が常にカーソル位置
+不明（空）を返すため、ATOKは0起点の手探りでしか問い合わせできておらず、
+周辺文字列にアクセスする足がかり自体が与えられていない」可能性が高い。
+この計画は破棄せず、フェーズ1（`selectedRange()`を正しいカーソル位置に
+直す）に進み、その後で改めてATOKの挙動を観測する方針とした。
 
-`SurfaceView_AppKit.swift`の`NSTextInputClient` extension:
+### フェーズ1: コア側に入力行取得APIを足す — 実施済み（2026-08-27）
 
-- 入力行テキストとカーソルUTF-16オフセットを保持するキャッシュを持つ
-  （`CachedValue`の既存パターンを使う。ただしIMEの応答性が要るので
-  durationは`cachedScreenContents`の500msより短く。フェーズ0の観測で
-  呼び出し頻度を見てから決める）
-- `selectedRange()`: `hasMarkedText()`が`true`のときだけ
-  `NSRange(location: cursorUTF16Offset, length: 0)`を返す。それ以外は現状維持
-- `attributedSubstring(forProposedRange:actualRange:)`:
-  `hasMarkedText()`が`true`のとき、入力行テキストから要求rangeとの共通部分を
-  切り出して返し、**`actualRange`に実際に返した範囲を書き戻す**。
-  それ以外は現状のQuickLook向け実装を維持
-- `characterIndex(for:)`: 優先度低。フェーズ0でATOKが呼んでいなければ触らない
+上記の原案には実装前に致命的なバグが見つかったため、以下の内容に変更して
+実装した（コミット`6ccba0498`）:
 
-### フェーズ3: フォールバックと設定
+- **原案のバグ**: 「カーソル位置のセルの`semantic_content`が`.input`か」だけを
+  見ると、ユーザーが文字を打った直後（カーソルが次の未書込セルに進んだ状態、
+  一番肝心なタイミング）で毎回失敗する。`Screen.promptClickMove`と同じ
+  `cursor.semantic_content == .input or cursor.page_cell.semantic_content == .input`
+  というOR条件に変更した
+- **`cursor_utf16_offset`パラメータを廃止**。「返す文字列は常にカーソル位置で
+  終わる」という設計にし、呼び出し側（Swift）は`(text as NSString).length`を
+  そのままカーソルのUTF-16オフセットとして使えるようにした。Zig側はUTF-16を
+  一切扱わない
+- `Screen.inputLineTextBeforeCursor`（`src/terminal/Screen.zig`、
+  `promptClickMove`の直後）: `selectLine`+`selectionString`（`map`オプションで
+  バイトインデックス→Pinのマッピングを取得）→カーソルPinに`Pin.eql`で一致する
+  バイト位置で文字列を切り詰める、という実装
+- `Surface.inputLineBeforeCursor`/`Locked`（`dumpText`/`dumpTextLocked`と
+  同じロック規約）
+- C ABI: `ghostty_surface_read_input_line(ghostty_surface_t, ghostty_text_s*)`
+  （`cursor_utf16_offset`パラメータは無し、既存の`ghostty_text_s`を再利用）
+- `zig build test -Dtest-filter=inputLineTextBeforeCursor`で12ケース・77件
+  全てgreen（基本、OSC133非対応、プロンプト/出力上のカーソル、空入力、全角、
+  ソフトラップ、絵文字サロゲートペア、グラフェンクラスタ、行途中カーソル、
+  ソフトラップ跨ぎ行途中、画面最初）
 
-- OSC 133非対応シェルでは何も返さない（＝現状維持）ことをREADMEに明記
-- 挙動に問題が出た場合に切れるよう、設定オプションでの無効化を検討。
-  ただし設定を増やすコストと釣り合うかはフェーズ2の結果を見て判断する
+### フェーズ2: Swift側の配線 — 実施済み（2026-08-27）
 
-## 検証
+`SurfaceView_AppKit.swift`の`NSTextInputClient` extension（コミット`832b3bdea`）:
 
-- `zig build test -Dtest-filter=<新規テスト名>` でコア側オフセット計算を検証
-- 実機でATOKを使い、以下を確認:
-  - 入力行に文脈がある状態で変換候補が変わるか（例: `git ` と打った後に
-    「こみっと」→「commit」等の学習が効くか）
-  - preedit中にカーソル移動・画面スクロール・ペイン切り替えをしてもクラッシュ
-    しないか
-  - **回帰確認**: マウス選択→QuickLook（3本指タップ/`⌃⌘D`）が従来どおり動くか
-  - **回帰確認**: VoiceOverで選択テキストが正しく読まれるか
-  - ことえり・韓国語IMEでpreeditが壊れていないか（過去に`fa141a726`,
-    `d60a16c14`などIME周りの修正が入っている領域なので特に注意）
+- `cachedInputLineBeforeCursor: CachedValue<String>`をduration
+  `.milliseconds(50)`で追加（`cachedScreenContents`の500msより短く。ATOKが
+  `attributedString()`を3回連続で呼ぶ既知の挙動を1回のロック取得に潰す狙い。
+  実機観測後に調整前提の暫定値）
+- **`attributedString()`**: ゲート条件なしで実装。ファイル内でこのメソッドを
+  呼んでいるのはIMEだけ（QuickLook・Accessibilityは無関係）と確認済みなので
+  回帰リスクはゼロ。フェーズ0で観測された「preedit開始直前に3回連続で呼ばれる」
+  という挙動に直接効く
+- **`selectedRange()`**: 既存のマウス選択パス（`ghostty_surface_read_selection`）
+  は変更せず、失敗時のフォールバックとして`hasMarkedText()==true`のときだけ
+  `NSRange(location: (inputLine as NSString).length, length: 0)`を返す
+- **`attributedSubstring(forProposedRange:actualRange:)`**: 同様に既存の
+  マウス選択パスを保持し、フォールバックとして`hasMarkedText()==true`のとき
+  だけ入力行テキストを`NSIntersectionRange`で切り出し`actualRange`に書き戻す
+- `characterIndex(for:)`は変更なし（フェーズ0でATOKが呼んでいないことを確認済み）
+- `zig build` / `swiftlint lint --strict` いずれも成功
 
-## リスク・未解決
+**実機観測結果（2026-08-27、ATOKのみ）**:
 
-- **フェーズ0の結果次第で全部無駄になる。** ATOKが`nil`を受けた時点で
-  周辺文字列の利用を諦めている可能性、そもそも問い合わせていない可能性がある
-- `selectedRange()`を`hasMarkedText()`で分岐させる方式は、「マウス選択がある状態で
-  IME入力を開始する」ケースで QuickLook 判定（:1989）と干渉しうる。
-  フェーズ2で実機確認が要る
-- 入力行の取得はロックを取って画面を走査するので、preedit中に高頻度で呼ばれると
-  レンダリングに影響する可能性がある。キャッシュのdurationで調整する
-- カーソル位置がビューポート外（スクロール中）の場合の扱いは未検討。
-  `imePoint()`にも同じ`TODO`が残っている（`src/Surface.zig:2111`）
-- upstream（ghostty-org/ghostty）に同種の実装・議論があるかは未調査。
-  フェーズ1に入る前に一度確認するとよい
+- 最初の実機テストでは`attributedString()`が0回だった。原因はATOK側の
+  環境設定「挿入ポイント前後の文章を参照して変換する」がOFFだったこと。
+  ONにすると`attributedString()`が呼ばれるようになった
+- しかし当初は**preedit開始前に1度呼ばれた後、同じフォーカスセッション中は
+  二度と呼ばれない**問題があった。原因は`selectedRange()`が
+  `hasMarkedText()==false`の間ずっと固定の空レンジを返すため、ATOKが
+  「カーソル位置は変わっていない＝文脈も変わっていない」と誤解し、
+  古い（最初は空の）文脈をキャッシュしたまま使い続けていたためと判明
+- 対応: `insertText()`でIME確定があった際、`cachedInputLineBeforeCursor`を
+  即時invalidateしてから`NSTextInputContext.invalidateCharacterCoordinates()`
+  を呼び、IMEに明示的に文脈更新を伝えるようにした（コミット`5479cfd8d`,
+  `79af5e22f`）。`CachedValue`に手動`invalidate()`を追加している
+- 対応後の観測で、文節ごとに確定・変換を繰り返すテスト（ATOK自身の連文節
+  解析の影響を排除するため）で、`ghostty_surface_read_input_line`が
+  文節確定のたびに正しく更新された文脈（例:「周囲がうるさいので集中して」
+  =13文字）を返していることをログで確認できた。「先生の話を聞く」
+  「頭痛の薬が効く」「人の話を聞かない」「薬の効果が効かない」など
+  同音異義語を含む複数の文で、意図通りの変換ができることを確認した
+  （「集中して効く/聞く」のような、そもそも定着度の低い連語では今回の
+  文脈提供だけでは変換が変わらないケースもあったが、これはATOKの言語
+  モデル側の限界であり実装の不備ではないと判断）
+- QuickLook（3本指タップ）は動作確認済み、回帰なし
+- VoiceOverは実機のキーボード設定でショートカットが押せず未確認。ただし
+  `selectedRange()`/`attributedSubstring()`の既存マウス選択パス
+  （VoiceOverが実際に使う経路）はコード上一切変更しておらず、新しい
+  IME用分岐は`hasMarkedText()==true`かつ選択なしの場合のみ動作するため、
+  回帰リスクは低いと判断
+- 観測用の`ime-observe:`一時ログは全て削除した（コミット`0a2200ab6`）
+
+### フェーズ3: フォールバックと設定 — 現状維持で十分と判断
+
+- OSC 133非対応シェルでは`ghostty_surface_read_input_line`が`false`を
+  返し、`attributedString()`等が空文字列を返すことで自然に現状維持
+  （劣化なし）になっている。追加のフォールバック実装は不要
+- 実機観測で問題が顕在化しなかったため、設定オプションでの無効化は
+  今回は追加しない。将来問題が報告されたら検討する
+
+## 検証（結果）
+
+- `zig build test -Dtest-filter=inputLineTextBeforeCursor`: 12ケース・
+  77件全てgreen
+- `zig build` / `swiftlint lint --strict`: いずれも成功
+- 実機ATOKでの変換精度確認、QuickLook回帰確認: 実施・問題なし
+- VoiceOver回帰確認: 未実施（上記の通りコードレビューで安全性を判断）
+- ことえり・韓国語IMEでのpreedit確認: 未実施（今回のスコープでは
+  ATOKのみ検証。ことえりはフェーズ0で`attributedString()`が5回呼ばれる
+  ことは確認済みで、`attributedString()`自体は無条件実装のため影響なし
+  のはずだが、`selectedRange()`/`attributedSubstring()`のIME分岐は
+  未確認）
+
+## リスク・未解決（最終状態）
+
+- upstream（ghostty-org/ghostty）は調査済み・該当なし（コード検索・
+  issue検索で関連する実装・議論は見つからなかった）
+- VoiceOverでの実機回帰確認は未実施のまま（理由は上記）。気になる場合は
+  後日確認する
+- ことえり・韓国語IMEでの`selectedRange()`/`attributedSubstring()`分岐の
+  実機確認は未実施。preedit自体は元々`hasMarkedText()`のガードで保護
+  されているため大きな回帰は考えにくいが、問題報告があれば個別に見る
+- カーソル位置がビューポート外（スクロール中）の場合の扱いは未検討のまま
+  スコープ外とした。`imePoint()`にも同じ`TODO`が残っている
+  （`src/Surface.zig:2111`）
+- `cachedInputLineBeforeCursor`のduration（50ms）は暫定値のまま。実機で
+  パフォーマンス上の問題が出れば調整する
