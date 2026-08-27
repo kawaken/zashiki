@@ -187,42 +187,69 @@ Textual依存解決エラーに隠れて発見できていなかった別の実�
 - `characterIndex(for:)`は変更なし（フェーズ0でATOKが呼んでいないことを確認済み）
 - `zig build` / `swiftlint lint --strict` いずれも成功
 
-**未実施（次にユーザーが起きてから）**:
-- `attributedString()`単体、および`selectedRange()`/`attributedSubstring()`の
-  IME分岐が入った状態での実機観測（ATOKでの変換候補の変化を確認）
-- **回帰確認必須**: マウス選択→QuickLook（3本指タップ/`⌃⌘D`）、VoiceOverでの
-  選択テキスト読み上げが従来通り動くか
-- キャッシュduration（50ms暫定値）の調整要否を実機の呼び出し頻度から判断
+**実機観測結果（2026-08-27、ATOKのみ）**:
 
-### フェーズ3: フォールバックと設定
+- 最初の実機テストでは`attributedString()`が0回だった。原因はATOK側の
+  環境設定「挿入ポイント前後の文章を参照して変換する」がOFFだったこと。
+  ONにすると`attributedString()`が呼ばれるようになった
+- しかし当初は**preedit開始前に1度呼ばれた後、同じフォーカスセッション中は
+  二度と呼ばれない**問題があった。原因は`selectedRange()`が
+  `hasMarkedText()==false`の間ずっと固定の空レンジを返すため、ATOKが
+  「カーソル位置は変わっていない＝文脈も変わっていない」と誤解し、
+  古い（最初は空の）文脈をキャッシュしたまま使い続けていたためと判明
+- 対応: `insertText()`でIME確定があった際、`cachedInputLineBeforeCursor`を
+  即時invalidateしてから`NSTextInputContext.invalidateCharacterCoordinates()`
+  を呼び、IMEに明示的に文脈更新を伝えるようにした（コミット`5479cfd8d`,
+  `79af5e22f`）。`CachedValue`に手動`invalidate()`を追加している
+- 対応後の観測で、文節ごとに確定・変換を繰り返すテスト（ATOK自身の連文節
+  解析の影響を排除するため）で、`ghostty_surface_read_input_line`が
+  文節確定のたびに正しく更新された文脈（例:「周囲がうるさいので集中して」
+  =13文字）を返していることをログで確認できた。「先生の話を聞く」
+  「頭痛の薬が効く」「人の話を聞かない」「薬の効果が効かない」など
+  同音異義語を含む複数の文で、意図通りの変換ができることを確認した
+  （「集中して効く/聞く」のような、そもそも定着度の低い連語では今回の
+  文脈提供だけでは変換が変わらないケースもあったが、これはATOKの言語
+  モデル側の限界であり実装の不備ではないと判断）
+- QuickLook（3本指タップ）は動作確認済み、回帰なし
+- VoiceOverは実機のキーボード設定でショートカットが押せず未確認。ただし
+  `selectedRange()`/`attributedSubstring()`の既存マウス選択パス
+  （VoiceOverが実際に使う経路）はコード上一切変更しておらず、新しい
+  IME用分岐は`hasMarkedText()==true`かつ選択なしの場合のみ動作するため、
+  回帰リスクは低いと判断
+- 観測用の`ime-observe:`一時ログは全て削除した（コミット`0a2200ab6`）
 
-- OSC 133非対応シェルでは何も返さない（＝現状維持）ことをREADMEに明記
-- 挙動に問題が出た場合に切れるよう、設定オプションでの無効化を検討。
-  ただし設定を増やすコストと釣り合うかはフェーズ2の結果を見て判断する
+### フェーズ3: フォールバックと設定 — 現状維持で十分と判断
 
-## 検証
+- OSC 133非対応シェルでは`ghostty_surface_read_input_line`が`false`を
+  返し、`attributedString()`等が空文字列を返すことで自然に現状維持
+  （劣化なし）になっている。追加のフォールバック実装は不要
+- 実機観測で問題が顕在化しなかったため、設定オプションでの無効化は
+  今回は追加しない。将来問題が報告されたら検討する
 
-- `zig build test -Dtest-filter=<新規テスト名>` でコア側オフセット計算を検証
-- 実機でATOKを使い、以下を確認:
-  - 入力行に文脈がある状態で変換候補が変わるか（例: `git ` と打った後に
-    「こみっと」→「commit」等の学習が効くか）
-  - preedit中にカーソル移動・画面スクロール・ペイン切り替えをしてもクラッシュ
-    しないか
-  - **回帰確認**: マウス選択→QuickLook（3本指タップ/`⌃⌘D`）が従来どおり動くか
-  - **回帰確認**: VoiceOverで選択テキストが正しく読まれるか
-  - ことえり・韓国語IMEでpreeditが壊れていないか（過去に`fa141a726`,
-    `d60a16c14`などIME周りの修正が入っている領域なので特に注意）
+## 検証（結果）
 
-## リスク・未解決
+- `zig build test -Dtest-filter=inputLineTextBeforeCursor`: 12ケース・
+  77件全てgreen
+- `zig build` / `swiftlint lint --strict`: いずれも成功
+- 実機ATOKでの変換精度確認、QuickLook回帰確認: 実施・問題なし
+- VoiceOver回帰確認: 未実施（上記の通りコードレビューで安全性を判断）
+- ことえり・韓国語IMEでのpreedit確認: 未実施（今回のスコープでは
+  ATOKのみ検証。ことえりはフェーズ0で`attributedString()`が5回呼ばれる
+  ことは確認済みで、`attributedString()`自体は無条件実装のため影響なし
+  のはずだが、`selectedRange()`/`attributedSubstring()`のIME分岐は
+  未確認）
 
-- **フェーズ0の結果次第で全部無駄になる。** ATOKが`nil`を受けた時点で
-  周辺文字列の利用を諦めている可能性、そもそも問い合わせていない可能性がある
-- `selectedRange()`を`hasMarkedText()`で分岐させる方式は、「マウス選択がある状態で
-  IME入力を開始する」ケースで QuickLook 判定（:1989）と干渉しうる。
-  フェーズ2で実機確認が要る
-- 入力行の取得はロックを取って画面を走査するので、preedit中に高頻度で呼ばれると
-  レンダリングに影響する可能性がある。キャッシュのdurationで調整する
-- カーソル位置がビューポート外（スクロール中）の場合の扱いは未検討。
-  `imePoint()`にも同じ`TODO`が残っている（`src/Surface.zig:2111`）
-- upstream（ghostty-org/ghostty）に同種の実装・議論があるかは未調査。
-  フェーズ1に入る前に一度確認するとよい
+## リスク・未解決（最終状態）
+
+- upstream（ghostty-org/ghostty）は調査済み・該当なし（コード検索・
+  issue検索で関連する実装・議論は見つからなかった）
+- VoiceOverでの実機回帰確認は未実施のまま（理由は上記）。気になる場合は
+  後日確認する
+- ことえり・韓国語IMEでの`selectedRange()`/`attributedSubstring()`分岐の
+  実機確認は未実施。preedit自体は元々`hasMarkedText()`のガードで保護
+  されているため大きな回帰は考えにくいが、問題報告があれば個別に見る
+- カーソル位置がビューポート外（スクロール中）の場合の扱いは未検討のまま
+  スコープ外とした。`imePoint()`にも同じ`TODO`が残っている
+  （`src/Surface.zig:2111`）
+- `cachedInputLineBeforeCursor`のduration（50ms）は暫定値のまま。実機で
+  パフォーマンス上の問題が出れば調整する
