@@ -283,14 +283,9 @@ extension Zashiki {
             cachedInputLineBeforeCursor = .init(duration: .milliseconds(50)) { [weak self] in
                 guard let self, let surface = self.surface else { return "" }
                 var text = ghostty_text_s()
-                guard ghostty_surface_read_input_line(surface, &text) else {
-                    Zashiki.logger.debug("ime-observe: ghostty_surface_read_input_line failed (cursor not in OSC133 input region)")
-                    return ""
-                }
+                guard ghostty_surface_read_input_line(surface, &text) else { return "" }
                 defer { ghostty_surface_free_text(surface, &text) }
-                let result = String(cString: text.text)
-                Zashiki.logger.debug("ime-observe: ghostty_surface_read_input_line ok len=\(result.utf16.count, privacy: .public)")
-                return result
+                return String(cString: text.text)
             }
 
             // Set a timer to show the ghost emoji after 500ms if no title is set
@@ -1879,9 +1874,7 @@ extension Zashiki {
 
 extension Zashiki.SurfaceView: NSTextInputClient {
     func hasMarkedText() -> Bool {
-        let result = markedText.length > 0
-        Zashiki.logger.debug("ime-observe: hasMarkedText result=\(result, privacy: .public)")
-        return result
+        return markedText.length > 0
     }
 
     func markedRange() -> NSRange {
@@ -1890,10 +1883,7 @@ extension Zashiki.SurfaceView: NSTextInputClient {
     }
 
     func selectedRange() -> NSRange {
-        guard let surface = self.surface else {
-            Zashiki.logger.debug("ime-observe: selectedRange no surface, returning empty")
-            return NSRange()
-        }
+        guard let surface = self.surface else { return NSRange() }
 
         // Get our range from the Zashiki API. There is a race condition between getting the
         // range and actually using it since our selection may change but there isn't a good
@@ -1901,9 +1891,7 @@ extension Zashiki.SurfaceView: NSTextInputClient {
         var text = ghostty_text_s()
         if ghostty_surface_read_selection(surface, &text) {
             defer { ghostty_surface_free_text(surface, &text) }
-            let result = NSRange(location: Int(text.offset_start), length: Int(text.offset_len))
-            Zashiki.logger.debug("ime-observe: selectedRange result=\(NSStringFromRange(result), privacy: .public)")
-            return result
+            return NSRange(location: Int(text.offset_start), length: Int(text.offset_len))
         }
 
         // No mouse selection. Only report the IME cursor position while
@@ -1913,14 +1901,9 @@ extension Zashiki.SurfaceView: NSTextInputClient {
         // coordinate space, which is incompatible with our input-line-
         // relative offset below. Gating on hasMarkedText() keeps those
         // call sites unaffected.
-        guard hasMarkedText() else {
-            Zashiki.logger.debug("ime-observe: selectedRange no selection, returning empty")
-            return NSRange()
-        }
+        guard hasMarkedText() else { return NSRange() }
         let inputLine = cachedInputLineBeforeCursor.get()
-        let result = NSRange(location: (inputLine as NSString).length, length: 0)
-        Zashiki.logger.debug("ime-observe: selectedRange (IME) result=\(NSStringFromRange(result), privacy: .public)")
-        return result
+        return NSRange(location: (inputLine as NSString).length, length: 0)
     }
 
     func attributedString() -> NSAttributedString {
@@ -1931,7 +1914,6 @@ extension Zashiki.SurfaceView: NSTextInputClient {
         // observed calling this three times in a row *before* starting a
         // preedit session (hasMarkedText() becomes true only afterward).
         let inputLine = cachedInputLineBeforeCursor.get()
-        Zashiki.logger.debug("ime-observe: attributedString() returning len=\(inputLine.utf16.count, privacy: .public)")
         guard !inputLine.isEmpty else { return NSAttributedString() }
         return NSAttributedString(string: inputLine)
     }
@@ -1972,17 +1954,10 @@ extension Zashiki.SurfaceView: NSTextInputClient {
     }
 
     func attributedSubstring(forProposedRange range: NSRange, actualRange: NSRangePointer?) -> NSAttributedString? {
-        Zashiki.logger.debug("ime-observe: attributedSubstring range=\(NSStringFromRange(range), privacy: .public) hasActualRangePointer=\(actualRange != nil, privacy: .public)")
-        guard let surface = self.surface else {
-            Zashiki.logger.debug("ime-observe: attributedSubstring no surface, returning nil")
-            return nil
-        }
+        guard let surface = self.surface else { return nil }
 
         // If the range is empty then we don't need to return anything
-        guard range.length > 0 else {
-            Zashiki.logger.debug("ime-observe: attributedSubstring empty range requested, returning nil")
-            return nil
-        }
+        guard range.length > 0 else { return nil }
 
         // I used to do a bunch of testing here that the range requested matches the
         // selection range or contains it but a lot of macOS system behaviors request
@@ -1993,7 +1968,6 @@ extension Zashiki.SurfaceView: NSTextInputClient {
         var text = ghostty_text_s()
         if ghostty_surface_read_selection(surface, &text) {
             defer { ghostty_surface_free_text(surface, &text) }
-            Zashiki.logger.debug("ime-observe: attributedSubstring returning text len=\(text.text_len, privacy: .public)")
 
             // If we can get a font then we use the font. This should always work
             // since we always have a primary font. The only scenario this doesn't
@@ -2015,23 +1989,15 @@ extension Zashiki.SurfaceView: NSTextInputClient {
         // No mouse selection. Only fall back to the IME input line while
         // actively composing (see selectedRange() above for why this is
         // gated on hasMarkedText()).
-        guard hasMarkedText() else {
-            Zashiki.logger.debug("ime-observe: attributedSubstring no selection, returning nil")
-            return nil
-        }
+        guard hasMarkedText() else { return nil }
         let ns = cachedInputLineBeforeCursor.get() as NSString
         let clamped = NSIntersectionRange(range, NSRange(location: 0, length: ns.length))
-        guard clamped.length > 0 else {
-            Zashiki.logger.debug("ime-observe: attributedSubstring (IME) range out of bounds, returning nil")
-            return nil
-        }
+        guard clamped.length > 0 else { return nil }
         actualRange?.pointee = clamped
-        Zashiki.logger.debug("ime-observe: attributedSubstring (IME) returning range=\(NSStringFromRange(clamped), privacy: .public)")
         return .init(string: ns.substring(with: clamped))
     }
 
     func characterIndex(for point: NSPoint) -> Int {
-        Zashiki.logger.debug("ime-observe: characterIndex point=\(NSStringFromPoint(point), privacy: .public) (stub, returning 0)")
         return 0
     }
 
