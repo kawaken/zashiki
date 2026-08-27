@@ -2127,9 +2127,13 @@ extension Zashiki.SurfaceView: NSTextInputClient {
         // a stale context. Without this, ATOK has been observed reading
         // it once when the IME activates and never again for the rest
         // of the focus session, so later conversions never see anything
-        // typed since.
+        // typed since. We must also invalidate our own cache first --
+        // CachedValue only expires on a timer, so without this the IME
+        // could re-read attributedString() right away and still get the
+        // stale (pre-commit) value back.
         defer {
             if hadMarkedText {
+                self.cachedInputLineBeforeCursor.invalidate()
                 self.inputContext?.invalidateCharacterCoordinates()
             }
         }
@@ -2522,5 +2526,13 @@ class CachedValue<T> {
         }
 
         return result
+    }
+
+    /// Clear the cached value immediately, ignoring the configured
+    /// duration. The next call to `get()` will call `fetch()` again.
+    func invalidate() {
+        value = nil
+        expiryTask?.cancel()
+        expiryTask = nil
     }
 }
