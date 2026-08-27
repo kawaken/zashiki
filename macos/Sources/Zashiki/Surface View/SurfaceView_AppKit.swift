@@ -283,9 +283,14 @@ extension Zashiki {
             cachedInputLineBeforeCursor = .init(duration: .milliseconds(50)) { [weak self] in
                 guard let self, let surface = self.surface else { return "" }
                 var text = ghostty_text_s()
-                guard ghostty_surface_read_input_line(surface, &text) else { return "" }
+                guard ghostty_surface_read_input_line(surface, &text) else {
+                    Zashiki.logger.debug("ime-observe: ghostty_surface_read_input_line failed (cursor not in OSC133 input region)")
+                    return ""
+                }
                 defer { ghostty_surface_free_text(surface, &text) }
-                return String(cString: text.text)
+                let result = String(cString: text.text)
+                Zashiki.logger.debug("ime-observe: ghostty_surface_read_input_line ok len=\(result.utf16.count, privacy: .public)")
+                return result
             }
 
             // Set a timer to show the ghost emoji after 500ms if no title is set
@@ -2115,6 +2120,18 @@ extension Zashiki.SurfaceView: NSTextInputClient {
             acc.append(chars)
             keyTextAccumulator = acc
             return
+        }
+
+        // Tell the IME that our surrounding text changed so it re-reads
+        // attributedString() for the next composition instead of reusing
+        // a stale context. Without this, ATOK has been observed reading
+        // it once when the IME activates and never again for the rest
+        // of the focus session, so later conversions never see anything
+        // typed since.
+        defer {
+            if hadMarkedText {
+                self.inputContext?.invalidateCharacterCoordinates()
+            }
         }
 
         if hadMarkedText, !chars.isEmpty {
