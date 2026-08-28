@@ -9,7 +9,9 @@
 
 ## Features
 
-- Japanese IME support with thicker underlines for the currently converted ATOK preedit clause.
+- Japanese IME support with thicker underlines for the currently converted ATOK preedit clause,
+  and surrounding-text context (via `NSTextInputClient`) so IMEs like ATOK can use the text
+  already typed on the current line for more accurate conversion.
 - Native SwiftUI Markdown preview (`Cmd+Shift+M`) with live file updates.
   Markdown files can also be opened from the CLI with
   `zashiki +markdown-preview <file>`, targeting the originating terminal window.
