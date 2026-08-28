@@ -49,6 +49,26 @@ jobs:
             echo "value=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Prepare release notes
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          # RCs use the same release notes as their corresponding stable version.
+          changelog_version="${RELEASE_VERSION%%-rc*}"
+          awk -v version="$changelog_version" '
+            $0 ~ "^## " version "([[:space:]]|$)" {
+              found = 1
+              next
+            }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+
+          if [ ! -s release-notes.md ]; then
+            echo "::error::No CHANGELOG entry found for $changelog_version"
+            exit 1
+          fi
+
       - name: Xcode Select
         run: |
           XCODE_PATH=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n1)
@@ -137,13 +157,6 @@ jobs:
           files: |
             Zashiki-*-macos.zip
             appcast.xml
-          generate_release_notes: true
+          generate_release_notes: false
+          body_path: release-notes.md
           prerelease: ${{ contains(steps.version.outputs.value, '-rc') }}
-          body: |
-            ad-hoc署名のローカルビルドです。Apple Developer Program未登録のため
-            notarizationはされていません。初回起動時にGatekeeperの警告が出る
-            場合は、右クリック→「開く」を選ぶか、以下を実行してください:
-
-            ```sh
-            xattr -cr Zashiki.app
-            ```
