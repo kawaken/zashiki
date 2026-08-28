@@ -137,6 +137,14 @@ pub fn init(
             // See https://forums.swift.org/t/xcode-26-unable-to-find-module-dependency/80516
             "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
         });
+        if (xc_arch != null) {
+            // Release-family configurations default ONLY_ACTIVE_ARCH to
+            // NO, so without this xcodebuild still links every arch in
+            // ARCHS_STANDARD (arm64 + x86_64) no matter what
+            // `-destination` says. That fails for the "native" xcframework
+            // target, which only contains the host arch's libghostty.
+            step.addArg("ONLY_ACTIVE_ARCH=YES");
+        }
 
         // We need the xcframework
         deps.xcframework.addStepDependencies(&step.step);
@@ -180,6 +188,11 @@ pub fn init(
             // above.
             "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
         });
+        if (xc_arch != null) {
+            // See the comment on the equivalent flag in the `build` step
+            // above.
+            step.addArg("ONLY_ACTIVE_ARCH=YES");
+        }
 
         // We need the xcframework
         deps.xcframework.addStepDependencies(&step.step);
