@@ -102,6 +102,14 @@ to anyone, not just the maintainer.
 - If in doubt whether something is personal, ask before including it in
   a PR/commit rather than publishing and asking forgiveness.
 
+## Release
+
+Before pushing a release tag (`v*.*.*`), add an entry to `CHANGELOG.md`
+summarizing user-facing changes since the previous release. Keep it short —
+a flat bullet list per version, not a PR-by-PR dump (GitHub's auto-generated
+release notes already cover that). Include changes that don't show up in
+README.md's feature list too (e.g. platform-support changes, removals).
+
 ## Xcode
 
 Building the macOS app requires Xcode, the macOS SDK, the iOS SDK, and Metal
