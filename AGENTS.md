@@ -77,6 +77,10 @@ task, inspect its state before modifying existing work.
   the current task
 - Submit changes from the dedicated branch as a PR and merge them into `main`
   through the PR. Do not commit or push directly to `main`
+- After creating a PR, enable GitHub AutoMerge with `gh pr merge --auto` so the
+  PR is merged automatically once its required checks and review requirements
+  are satisfied. If AutoMerge cannot be enabled, check the reason and report it
+  instead of merging manually without confirmation
 - Remove a worktree after its corresponding PR has been merged. To clean only
   build artifacts, use `make clean` rather than invoking `rm -rf` directly. To
   remove a worktree, use `git worktree remove --force` (`-f -f` if it is locked).
