@@ -59,8 +59,22 @@ Before creating a release tag (`v*.*.*`), review the user-facing changes since
 the previous release and update `CHANGELOG.md`. Summarize the changes from the
 user's perspective instead of simply copying PR titles.
 
-## Plan Lifecycle
+## Plan and Issue Lifecycle
 
-Keep active plans in `plan/`. When work is complete, update the plan with the
-actual changes and any deviations from the original plan, move it to
-`docs/history/`, and remove it from `plan/`.
+Plans start as local files in `plan/`, refined through discussion. Update the
+file directly whenever the plan changes.
+
+- Once a plan is reasonably settled, create a GitHub Issue for it. Use the
+  plan's title and content as the issue's title and body, and link back to
+  the plan file from the issue.
+- The issue tracks progress; the plan file stays the source of truth for
+  design. When the plan file changes, update the issue too — this doesn't
+  have to happen in the same commit, but keep the two from drifting apart.
+- When starting work on an issue, add the `wip` label.
+- Findings and surprises discovered while implementing go into the plan file
+  first, then into the issue (since the issue should reflect the plan).
+- When work completes, move the plan to `docs/history/`, remove it from
+  `plan/`, and append the implementation decisions or CI findings worth
+  keeping. Then close the issue.
+- Don't let a PR auto-close the issue (e.g. via "Closes #123" in the PR
+  body). Close the issue explicitly, as its own step.
