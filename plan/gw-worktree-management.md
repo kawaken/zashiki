@@ -1,124 +1,77 @@
-# `gw` による Git worktree 管理の検討計画
+# `gw` Worktree Status サイドパネル
 
-## 目的
+## 経緯
 
-複数のコーディングエージェントと複数のタスクを同じリポジトリで並行実行する
-ため、Git worktree の作成・確認・レビュー・cleanup を一貫して管理できる方法を
-検討する。
+当初は「`kawaken/gw`をGit worktree管理ツールとして採用するか」を検討する計画だった。実際に`gw guide`、`gw list [--json]`、`gw inspect <worktree> [--json]`、`gw refresh [--json]`、`gw clean --dry-run`を実行して動作確認した結果、`gw`はGit状態・GitHub PR状態（gh経由）・エージェントセッション状態（claude:active/ended/unknown）を突き合わせて`keep`/`review`/`recommended`のcleanup判定を返すツールとして十分機能しており、採用は確定方向。
 
-本計画では、既存の `kawaken/gw` を第一候補として評価する。`gw` が利用できない
-環境では、Git 標準の `git worktree` にフォールバックできる構成を前提とする。
+その後、この`gw`の情報をZashiki本体のUIに統合したいという要望が出た。「Markdownプレビューのように、左側のサイドパネルでworktree状態を確認したい。将来的にはVSCodeのように複数の情報パネルを切り替えられるものにしたいが、今回はそこまでやらない」という方針。
 
-この計画の対象は運用設計と適合性確認であり、計画書の追加時点では `gw` の導入、
-既存のエージェント設定変更、worktree構成の移行は行わない。
+そこで本プランは「gwの適合性検討」から「gw情報を表示するworktree状態サイドパネルの実装」へ切り替える。既存のMarkdown Preview機能（右側パネル、`SplitView`ベース）が唯一かつ最も近い実装前例であり、これをテンプレートとして左パネルを実装する。
 
-## 前提と原則
+## 実装内容
 
-- `1 task = 1 branch = 1 worktree` を維持する
-- `main` は読み取り専用とし、実装作業は専用worktreeで行う
-- ブランチは最新の `origin/main` を起点にする
-- 既に実行環境や別のツールが専用worktreeを作成している場合は、それを再利用し、
-  nested worktreeを作成しない
-- Worktree管理とエージェントの起動を分離する。`gw` が特定のエージェントに依存
-  しない限り、Codex、Claude、その他のエージェントから同じ管理機能を利用できる
-- `gw` がない環境でも、リポジトリの作業ルールが成立するようにする
+### 新規ファイル（`macos/Sources/Features/Worktree Status/`）
 
-## `gw` の適合性確認
+| ファイル | 役割 |
+|---|---|
+| `WorktreeStatusModel.swift` | ウィンドウ単位の状態を持つ`ObservableObject`。`isVisible`/`worktrees`/`isLoading`/`errorMessage`/`lastUpdatedAt`/`revision`。`open()`/`close()`/`toggle()`/`refresh(directory:)`。`MarkdownPreviewModel.swift`が雛形。 |
+| `GwSchema.swift` | `gw list --json`のCodable構造体群。列挙的な文字列フィールド（`cleanup.recommendation`, `agent.lifecycle`等）はSwift `enum`に直接デコードせず`String`として保持し、UI側でtolerantに`switch`＋`default`変換する（`gw`のマイナー更新で未知の値が増えてもデコード全体が失敗しないようにするため）。 |
+| `GwClient.swift` | `Process`起動・PATH解決・タイムアウト・stdout/stderr分離取得・デコードを担う層。`func fetchWorktrees(directory: URL) async throws -> GwListOutput`。 |
+| `WorktreeStatusSplit.swift` | `MarkdownPreviewSplit`の左パネル版（`SplitView(.horizontal, $split, left: WorktreeStatusPane, right: content)`）。 |
+| `WorktreeStatusPane.swift` | ヘッダー（タイトル・更新ボタン／スピナー・閉じるボタン）＋本体（loading/error/gw未検出/pwd未確定/空/一覧の各状態）。 |
+| `WorktreeStatusRowView.swift` | 1worktree分の行UI（branch or 短縮HEAD、cleanupバッジ、PRバッジ、agentライフサイクルアイコン、ahead/behind、lockアイコン）。 |
 
-### 1. Worktree作成
+### 変更ファイル
 
-以下を確認する。
+| ファイル | 変更内容 |
+|---|---|
+| `macos/Sources/Features/Terminal/BaseTerminalController.swift` | `let worktreeStatus = WorktreeStatusModel()`を`markdownPreview`と並べて追加。`toggleWorktreeStatus(_:)` IBActionを追加。 |
+| `macos/Sources/Features/Terminal/TerminalView.swift` | `TerminalViewModel`プロトコルに`var worktreeStatus: WorktreeStatusModel { get }`を追加。既存の`MarkdownPreviewSplit`をさらに`WorktreeStatusSplit`で外側からラップ。既存の`@FocusedValue(\.zashikiSurfacePwd)`を使い、`.onChange`でデバウンス付き再取得をトリガー。 |
+| `macos/Sources/App/macOS/MainMenu.xib` | Viewメニューに「Toggle Worktree Status」を追加、`toggleWorktreeStatus:`へ接続。 |
 
-- `origin/main` を最新化してからタスク用ブランチを作成できるか
-- ブランチ名をリポジトリのルールに従うフラットな名前にできるか
-- 作成先のパスを予測可能にできるか
-- primary checkoutから実行した場合に、作成後のworktreeパスを呼び出し元へ返せるか
-- 既存のタスク用worktreeから誤って別のworktreeを作成しないか
+## 主要な設計判断
 
-### 2. 既存Worktreeの検出
+1. **データ取得はSwift `Process`で直接`gw list --json`を呼ぶ**（Zig CLI経由は不採用）。Zig CLI経由にしても結局Swift側が`zashiki`バイナリを`Process`起動する必要があり、工程が増えるだけで解決する問題がない。Swiftで`Process`を使う前例はゼロだが、今回のような「GUIが外部コマンドの結果を能動的に取り込む」ユースケース自体が初めてなので新規開拓する。
+2. **更新トリガーは「パネル表示時」「手動更新ボタン」「フォーカス中サーフェスのpwd変化（デバウンス300〜500ms）」の3つのみ。自動ポーリングは行わない。** 実測で`gw list --json`は約5秒かかる（GitHub/agent情報取得が支配的）。常時ポーリングはコストが高すぎる。`MarkdownPreviewFileWatcher`がイベント駆動でポーリングを避けている既存方針とも揃える。
+3. **`gw`未インストール／非Git環境ではパネルを無効化せず、エラー状態を表示する。** `git worktree list`ベースの簡易フォールバックはV1では実装しない（cleanup判定・PR状態・agent状態という付加価値のほとんどが`gw`固有情報であり、フォールバックしても大きく劣化した表示にしかならないため）。PATH解決は`ProcessInfo.environment["PATH"]`→既知のインストール先（`/opt/homebrew/bin`, `/usr/local/bin`, `~/go/bin`, `~/.local/bin`）→`ZASHIKI_GW`環境変数の順に探索する。
+4. **表示対象リポジトリは`surfacePwd`から決定。** `gw`に`-C`相当のフラグは無く、`git`同様カレントディレクトリから親を辿って解決するため、`Process.currentDirectoryURL`に`surfacePwd`を渡すだけでよい。`surfacePwd`が`nil`の場合はホーム等へフォールバックせず、明示的な空状態を表示する。
+5. **将来のパネル切り替え基盤は作り込まない。** 今回はMarkdown Preview（右）とWorktree Status（左）が別サイドなので、同一スロットでの切り替えUIは不要。`isVisible`＋`open/close/toggle`という共通の形と、モデル/ビューの責務分離だけ守っておく（Rule of Three：2例目で無理に共通化しない）。
 
-- 現在のディレクトリがprimary checkoutか専用worktreeかを判定できるか
-- 既存worktree・ブランチ・lock状態を一覧表示できるか
-- 他のエージェントが使用中のworktreeを誤って選択しないか
-- detached HEADや実行環境が管理するworktreeを安全に扱えるか
+## エラーハンドリング
 
-### 3. Reviewとエージェント連携
+`GwClientError`として`.binaryNotFound` / `.processFailed(exitCode:, stderr:)` / `.timedOut`（15〜20秒閾値） / `.decodingFailed`を区別し、それぞれ異なるメッセージを表示する。取得失敗時も直前の`worktrees`一覧は消さず、`errorMessage`と`lastUpdatedAt`の古さだけ更新する（`MarkdownPreviewModel.errorMessage`と同じ設計）。
 
-`gw` にはworktree作成後やレビュー用worktree作成後のhookがあるため、以下を確認
-する。
+## 実装ステップ
 
-- `post-create` / `post-review` hookを、エージェント固有の処理と一般的な初期化処理に
-  分離できるか
-- Claude固有のレビュー起動処理が、Worktree管理本体の必須依存になっていないか
-- Codexや他のエージェントを使う場合に、作業ディレクトリを正しく引き渡せるか
-- Desktopアプリのように、作業ディレクトリの切り替えを呼び出し元が必要とする環境
-  で、責務の境界を明確にできるか
+1. `GwSchema.swift`：Codable構造体とtolerant変換。fixture（PR有無、detached、locked、agent情報欠落パターン）でデコード検証。
+2. `GwClient.swift`：PATH解決・`Process`起動・タイムアウト・エラー型。バイナリパスをDIできる初期化子でテスト可能にする。
+3. `WorktreeStatusModel.swift`：`GwClient`を呼ぶ状態管理。
+4. `WorktreeStatusPane.swift`/`WorktreeStatusRowView.swift`：各状態のUI。
+5. `WorktreeStatusSplit.swift`：左パネル版`SplitView`ラッパー。
+6. `BaseTerminalController.swift`・`TerminalView.swift`・`MainMenu.xib`の配線、`surfacePwd`デバウンス再取得。
+7. 実機でのPATH問題を確認し、必要ならフォールバック探索先を調整。
+8. Xcodeビルド・動作確認、Markdown Previewとの左右同時表示確認。
 
-### 4. Cleanup
+## 検証
 
-以下の安全条件を満たせるか確認する。
+- 実機ビルドで複数worktreeを持つ本リポジトリを開き、パネル表示内容が`gw list --json`の実行結果と一致することを確認。
+- detached HEAD、PRなし、agent情報欠落のworktreeがクラッシュせず適切な代替表示になることを確認。
+- `gw`をPATHから外した状態でエラー表示になり、メニュー項目自体は有効なままであることを確認。
+- 非Gitディレクトリにフォーカスした状態でエラーメッセージが表示されることを確認。
+- 更新ボタン押下中、約5秒のローディング表示でUIがフリーズしないことを確認。
+- Markdown Preview（右）とWorktree Status（左）同時表示でレイアウトが破綻しないことを確認。
+- 複数ペイン（別worktree）間のフォーカス切り替えでパネル内容が追従することを確認。
 
-- PRがマージ済み、または対象ブランチが明示的にcleanup対象である
-- 未コミット変更、未追跡ファイル、未push commitがない
-- worktreeがlock中でない
-- 現在実行中のタスクや他エージェントが使用していない
-- `main`や保護対象のworktreeを削除しない
-- dry-runまたは一覧確認を経てから削除できる
-- worktree削除後に不要なローカルブランチや参照を整理できる
+## 対象外（将来課題）
 
-## 想定する運用
+- パネル切り替えUI（VSCode的なアクティビティバー、同一スロットでの複数パネル排他表示）
+- `gw clean`のUI操作化（本パネルは読み取り専用）
+- `zashiki://worktree-status/...`のようなCLIトリガーの新設
+- `gw`未検出時の`git worktree list --porcelain`ベース簡易フォールバック
+- 自動ポーリング（低頻度タイマーによるambient更新）
+- `gw inspect`によるworktree詳細ドリルダウン
+- 設定ファイルでのパネル無効化・`gw`パス明示設定UI
 
-### 作業開始
+## 完了後
 
-1. `gw` が利用可能か確認する
-2. 利用可能なら `gw` の作成・一覧機能を使う
-3. 利用できない場合は、リポジトリで定義したGit標準手順へフォールバックする
-4. 作成されたworktreeをエージェントの作業ディレクトリとして使用する
-
-### 作業中
-
-- エージェントは現在のworktreeを確認し、既存の専用worktreeなら再作成しない
-- Worktreeの一覧・lock・変更状態は `gw` またはGit標準コマンドで確認する
-- 他のタスクのworktreeやブランチを変更しない
-
-### PRマージ後
-
-1. PRがマージ済みであることを確認する
-2. `gw` のdry-runまたは一覧機能でcleanup候補を確認する
-3. 未コミット変更・未push commit・lock・利用中状態を確認する
-4. 問題がなければworktreeと不要なローカルブランチを削除する
-5. Gitのworktree管理情報をpruneする
-
-cleanupは各実装エージェントに自動で任せず、primary checkoutから行うメンテナンス
-操作、または人間が明示的に実行する操作として扱う。
-
-## リポジトリ側の変更案
-
-適合性確認の結果、`gw`を採用する場合は次の変更を検討する。
-
-- `AGENTS.md` に「`gw` が利用可能ならWorktree管理に優先して使用する」と追記する
-- `gw` がない場合の `git worktree` フォールバック手順を `AGENTS.md` または専用の
-  開発ドキュメントに記載する
-- Agent固有のhookと、Worktree作成後に共通で必要な初期化処理を分離する
-- cleanupをprimary checkoutから実行できる例外を明文化する
-- 必要であれば、`gw` の利用状態を確認するdry-run用の補助コマンドを追加する
-
-`gw`の導入が難しい場合は、Worktrunkなど既存OSSを代替候補として比較する。ただし、
-外部ツールを必須依存にはせず、Git標準手順を常に利用可能なフォールバックとして残す。
-
-## 完了条件
-
-- `gw` の作成・既存Worktree検出・review連携・cleanupの各要件を確認できている
-- Worktree作成とエージェント起動の責務が分離されている
-- Codex、Claude、その他のエージェントで同じルールを適用できる
-- `gw` がない環境でも作業を開始できる
-- 未コミット変更や他エージェントの作業を破壊しないcleanup手順が確立している
-- 採用、部分採用、見送りのいずれかを判断できる
-
-## 未解決事項
-
-- `gw` が最新の `origin/main` を起点にする処理をどこまで保証するか
-- Desktopアプリへ新しいworktreeのパスを渡す方法
-- detached HEADやCodexが管理するworktreeをどのように識別するか
-- PRマージ状態の判定にGitHub CLIやAPIを必須とするか
-- `gw`のhookをリポジトリ設定として共有するか、利用者の環境設定として扱うか
+実装PRがmainへマージされたら、このプランを`plan/`から削除する。PATH解決やエラーハンドリングで実装時に判明した知見があれば`docs/history/`へ短い履歴を残す。
