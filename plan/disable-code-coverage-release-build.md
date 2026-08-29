@@ -31,21 +31,21 @@ Xcodeの設定はClang系とSwift系で分かれているため、片方だけ�
 
 これを設定ファイル上の通常ビルドの既定値にする。
 
-### 2. Zigからの通常ビルドにも明示する
+### 2. Zigからの通常ビルド経路を分離する
 
-`src/build/ZashikiXcodebuild.zig`の通常アプリビルド用`xcodebuild`呼び出しに、以下を
-ビルド設定として渡す。
+`src/build/ZashikiXcodebuild.zig`の通常アプリビルド用`xcodebuild`呼び出しは scheme
+ではなく`Zashiki` targetを直接指定し、以下をビルド設定として渡す。
 
 - `CLANG_ENABLE_CODE_COVERAGE=NO`
 - `SWIFT_ENABLE_CODE_COVERAGE=NO`
 
-XcodeスキームやXcodeのバージョンによる解決差があっても、`zig build`の通常ビルドが
-計測付きにならないようにする。`xcodebuild test`側の設定は今回変更しない。
+scheme経由では上記設定を`NO`にしてもリンク時に計測フラグが残るため、通常ビルドと
+profiling/test操作の経路を分離する。`xcodebuild test`側の設定は今回変更しない。
 
 ### 3. profiling用途は対象外にする
 
-`ProfileAction`自体は削除しない。Xcodeから明示的にプロファイリングを実行する
-用途を残し、今回の変更対象は通常のアプリビルドに限定する。
+`ProfileAction`と`buildForProfiling`は変更しない。Xcodeから明示的にプロファイリングを
+実行する用途を残し、今回の変更対象は通常のアプリビルドに限定する。
 
 ## 検証
 

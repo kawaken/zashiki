@@ -108,7 +108,10 @@ pub fn init(
             // instead of relying on xcodebuild's directory inference.
             "-project",
             "Zashiki.xcodeproj",
-            "-scheme",
+            // Build the app target directly. The shared scheme's profiling
+            // action can add LLVM instrumentation even when coverage is
+            // disabled in the ReleaseLocal build settings.
+            "-target",
             "Zashiki",
             "-configuration",
             xc_config,
@@ -136,6 +139,10 @@ pub fn init(
             // implicit module build, which doesn't have this bug.
             // See https://forums.swift.org/t/xcode-26-unable-to-find-module-dependency/80516
             "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
+            // Keep the normal app build free of coverage instrumentation so
+            // it does not emit default.profraw.
+            "CLANG_ENABLE_CODE_COVERAGE=NO",
+            "SWIFT_ENABLE_CODE_COVERAGE=NO",
         });
 
         // We need the xcframework
