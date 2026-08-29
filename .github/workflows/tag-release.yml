@@ -74,7 +74,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh workflow run release.yml --ref "${{ github.ref_name }}" -f version="$TAG"
+          gh workflow run release.yml --ref "$TAG" -f version="$TAG"
 
           echo "### Tagged \`$TAG\`" >> "$GITHUB_STEP_SUMMARY"
           echo "Releaseワークフローをトリガーしました: https://github.com/${{ github.repository }}/actions/workflows/release.yml" >> "$GITHUB_STEP_SUMMARY"

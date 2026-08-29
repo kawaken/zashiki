@@ -72,6 +72,22 @@ checkout対象が`main`のままになっている。そのため、入力値は
 - universal binaryをRC配布物の必須要件にすること
 - 既存の`v0.2.0-rc.3`タグの上書き
 
+## 進捗・判明した事実
+
+- 実装内容1（Xcodeのビルドアーキテクチャ明示）はPR #66で対応済み。
+  `ARCHS=`ではなく、`xc_arch`指定時（native）に`ONLY_ACTIVE_ARCH=YES`を
+  build/testの両ステップへ追加する方式で解決した。Release
+  configurationは元々`ONLY_ACTIVE_ARCH=NO`のため、`-destination`で
+  archを絞っても両アーキをリンクしにいってしまうのが原因だった。
+- 実装内容2（Release workflowのcheckout対象）は未対応のまま残っていた。
+  原因は`.github/workflows/tag-release.yml`の`gh workflow run release.yml
+  --ref "${{ github.ref_name }}"`。`github.ref_name`はtag-release.yml自身の
+  起動元ref（=main）であり、新規に打ったタグではない。そのため
+  release.yml側の`actions/checkout`は常にmainをcheckoutし、
+  `git describe --exact-match --tags`がタグを検出できず
+  `MARKETING_VERSION`にコミット短縮ハッシュが入っていた。
+  `--ref "$TAG"`に修正した。
+
 ## 完了後
 
 実装とRC検証が完了したら、このプランを削除する。実装上の判断やCIで得た知見に
