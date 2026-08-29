@@ -4,16 +4,15 @@
   <img src="macos/Assets.xcassets/AppIcon.appiconset/icon_256x256@2x.png" alt="Zashiki icon" width="128">
 </p>
 
-[@kawaken](https://github.com/kawaken)'s macOS-only fork of
-[Ghostty](https://github.com/ghostty-org/ghostty).
+[@kawaken](https://github.com/kawaken)による、macOS専用の
+[Ghostty](https://github.com/ghostty-org/ghostty)フォークです。
 
-## Features
+## 特徴的な機能
 
-- Japanese IME support with thicker underlines for the currently converted ATOK preedit clause,
-  and surrounding-text context (via `NSTextInputClient`) so IMEs like ATOK can use the text
-  already typed on the current line for more accurate conversion.
-- Native SwiftUI Markdown preview (`Cmd+Shift+M`) with live file updates.
-  Markdown files can also be opened from the CLI with
-  `zashiki +markdown-preview <file>`, targeting the originating terminal window.
+- **日本語IME対応** — ATOKなどのpreeditで、変換中の文節を太い下線で表示します。また
+  `NSTextInputClient`経由で現在の行に入力済みの周辺文字列をIMEに渡すことで、
+  ATOKなどの変換精度を改善します。
+- **Markdownプレビュー** — `Cmd+Shift+M`でSwiftUIネイティブのプレビューを開き、
+  ファイル変更をライブ反映します。
 
-See [README.ja.md](README.ja.md) for the Japanese version.
+リリースごとの変更点は[CHANGELOG.md](CHANGELOG.md)を参照してください。
