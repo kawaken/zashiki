@@ -108,10 +108,7 @@ pub fn init(
             // instead of relying on xcodebuild's directory inference.
             "-project",
             "Zashiki.xcodeproj",
-            // Build the app target directly. The shared scheme's profiling
-            // action can add LLVM instrumentation even when coverage is
-            // disabled in the ReleaseLocal build settings.
-            "-target",
+            "-scheme",
             "Zashiki",
             "-configuration",
             xc_config,
@@ -141,6 +138,7 @@ pub fn init(
             "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
             // Keep the normal app build free of coverage instrumentation so
             // it does not emit default.profraw.
+            "ENABLE_CODE_COVERAGE=NO",
             "CLANG_ENABLE_CODE_COVERAGE=NO",
             "SWIFT_ENABLE_CODE_COVERAGE=NO",
         });

@@ -11,8 +11,8 @@ profiling対象として指定されており、`ReleaseLocal`を使うビルド
 `-fprofile-instr-generate`が追加されていることを確認した。このフラグがLLVMの
 プロファイルランタイムをリンクし、実行終了時に既定名の`default.profraw`を生成する。
 
-Xcodeの設定はClang系とSwift系で分かれているため、片方だけを無効化すると計測が
-残る可能性がある。
+Xcodeには共通のコードカバレッジ設定とClang系・Swift系の設定があるため、共通設定
+だけ、または言語別設定だけを無効化すると計測が残る可能性がある。
 
 ## 目的
 
@@ -28,19 +28,22 @@ Xcodeの設定はClang系とSwift系で分かれているため、片方だけ�
 
 - `CLANG_ENABLE_CODE_COVERAGE = NO`
 - `SWIFT_ENABLE_CODE_COVERAGE = NO`
+- `ENABLE_CODE_COVERAGE = NO`
 
 これを設定ファイル上の通常ビルドの既定値にする。
 
-### 2. Zigからの通常ビルド経路を分離する
+### 2. Zigからの通常ビルドにも明示する
 
-`src/build/ZashikiXcodebuild.zig`の通常アプリビルド用`xcodebuild`呼び出しは scheme
-ではなく`Zashiki` targetを直接指定し、以下をビルド設定として渡す。
+`src/build/ZashikiXcodebuild.zig`の通常アプリビルド用`xcodebuild`呼び出しに、以下を
+ビルド設定として渡す。
 
+- `ENABLE_CODE_COVERAGE=NO`
 - `CLANG_ENABLE_CODE_COVERAGE=NO`
 - `SWIFT_ENABLE_CODE_COVERAGE=NO`
 
-scheme経由では上記設定を`NO`にしてもリンク時に計測フラグが残るため、通常ビルドと
-profiling/test操作の経路を分離する。`xcodebuild test`側の設定は今回変更しない。
+通常ビルドのアーキテクチャ指定を維持したまま、schemeやXcodeのバージョンによる
+設定解決差があっても`zig build`の通常ビルドが計測付きにならないようにする。
+`xcodebuild test`側の設定は今回変更しない。
 
 ### 3. profiling用途は対象外にする
 
