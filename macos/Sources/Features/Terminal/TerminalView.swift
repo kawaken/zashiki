@@ -38,6 +38,9 @@ protocol TerminalViewModel: ObservableObject {
 
     /// The state for this window's Markdown preview pane.
     var markdownPreview: MarkdownPreviewModel { get }
+
+    /// The state for this window's Worktree Status pane.
+    var worktreeStatus: WorktreeStatusModel { get }
 }
 
 /// The main terminal view. This terminal view supports splits.
@@ -52,6 +55,11 @@ struct TerminalView<ViewModel: TerminalViewModel>: View {
 
     /// The most recently focused surface, equal to `focusedSurface` when it is non-nil.
     @State private var lastFocusedSurface: Weak<Zashiki.SurfaceView>?
+
+    /// Debounces Worktree Status refreshes triggered by `pwdURL` changing,
+    /// so rapid focus changes across surfaces don't fire a `gw list` per
+    /// hop.
+    @State private var worktreeStatusRefreshTask: Task<Void, Never>?
 
     // This seems like a crutch after switching from SwiftUI to AppKit lifecycle.
     @FocusState private var focused: Bool
@@ -74,56 +82,66 @@ struct TerminalView<ViewModel: TerminalViewModel>: View {
         case .error:
             ErrorView()
         case .ready:
-            MarkdownPreviewSplit(ghostty: ghostty, model: viewModel.markdownPreview) {
-                ZStack {
-                    VStack(spacing: 0) {
-                        // If we're running in debug mode we show a warning so that users
-                        // know that performance will be degraded.
-                        if Zashiki.info.mode == GHOSTTY_BUILD_MODE_DEBUG || Zashiki.info.mode == GHOSTTY_BUILD_MODE_RELEASE_SAFE {
-                            DebugBuildWarningView()
-                        }
+            WorktreeStatusSplit(ghostty: ghostty, model: viewModel.worktreeStatus, directory: pwdURL) {
+                MarkdownPreviewSplit(ghostty: ghostty, model: viewModel.markdownPreview) {
+                    ZStack {
+                        VStack(spacing: 0) {
+                            // If we're running in debug mode we show a warning so that users
+                            // know that performance will be degraded.
+                            if Zashiki.info.mode == GHOSTTY_BUILD_MODE_DEBUG || Zashiki.info.mode == GHOSTTY_BUILD_MODE_RELEASE_SAFE {
+                                DebugBuildWarningView()
+                            }
 
-                        TerminalSplitTreeView(
-                            tree: viewModel.surfaceTree,
-                            action: { delegate?.performSplitAction($0) })
-                            .environmentObject(ghostty)
-                            .zashikiLastFocusedSurface(lastFocusedSurface)
-                            .focused($focused)
-                            .onAppear { self.focused = true }
-                            .onChange(of: focusedSurface) { newValue in
-                                // We want to keep track of our last focused surface so even if
-                                // we lose focus we keep this set to the last non-nil value.
-                                if newValue != nil {
-                                    lastFocusedSurface = .init(newValue)
-                                    self.delegate?.focusedSurfaceDidChange(to: newValue)
+                            TerminalSplitTreeView(
+                                tree: viewModel.surfaceTree,
+                                action: { delegate?.performSplitAction($0) })
+                                .environmentObject(ghostty)
+                                .zashikiLastFocusedSurface(lastFocusedSurface)
+                                .focused($focused)
+                                .onAppear { self.focused = true }
+                                .onChange(of: focusedSurface) { newValue in
+                                    // We want to keep track of our last focused surface so even if
+                                    // we lose focus we keep this set to the last non-nil value.
+                                    if newValue != nil {
+                                        lastFocusedSurface = .init(newValue)
+                                        self.delegate?.focusedSurfaceDidChange(to: newValue)
+                                    }
                                 }
-                            }
-                            .onChange(of: pwdURL) { newValue in
-                                self.delegate?.pwdDidChange(to: newValue)
-                            }
-                            .onChange(of: cellSize) { newValue in
-                                guard let size = newValue else { return }
-                                self.delegate?.cellSizeDidChange(to: size)
-                            }
-                            .frame(idealWidth: lastFocusedSurface?.value?.initialSize?.width,
-                                   idealHeight: lastFocusedSurface?.value?.initialSize?.height)
-                    }
-                    // Ignore safe area to extend up in to the titlebar region if we have the "hidden" titlebar style
-                    .ignoresSafeArea(.container, edges: ghostty.config.macosTitlebarStyle == .hidden ? .top : [])
+                                .onChange(of: pwdURL) { newValue in
+                                    self.delegate?.pwdDidChange(to: newValue)
 
-                    if let surfaceView = lastFocusedSurface?.value {
-                        TerminalCommandPaletteView(
-                            surfaceView: surfaceView,
-                            isPresented: $viewModel.commandPaletteIsShowing,
-                            zashikiConfig: ghostty.config,
-                            updateViewModel: (NSApp.delegate as? AppDelegate)?.updateViewModel) { action in
-                            self.delegate?.performAction(action, on: surfaceView)
+                                    worktreeStatusRefreshTask?.cancel()
+                                    guard viewModel.worktreeStatus.isVisible, let newValue else { return }
+                                    worktreeStatusRefreshTask = Task {
+                                        try? await Task.sleep(nanoseconds: 400_000_000)
+                                        guard !Task.isCancelled else { return }
+                                        viewModel.worktreeStatus.refresh(directory: newValue)
+                                    }
+                                }
+                                .onChange(of: cellSize) { newValue in
+                                    guard let size = newValue else { return }
+                                    self.delegate?.cellSizeDidChange(to: size)
+                                }
+                                .frame(idealWidth: lastFocusedSurface?.value?.initialSize?.width,
+                                       idealHeight: lastFocusedSurface?.value?.initialSize?.height)
                         }
-                    }
+                        // Ignore safe area to extend up in to the titlebar region if we have the "hidden" titlebar style
+                        .ignoresSafeArea(.container, edges: ghostty.config.macosTitlebarStyle == .hidden ? .top : [])
 
-                    // Show update information above all else.
-                    if viewModel.updateOverlayIsVisible {
-                        UpdateOverlay()
+                        if let surfaceView = lastFocusedSurface?.value {
+                            TerminalCommandPaletteView(
+                                surfaceView: surfaceView,
+                                isPresented: $viewModel.commandPaletteIsShowing,
+                                zashikiConfig: ghostty.config,
+                                updateViewModel: (NSApp.delegate as? AppDelegate)?.updateViewModel) { action in
+                                self.delegate?.performAction(action, on: surfaceView)
+                            }
+                        }
+
+                        // Show update information above all else.
+                        if viewModel.updateOverlayIsVisible {
+                            UpdateOverlay()
+                        }
                     }
                 }
             }

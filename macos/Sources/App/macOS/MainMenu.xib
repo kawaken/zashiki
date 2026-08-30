@@ -344,6 +344,12 @@
                                     <action selector="toggleMarkdownPreview:" target="-1" id="mVw-3D-hE2"/>
                                 </connections>
                             </menuItem>
+                            <menuItem title="Toggle Worktree Status" id="gW5-St-Tus">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <connections>
+                                    <action selector="toggleWorktreeStatus:" target="-1" id="gW5-St-Act"/>
+                                </connections>
+                            </menuItem>
                             <menuItem title="Change Tab Title..." id="iac-lh-Cl7">
                                 <modifierMask key="keyEquivalentModifierMask"/>
                                 <connections>

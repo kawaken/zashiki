@@ -54,6 +54,9 @@ class BaseTerminalController: NSWindowController,
     /// The state for this window's Markdown preview pane.
     let markdownPreview = MarkdownPreviewModel()
 
+    /// The state for this window's Worktree Status pane.
+    let worktreeStatus = WorktreeStatusModel()
+
     /// True when any surface in this controller currently has an active bell.
     @Published private(set) var bell: Bool = false
 
@@ -1454,6 +1457,19 @@ class BaseTerminalController: NSWindowController,
     @IBAction func toggleMarkdownPreview(_ sender: Any?) {
         markdownPreview.toggle()
         if !markdownPreview.isVisible, let focusedSurface {
+            // Hiding the pane can leave focus in a weird spot (the pane's
+            // own controls, if it had any). Send focus back to the terminal.
+            Zashiki.moveFocus(to: focusedSurface)
+        }
+    }
+
+    @IBAction func toggleWorktreeStatus(_ sender: Any?) {
+        worktreeStatus.toggle()
+        if worktreeStatus.isVisible {
+            if let pwd = focusedSurface?.pwd, !pwd.isEmpty {
+                worktreeStatus.refresh(directory: URL(fileURLWithPath: pwd))
+            }
+        } else if let focusedSurface {
             // Hiding the pane can leave focus in a weird spot (the pane's
             // own controls, if it had any). Send focus back to the terminal.
             Zashiki.moveFocus(to: focusedSurface)
