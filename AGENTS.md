@@ -14,6 +14,17 @@ ongoing product rather than a one-off patch set:
 
 ## Commands
 
+- **Development task runner:** `just`
+  - Run `just` or `just help` to list the available development tasks.
+  - `just build`, `just build-core`, and `just run` cover the common build
+    workflows.
+  - `just test-fast` is the PR-sized check; use `just test` for the full suite
+    including macOS XCTest. Use `just test-filter "<test name>"` for a focused
+    Zig test run.
+  - `just lint`, `just format`, and `just ci` cover formatting and CI checks.
+  - Install `just` with Homebrew (`brew install just`). Set `DEVELOPER_DIR`
+    when a task must use a particular Xcode; tasks do not change the system-wide
+    `xcode-select` setting.
 - **Build:** `zig build`
   - If you're on macOS and don't need to build the macOS app, use
     `-Demit-macos-app=false` to skip building the app bundle and speed up
@@ -22,7 +33,7 @@ ongoing product rather than a one-off patch set:
   - Prefer to run targeted tests with `-Dtest-filter` because the full
     test suite is slow to run.
 - **Test filter (Zig)**: `zig build test -Dtest-filter=<test name>`
-- **Formatting (Zig)**: `zig fmt .`
+- **Formatting (Zig)**: `git ls-files -z '*.zig' | xargs -0 zig fmt`
 - **Formatting (Swift)**: `swiftlint lint --strict --fix`
 - **Formatting (other)**: `prettier -w .`
 - These three run automatically on staged files via a pre-commit hook

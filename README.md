@@ -16,3 +16,25 @@
   ファイル変更をライブ反映します。
 
 リリースごとの変更点は[CHANGELOG.md](CHANGELOG.md)を参照してください。
+
+## 開発
+
+開発用のビルド・テスト・Lint・整形コマンドは、リポジトリ直下の
+`justfile` にまとめています。macOS では Homebrew で `just` を導入してから、
+`just` または `just help` で利用可能なタスクを確認してください。
+
+```sh
+brew install just
+just build
+just test-fast
+just lint
+```
+
+`just test-fast` は PR 向けのテストと Swift コンパイル、`just test` は macOS
+XCTest を含むフルテストを実行します。特定の Zig テストだけを実行する場合は
+`just test-filter "テスト名"` を使ってください。Xcode を切り替える場合は、
+システム設定を変更せず `DEVELOPER_DIR` を指定できます。
+
+```sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer just test-fast
+```
