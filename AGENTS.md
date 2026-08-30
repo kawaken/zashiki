@@ -96,8 +96,12 @@ file directly whenever the plan changes.
   to both other agents and the human.
 - Findings and surprises discovered while implementing go into the plan file
   first, then into the issue (since the issue should reflect the plan).
-- When work completes: move the plan to `docs/history/`, remove it from
+- When work completes, move the plan to `docs/history/`, remove it from
   `plan/`, and append the implementation decisions or CI findings worth
-  keeping. Then remove the `wip` label and close the issue.
+  keeping. Then remove the `wip` label.
+- Don't close the issue yourself unless it's a documentation-only change
+  with nothing to verify. Anything with behavior to verify (code, CI,
+  workflow changes) gets the `needs-verification` label instead — leave the
+  close itself to the human, whether they close it directly or tell you to.
 - Don't let a PR auto-close the issue (e.g. via "Closes #123" in the PR
   body). Close the issue explicitly, as its own step.
