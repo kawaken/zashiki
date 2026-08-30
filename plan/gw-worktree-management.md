@@ -8,6 +8,16 @@
 
 そこで本プランは「gwの適合性検討」から「gw情報を表示するworktree状態サイドパネルの実装」へ切り替える。既存のMarkdown Preview機能（右側パネル、`SplitView`ベース）が唯一かつ最も近い実装前例であり、これをテンプレートとして左パネルを実装する。
 
+### 2026-08-31 追記：実装着手前の再確認
+
+Issue化後に`gw`本体が更新されており、`gw list --json`/`gw clean --dry-run --json`のスキーマが当初の想定から変わっていた（`schema_version`フィールドの追加、`github`直下だった`pr`情報が`github.pr`のネスト構造に変更、`agent.provider`（`claude`/`codex`の区別）の追加）。「tolerantに文字列としてデコードする」という設計方針自体は変わらないが、構造体のネスト構成は現物に合わせて更新する（詳細は「`GwSchema.swift`」の項）。
+
+また、追加の要望が来たためスコープを次の3点変更する。
+
+1. **`gw clean`をUIから呼べるボタンを追加する**（当初「対象外」としていたが要望により追加）。個別worktreeの選択削除までは対応せず、`gw clean`（recommended判定のもの一括）をボタン一つで実行できれば十分とする。破壊的操作のため確認ダイアログを挟む。
+2. **PR番号は`#123`形式のテキスト＋GitHub URLへのリンクとして表示する。**
+3. **各行の状態表現は極力アイコンベースにする**（agentのprovider/lifecycle、git clean/dirty、cleanupの推奨度をSF Symbolsで視覚化し、branch名以外はテキストに頼りすぎない）。
+
 ## 実装内容
 
 ### 新規ファイル（`macos/Sources/Features/Worktree Status/`）
@@ -15,11 +25,11 @@
 | ファイル | 役割 |
 |---|---|
 | `WorktreeStatusModel.swift` | ウィンドウ単位の状態を持つ`ObservableObject`。`isVisible`/`worktrees`/`isLoading`/`errorMessage`/`lastUpdatedAt`/`revision`。`open()`/`close()`/`toggle()`/`refresh(directory:)`。`MarkdownPreviewModel.swift`が雛形。 |
-| `GwSchema.swift` | `gw list --json`のCodable構造体群。列挙的な文字列フィールド（`cleanup.recommendation`, `agent.lifecycle`等）はSwift `enum`に直接デコードせず`String`として保持し、UI側でtolerantに`switch`＋`default`変換する（`gw`のマイナー更新で未知の値が増えてもデコード全体が失敗しないようにするため）。 |
-| `GwClient.swift` | `Process`起動・PATH解決・タイムアウト・stdout/stderr分離取得・デコードを担う層。`func fetchWorktrees(directory: URL) async throws -> GwListOutput`。 |
+| `GwSchema.swift` | `gw list --json`/`gw clean --json`のCodable構造体群。トップレベルに`schema_version`（`Int`。想定外の値でも読み捨てて処理は継続し、UIに警告は出さない）。`worktree.github.pr`は`GwPullRequest?`のネスト構造体（`number: Int`, `title: String`, `state: String`, `merged_at: String?`, `url: String`, `head_branch: String`）として持ち、`worktree.github.status`（`available`等）と分ける。`worktree.agent.provider`（`claude`/`codex`/欠落＝Optional）を追加。列挙的な文字列フィールド（`cleanup.recommendation`, `agent.lifecycle`, `agent.activity`, `github.status`, `agent.provider`等）はSwift `enum`に直接デコードせず`String`として保持し、UI側でtolerantに`switch`＋`default`変換する（`gw`のマイナー更新で未知の値が増えてもデコード全体が失敗しないようにするため）。 |
+| `GwClient.swift` | `Process`起動・PATH解決・タイムアウト・stdout/stderr分離取得・デコードを担う層。`func fetchWorktrees(directory: URL) async throws -> GwListOutput`、`func clean(directory: URL) async throws -> GwCleanOutput`（`gw clean --json`。dry-runは使わずUI側で確認ダイアログを出してから直接実行する）。 |
 | `WorktreeStatusSplit.swift` | `MarkdownPreviewSplit`の左パネル版（`SplitView(.horizontal, $split, left: WorktreeStatusPane, right: content)`）。 |
-| `WorktreeStatusPane.swift` | ヘッダー（タイトル・更新ボタン／スピナー・閉じるボタン）＋本体（loading/error/gw未検出/pwd未確定/空/一覧の各状態）。 |
-| `WorktreeStatusRowView.swift` | 1worktree分の行UI（branch or 短縮HEAD、cleanupバッジ、PRバッジ、agentライフサイクルアイコン、ahead/behind、lockアイコン）。 |
+| `WorktreeStatusPane.swift` | ヘッダー（タイトル・更新ボタン／スピナー・`gw clean`ボタン・閉じるボタン）＋本体（loading/error/gw未検出/pwd未確定/空/一覧の各状態）。`gw clean`ボタンは`cleanup.recommendation == "recommended"`が1件も無い場合は無効化。押下で確認ダイアログ（対象branch・PR番号の一覧を表示）→実行→完了後`refresh()`。 |
+| `WorktreeStatusRowView.swift` | 1worktree分の行UI。branch名（またはdetached時は短縮HEAD）はテキスト表示、それ以外は極力SF Symbolsアイコン化する：git clean/dirtyの丸アイコン、agent providerのアイコン＋lifecycle（active/ended/unknown）を色で表現、cleanupの推奨度アイコン（recommended/review/keep）、ahead/behindの矢印＋数字、lockアイコン。PRは`#<number>`のテキストリンク（`state`で色分け、クリックで`url`を開く）として表示。 |
 
 ### 変更ファイル
 
@@ -39,14 +49,22 @@
 
 ## エラーハンドリング
 
-`GwClientError`として`.binaryNotFound` / `.processFailed(exitCode:, stderr:)` / `.timedOut`（15〜20秒閾値） / `.decodingFailed`を区別し、それぞれ異なるメッセージを表示する。取得失敗時も直前の`worktrees`一覧は消さず、`errorMessage`と`lastUpdatedAt`の古さだけ更新する（`MarkdownPreviewModel.errorMessage`と同じ設計）。
+`GwClientError`として`.binaryNotFound` / `.processFailed(exitCode:, stderr:)` / `.timedOut`（15〜20秒閾値） / `.decodingFailed`を区別し、それぞれ異なるメッセージを表示する。取得失敗時も直前の`worktrees`一覧は消さず、`errorMessage`と`lastUpdatedAt`の古さだけ更新する（`MarkdownPreviewModel.errorMessage`と同じ設計）。`clean()`の失敗も同様に`errorMessage`へ反映し、`worktrees`は変更しない（部分的に削除が成功していた場合は直後の`refresh()`で実態に追従させる）。
+
+## `gw clean`ボタンの挙動
+
+1. ヘッダーの`gw clean`ボタンは`cleanup.recommendation == "recommended"`のworktreeが0件のとき非活性。
+2. 押下時、対象worktree（branch名・PR番号があれば`#123`）の一覧を確認ダイアログ（`NSAlert`）に列挙し、実行/キャンセルを選ばせる。
+3. 実行を選ぶと`GwClient.clean(directory:)`（`gw clean --json`、dry-runなしの実削除）を呼ぶ。ボタンはローディング状態にしてボタン自体を無効化（二重実行防止）。
+4. 成功・失敗いずれも完了後に`refresh()`し、`worktrees`を最新化する。失敗時は`errorMessage`にstderrの要約を表示する。
+5. `--dry-run`はUIからは呼ばない（確認ダイアログ自体がdry-runの代替）。
 
 ## 実装ステップ
 
-1. `GwSchema.swift`：Codable構造体とtolerant変換。fixture（PR有無、detached、locked、agent情報欠落パターン）でデコード検証。
-2. `GwClient.swift`：PATH解決・`Process`起動・タイムアウト・エラー型。バイナリパスをDIできる初期化子でテスト可能にする。
-3. `WorktreeStatusModel.swift`：`GwClient`を呼ぶ状態管理。
-4. `WorktreeStatusPane.swift`/`WorktreeStatusRowView.swift`：各状態のUI。
+1. `GwSchema.swift`：Codable構造体とtolerant変換。fixture（PR有無、detached、locked、agent情報欠落、`provider`欠落パターン）でデコード検証。
+2. `GwClient.swift`：PATH解決・`Process`起動・タイムアウト・エラー型・`fetchWorktrees`/`clean`。バイナリパスをDIできる初期化子でテスト可能にする。
+3. `WorktreeStatusModel.swift`：`GwClient`を呼ぶ状態管理（`refresh`/`clean`）。
+4. `WorktreeStatusPane.swift`/`WorktreeStatusRowView.swift`：各状態のUI、アイコン表現、PRリンク、`gw clean`ボタンと確認ダイアログ。
 5. `WorktreeStatusSplit.swift`：左パネル版`SplitView`ラッパー。
 6. `BaseTerminalController.swift`・`TerminalView.swift`・`MainMenu.xib`の配線、`surfacePwd`デバウンス再取得。
 7. 実機でのPATH問題を確認し、必要ならフォールバック探索先を調整。
@@ -55,17 +73,20 @@
 ## 検証
 
 - 実機ビルドで複数worktreeを持つ本リポジトリを開き、パネル表示内容が`gw list --json`の実行結果と一致することを確認。
-- detached HEAD、PRなし、agent情報欠落のworktreeがクラッシュせず適切な代替表示になることを確認。
+- detached HEAD、PRなし、agent情報欠落（`provider`欠落含む）のworktreeがクラッシュせず適切な代替表示になることを確認。
 - `gw`をPATHから外した状態でエラー表示になり、メニュー項目自体は有効なままであることを確認。
 - 非Gitディレクトリにフォーカスした状態でエラーメッセージが表示されることを確認。
 - 更新ボタン押下中、約5秒のローディング表示でUIがフリーズしないことを確認。
+- PRバッジをクリックしてデフォルトブラウザでPRページが開くことを確認。
+- recommended対象がない状態で`gw clean`ボタンが非活性になることを確認。
+- recommended対象がある状態で`gw clean`実行→確認ダイアログ→実行後に一覧が更新され、削除されたworktreeが消えることを確認。
 - Markdown Preview（右）とWorktree Status（左）同時表示でレイアウトが破綻しないことを確認。
 - 複数ペイン（別worktree）間のフォーカス切り替えでパネル内容が追従することを確認。
 
 ## 対象外（将来課題）
 
 - パネル切り替えUI（VSCode的なアクティビティバー、同一スロットでの複数パネル排他表示）
-- `gw clean`のUI操作化（本パネルは読み取り専用）
+- 個別worktreeを選択しての部分削除（`gw clean`は一括実行のみ対応）
 - `zashiki://worktree-status/...`のようなCLIトリガーの新設
 - `gw`未検出時の`git worktree list --porcelain`ベース簡易フォールバック
 - 自動ポーリング（低頻度タイマーによるambient更新）
