@@ -68,6 +68,10 @@ class DockTilePlugin: NSObject, NSDockTilePlugIn {
 
 private extension NSDockTile {
     func setIcon(_ newIcon: NSImage?) {
+        // `newIcon` isn't `Sendable`, but the caller doesn't touch it again
+        // after this call, so it's safe to hand off to the main thread.
+        nonisolated(unsafe) let newIcon = newIcon
+
         // Update the Dock tile on the main thread.
         DispatchQueue.main.async {
             guard let newIcon else {
