@@ -9,10 +9,9 @@ struct ColorizedZashikiIconTests {
             NSColor(hex: "#112233")!,
             NSColor(hex: "#AABBCC")!,
         ],
-        ghostColor: NSColor = NSColor(hex: "#445566")!,
         frame: Zashiki.MacOSIconFrame = .aluminum
     ) -> ColorizedZashikiIcon {
-        .init(screenColors: screenColors, ghostColor: ghostColor, frame: frame)
+        .init(screenColors: screenColors, frame: frame)
     }
 
     // MARK: - Codable
@@ -24,7 +23,6 @@ struct ColorizedZashikiIconTests {
 
         #expect(decoded == icon)
         #expect(decoded.screenColors.compactMap(\.hexString) == ["#112233", "#AABBCC"])
-        #expect(decoded.ghostColor.hexString == "#445566")
         #expect(decoded.frame == .chrome)
     }
 
@@ -35,7 +33,7 @@ struct ColorizedZashikiIconTests {
         let payload = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
         #expect(payload["version"] as? Int == 1)
         #expect(payload["screenColors"] as? [String] == ["#112233", "#AABBCC"])
-        #expect(payload["ghostColor"] as? String == "#445566")
+        #expect(payload["ghostColor"] == nil)
         #expect(payload["frame"] as? String == "plastic")
     }
 
@@ -50,7 +48,6 @@ struct ColorizedZashikiIconTests {
 
         let decoded = try JSONDecoder().decode(ColorizedZashikiIcon.self, from: data)
         #expect(decoded.screenColors.compactMap(\.hexString) == ["#112233", "#AABBCC"])
-        #expect(decoded.ghostColor.hexString == "#445566")
         #expect(decoded.frame == .beige)
     }
 
@@ -74,7 +71,7 @@ struct ColorizedZashikiIconTests {
         }
     }
 
-    @Test func decodingInvalidGhostColorThrows() {
+    @Test func decodingLegacyPayloadIgnoresInvalidGhostColor() throws {
         let data = Data("""
         {
             "version": 1,
@@ -84,14 +81,8 @@ struct ColorizedZashikiIconTests {
         }
         """.utf8)
 
-        do {
-            _ = try JSONDecoder().decode(ColorizedZashikiIcon.self, from: data)
-            Issue.record("Expected decode to fail for invalid ghost color")
-        } catch let DecodingError.dataCorrupted(context) {
-            #expect(context.debugDescription.contains("Failed to decode ghost color"))
-        } catch {
-            Issue.record("Expected DecodingError.dataCorrupted, got: \(error)")
-        }
+        let decoded = try JSONDecoder().decode(ColorizedZashikiIcon.self, from: data)
+        #expect(decoded.frame == .chrome)
     }
 
     @Test func decodingInvalidScreenColorsDropsInvalidEntries() throws {
@@ -99,7 +90,6 @@ struct ColorizedZashikiIconTests {
         {
             "version": 1,
             "screenColors": ["#112233", "invalid", "#AABBCC"],
-            "ghostColor": "#445566",
             "frame": "chrome"
         }
         """.utf8)
@@ -116,7 +106,6 @@ struct ColorizedZashikiIconTests {
                 NSColor(red: 0x11 / 255.0, green: 0x22 / 255.0, blue: 0x33 / 255.0, alpha: 1.0),
                 NSColor(red: 0xAA / 255.0, green: 0xBB / 255.0, blue: 0xCC / 255.0, alpha: 1.0),
             ],
-            ghostColor: NSColor(red: 0x44 / 255.0, green: 0x55 / 255.0, blue: 0x66 / 255.0, alpha: 1.0),
             frame: .chrome
         )
         let rhs = makeIcon(frame: .chrome)
@@ -136,9 +125,4 @@ struct ColorizedZashikiIconTests {
         #expect(lhs != rhs)
     }
 
-    @Test func equatableReturnsFalseForDifferentGhostColor() {
-        let lhs = makeIcon(ghostColor: NSColor(hex: "#445566")!)
-        let rhs = makeIcon(ghostColor: NSColor(hex: "#665544")!)
-        #expect(lhs != rhs)
-    }
 }

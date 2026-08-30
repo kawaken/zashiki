@@ -11,13 +11,12 @@ extension View {
             return Image(nsImage: icon)
         }
 
-        // Get our defined application icon image.
-        if let nsImage = NSApp.applicationIconImage {
-            return Image(nsImage: nsImage)
+        if let icon = NSApp.applicationIconImage {
+            return Image(nsImage: icon)
         }
         #endif
 
-        // Fall back to a static representation
-        return Image("AppIconImage")
+        // Fall back to a generic image for previews and non-macOS builds.
+        return Image(systemName: "terminal")
     }
 }

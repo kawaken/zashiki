@@ -3,7 +3,7 @@ import SwiftUI
 struct ErrorView: View {
     var body: some View {
         HStack {
-            Image("AppIconImage")
+            zashikiIconImage()
                 .resizable()
                 .scaledToFit()
                 .frame(width: 128, height: 128)
