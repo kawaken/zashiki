@@ -76,7 +76,10 @@ struct AboutView: View {
 
     var body: some View {
         VStack(alignment: .center) {
-            CyclingIconView()
+            zashikiIconImage()
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(height: 128)
 
             VStack(alignment: .center, spacing: 32) {
                 VStack(alignment: .center, spacing: 8) {
