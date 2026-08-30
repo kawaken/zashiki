@@ -1,8 +1,9 @@
 # Changelog
 
-Zashiki（[@kawaken](https://github.com/kawaken)によるGhosttyの個人用macOSフォーク）の
-リリースごとの変更点。README.mdに載せるほどではない細かな修正・削除も含め、
-ユーザーに影響のある変更をここに記録する。
+## v0.2.1 (2026-08-31)
+
+- Aboutウィンドウで表示されていたGhosttyロゴへの切り替えアニメーションを廃止し、Zashikiロゴに固定
+- Alternate Iconsなどに残っていたGhostty由来のアイコンアセットを削除
 
 ## v0.2.0 (2026-08-28)
 
