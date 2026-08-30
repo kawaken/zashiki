@@ -39,28 +39,28 @@ Zashikiの開発・検証・配布準備で使うコマンドを`just`にまと�
 
 ### 基本タスク
 
-| タスク | 内容 |
-| --- | --- |
-| `build` | 通常のDebugビルド（`zig build`） |
-| `build-core` | macOSアプリを除いたビルド |
-| `run` | 開発用ビルドを実行してアプリを起動（`zig build run`） |
-| `test` | フルテスト（macOSアプリのXCTestを含む） |
-| `test-fast` | PR向けにXCTestを省略したテストとSwiftコンパイル |
-| `test-filter NAME` | Zigテストを名前で絞り込む |
-| `lint` | Zig fmtチェック、SwiftLint、Prettierのチェック |
-| `format` | 各フォーマッタによる自動修正 |
-| `clean` | ビルド成果物・DerivedDataなどを削除 |
-| `logs` | ZashikiのmacOSログを表示 |
+| タスク             | 内容                                                  |
+| ------------------ | ----------------------------------------------------- |
+| `build`            | 通常のDebugビルド（`zig build`）                      |
+| `build-core`       | macOSアプリを除いたビルド                             |
+| `run`              | 開発用ビルドを実行してアプリを起動（`zig build run`） |
+| `test`             | フルテスト（macOSアプリのXCTestを含む）               |
+| `test-fast`        | PR向けにXCTestを省略したテストとSwiftコンパイル       |
+| `test-filter NAME` | Zigテストを名前で絞り込む                             |
+| `lint`             | Zig fmtチェック、SwiftLintのチェック                  |
+| `format`           | ZigとSwiftのフォーマッタによる自動修正                |
+| `clean`            | ビルド成果物を削除                                    |
+| `logs`             | ZashikiのmacOSログを表示                              |
 
 ### 補助タスク
 
-| タスク | 内容 |
-| --- | --- |
-| `help` | タスク一覧と使い分けを表示。`just`のデフォルト表示との関係を決める |
-| `ci` | ローカルでPR向けのチェック一式を実行 |
-| `dist` | Zigの配布用tarball生成ステップを呼び出す |
-| `distcheck` | 配布物の検証ステップを呼び出す |
-| `xcode-version` | 使用中のXcodeバージョンを確認する。必要性を見て採否を決める |
+| タスク          | 内容                                                               |
+| --------------- | ------------------------------------------------------------------ |
+| `help`          | タスク一覧と使い分けを表示。`just`のデフォルト表示との関係を決める |
+| `ci`            | ローカルでPR向けのチェック一式を実行                               |
+| `dist`          | Zigの配布用tarball生成ステップを呼び出す                           |
+| `distcheck`     | 配布物の検証ステップを呼び出す                                     |
+| `xcode-version` | 使用中のXcodeバージョンを確認する。必要性を見て採否を決める        |
 
 Markdownプレビュー起動のような完成済みアプリの利用コマンドは追加しない。
 
@@ -109,3 +109,32 @@ GitHub Release作成の流れ自体を別途見直すため、本planでは実�
 - `build-core`が実際に必要か、`test-fast`との役割をどう分けるか
 - `ci`に含めるタスクと、macOSランナーのコストが高い処理の扱い
 - Xcodeを「最新」に解決する方法と、CIでの再現性の確保
+
+## 実装結果
+
+- `just` は macOS の開発環境では Homebrew、CI では `brew install just` で導入する。
+  `just` 自体のバージョン管理を mise に追加することは、既存の mise 設定がないため
+  今回は行わない。
+- リポジトリ直下の `justfile` に、build・test・lint・format・clean・logs・dist・
+  `xcode-version` と、PR向けの `ci` を定義した。`just` を引数なしで実行すると、
+  `help` と同じ一覧と使い分けを表示する。
+- 既存の Makefile にあった `clean` と `glad` は `justfile` に移し、Makefile は削除した。
+- README に `just` の導入方法、代表的なタスク、`DEVELOPER_DIR` の使い方を追加した。
+- Markdown は lint/format の対象に含めない。Prettier は既存の手動コマンドとして
+  残すが、開発タスクや CI からは呼び出さない。
+- `DEVELOPER_DIR` を Xcode 選択の入口にし、タスクや CI がシステム全体の
+  `xcode-select` を変更しないようにした。CI のテスト job は選択した Developer
+  directory を `GITHUB_ENV` に渡し、`just xcode-version` と `just test-fast` が同じ
+  Xcode を使う。
+- `zig fmt --check .` は生成された `zig-pkg` 内の外部コードまで検査するため、
+  `git ls-files` で追跡中の Zig ファイルだけを検査・整形するようにした。
+- `test.yml` の PR チェックを `just test-fast` と `just lint` に移行した。リリース
+  workflow の全面見直しは行っていない。
+
+## 検証結果
+
+- `just --list --unsorted`、`just`、`just --fmt --check`、各 recipe の dry-run が成功。
+- `just test-filter inputLineTextBeforeCursor` が成功。
+- `just build-core` が成功。
+- `just test-fast` が成功。
+- `just lint` が成功（Zig fmt、SwiftLint 176 ファイル）。

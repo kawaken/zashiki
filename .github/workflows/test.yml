@@ -61,24 +61,29 @@ concurrency:
 
 jobs:
   test:
-    name: zig build test
+    name: just test-fast
     runs-on: macos-15
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Xcode Select
+      - name: Install just
+        run: brew install just
+
+      - name: Select Xcode
         run: |
           XCODE_PATH=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n1)
           if [ -z "$XCODE_PATH" ]; then
             echo "Xcode 26.x not found on this runner, falling back to the default Xcode"
-            XCODE_PATH=$(xcode-select -p | sed 's|/Contents/Developer||')
+            XCODE_PATH=$(xcode-select -p)
+          else
+            XCODE_PATH="$XCODE_PATH/Contents/Developer"
           fi
           echo "Using $XCODE_PATH"
-          sudo xcode-select -s "$XCODE_PATH"
+          echo "DEVELOPER_DIR=$XCODE_PATH" >> "$GITHUB_ENV"
 
       - name: Xcode Version
-        run: xcodebuild -version
+        run: just xcode-version
 
       - name: Cache Xcode DerivedData
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
@@ -100,14 +105,14 @@ jobs:
         with:
           version: ${{ steps.zig.outputs.version }}
 
-      - name: zig build test
+      - name: just test-fast
         # -Dmacos-app-xctest=falseにより、Zigコアのテストに加えてmacOSアプリの
         # Swiftコンパイル(xcodebuild build)は実行しつつ、XCTest
         # (xcodebuild test)はスキップする。xcodebuild testは実行時間や
         # macOSランナーのコストが大きいため、フルテストはリリース時
         # (release.yml)に回す想定。Swiftのコンパイルエラーはこのジョブで
         # 検出できる。
-        run: zig build test -Dmacos-app-xctest=false
+        run: just test-fast
 
   build:
     name: zig build (macOS app)
@@ -157,11 +162,14 @@ jobs:
         run: zig build -Doptimize=ReleaseFast -Dxcframework-target=native
 
   lint:
-    name: Lint (zig fmt / swiftlint / prettier)
+    name: just lint
     runs-on: macos-15
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install just
+        run: brew install just
 
       - name: Get required Zig version
         id: zig
@@ -173,14 +181,8 @@ jobs:
         with:
           version: ${{ steps.zig.outputs.version }}
 
-      - name: zig fmt
-        run: zig fmt --check .
-
       - name: Install swiftlint
         run: brew install swiftlint
 
-      - name: swiftlint
-        run: swiftlint lint --strict
-
-      - name: prettier
-        run: npx --yes prettier --check .
+      - name: just lint
+        run: just lint
