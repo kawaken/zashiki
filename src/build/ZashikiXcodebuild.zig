@@ -158,9 +158,19 @@ pub fn init(
         // references them via symlinks.
         deps.resources.addStepDependencies(&step.step);
 
-        // Expect success
-        step.expectExitCode(0);
-
+        // Deliberately not calling step.expectExitCode(0) here: that
+        // switches Run's internal stdio mode from `.infer_from_args` to
+        // `.check`, which makes it unconditionally copy the child's
+        // entire stderr into result_stderr -- even on success, whenever
+        // xcodebuild writes anything to stderr (e.g. its normal
+        // multiple-destination-match note). The build runner then treats
+        // any non-empty result_stderr as a reason to print a
+        // "failed command: ..." line, even though the step succeeded.
+        // Leaving stdio as `.infer_from_args` (the default for a
+        // has_side_effects step) keeps stdout/stderr inherited straight
+        // to the terminal for live build progress, and still fails the
+        // step on a non-zero exit code via Step.handleChildProcessTerm --
+        // we just don't get the false-positive "failed command:" noise.
         break :build step;
     };
 
@@ -206,9 +216,11 @@ pub fn init(
         // references them via symlinks.
         deps.resources.addStepDependencies(&step.step);
 
-        // Expect success
-        step.expectExitCode(0);
-
+        // See the comment on the equivalent step.expectExitCode(0) removal
+        // in the `build` step above: leaving stdio as `.infer_from_args`
+        // avoids Run unconditionally surfacing xcodebuild's normal stderr
+        // output as a false-positive "failed command:" line on success,
+        // while still failing the step on a non-zero exit code.
         break :xctest step;
     };
 
