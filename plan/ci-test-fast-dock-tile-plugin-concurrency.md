@@ -53,6 +53,60 @@ GitHub Actions の実行履歴を確認したところ:
 
 - #78 で対応した `expectExitCode(0)` 周りの再検討(そちらは既に解決済み)
 
+## 追加調査: 根本原因はXcodeバージョン選択の伝播漏れだった
+
+`DockTilePlugin.swift`側の`nonisolated(unsafe)`修正(PR #94)をCIで検証したところ、
+そのエラー自体は解消したが、続けて別のエラーが発生した:
+
+```
+Sources/Helpers/Backport.swift:126:19: error: cannot find type 'NSGlassEffectView' in scope
+```
+
+`NSGlassEffectView`はmacOS 26 SDKで追加された型で、`@available(macOS 26, *)`
+ガードを付けていてもコンパイル時の型解決自体はSDKに依存するため、macOS 26
+未満のSDK(Xcode 16.4が同梱するMacOSX15.5.sdk)ではビルドできない。
+
+CIのジョブログを確認すると、`Select Xcode`/`Xcode Version`ステップでは
+`DEVELOPER_DIR=/Applications/Xcode_26.3.0.app/Contents/Developer`が正しく
+設定され`xcodebuild -version`も`Xcode 26.3`を返しているのに、続く
+`just test-fast`ステップの`Command line invocation:`ログでは
+`/Applications/Xcode_16.4.app/Contents/Developer/usr/bin/xcodebuild`が
+実行されている。
+
+原因は`src/build/ZashikiXcodebuild.zig`の`build`/`xctest`両ステップ:
+
+```zig
+// External environment variables can mess up xcodebuild, so
+// we create a new empty environment.
+const env_map = try b.allocator.create(std.process.Environ.Map);
+env_map.* = .init(b.allocator);
+if (env.get("PATH")) |v| try env_map.put("PATH", v);
+```
+
+`xcodebuild`プロセスに渡す環境を意図的に空にして`PATH`だけコピーしている
+ため、`DEVELOPER_DIR`が継承されない。結果、CIが`DEVELOPER_DIR`で選択した
+Xcode 26.3.0は無視され、`xcodebuild`はシステムデフォルト(ランナーの
+`xcode-select`設定、Xcode 16.4)にフォールバックしていた。
+
+このロジックは2025-10-10の時点(コミット`47f3c946`)から存在しており、
+issue #92の「発生時期」調査で見つけた`f9096ab71`(PR #89)前後の変化とは
+無関係。おそらく以前は
+CIランナーイメージの`xcode-select`デフォルトがXcode 26系だったため
+表面化しておらず、ランナーイメージ更新でデフォルトがXcode 16.4になった
+ことで、この伝播漏れが初めて問題化したと考えられる(未確認)。
+
+### 対応方針
+
+`ZashikiXcodebuild.zig`の`build`/`xctest`両ステップの`env_map`に
+`DEVELOPER_DIR`をPATHと同様に明示的にコピーする。これによりCI側が選択した
+Xcodeバージョンが実際に使われるようになり、Xcode 16.4起因のエラー
+(Swift 6並行性エラー、`NSGlassEffectView`未定義)がそもそも発生しなく
+なるはず。
+
+`DockTilePlugin.swift`の`nonisolated(unsafe)`修正(PR #94)自体はSwift 6の
+並行性ルールに沿った正しい修正であり、悪影響もないため維持する
+(仮に将来何らかの理由でXcode 16.4が使われても安全になる副次効果がある)。
+
 ## 完了後
 
 対応方針が決まり実装・検証が完了したら、この計画を削除し、判断の要点を

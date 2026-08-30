@@ -96,6 +96,10 @@ pub fn init(
         const env_map = try b.allocator.create(std.process.Environ.Map);
         env_map.* = .init(b.allocator);
         if (env.get("PATH")) |v| try env_map.put("PATH", v);
+        // Without this, xcodebuild ignores an explicitly selected Xcode
+        // (e.g. CI setting DEVELOPER_DIR to pin a specific version) and
+        // falls back to the system default from `xcode-select`.
+        if (env.get("DEVELOPER_DIR")) |v| try env_map.put("DEVELOPER_DIR", v);
 
         const step = RunStep.create(b, "xcodebuild");
         step.has_side_effects = true;
@@ -178,6 +182,8 @@ pub fn init(
         const env_map = try b.allocator.create(std.process.Environ.Map);
         env_map.* = .init(b.allocator);
         if (env.get("PATH")) |v| try env_map.put("PATH", v);
+        // See the comment on the equivalent line in the `build` step above.
+        if (env.get("DEVELOPER_DIR")) |v| try env_map.put("DEVELOPER_DIR", v);
 
         const step = RunStep.create(b, "xcodebuild test");
         step.has_side_effects = true;
