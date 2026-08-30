@@ -2786,7 +2786,7 @@ keybind: Keybinds = .{},
 @"macos-titlebar-proxy-icon": MacTitlebarProxyIcon = .visible,
 
 /// Controls the windowing behavior when dropping a file or folder
-/// onto the Ghostty icon in the macOS dock.
+/// onto the Zashiki icon in the macOS dock.
 ///
 /// Valid values are:
 ///
@@ -2900,17 +2900,12 @@ keybind: Keybinds = .{},
 ///
 /// Valid values:
 ///
-///  * `official` - Use the official Ghostty icon.
-///  * `blueprint`, `chalkboard`, `microchip`, `glass`, `holographic`,
-///    `paper`, `retro`, `xray` - Official variants of the Ghostty icon
-///    hand-created by artists (no AI).
+///  * `official` - Use the Zashiki icon.
 ///  * `custom` - Use a completely custom icon. The location must be specified
 ///    using the additional `macos-custom-icon` configuration
-///  * `custom-style` - Use the official Ghostty icon but with custom
-///    styles applied to various layers. The custom styles must be
-///    specified using the additional `macos-icon`-prefixed configurations.
-///    The `macos-icon-ghost-color` and `macos-icon-screen-color`
-///    configurations are required for this style.
+///  * `custom-style` - Use the Zashiki icon with custom frame and screen
+///    effects. The screen colors must be specified using the additional
+///    `macos-icon-screen-color` configuration.
 ///
 /// WARNING: The `custom-style` option is _experimental_. We may change
 /// the format of the custom styles in the future. We're still finalizing
@@ -2942,14 +2937,6 @@ keybind: Keybinds = .{},
 /// Note: This configuration is required when `macos-icon` is set to
 /// `custom-style`.
 @"macos-icon-frame": MacAppIconFrame = .aluminum,
-
-/// The color of the ghost in the macOS app icon.
-///
-/// Note: This configuration is required when `macos-icon` is set to
-/// `custom-style`.
-///
-/// Specified as either hex (`#RRGGBB` or `RRGGBB`) or a named X11 color.
-@"macos-icon-ghost-color": ?Color = null,
 
 /// The color of the screen in the macOS app icon.
 ///
@@ -8167,14 +8154,6 @@ pub const MacHidden = enum {
 /// format at all.
 pub const MacAppIcon = enum {
     official,
-    blueprint,
-    chalkboard,
-    microchip,
-    glass,
-    holographic,
-    paper,
-    retro,
-    xray,
     custom,
     @"custom-style",
 };

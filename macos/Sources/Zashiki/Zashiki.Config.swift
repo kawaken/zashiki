@@ -435,14 +435,6 @@ extension Zashiki {
             return MacOSIconFrame(rawValue: str) ?? defaultValue
         }
 
-        var macosIconGhostColor: OSColor? {
-            guard let config = self.config else { return nil }
-            var v: ghostty_config_color_s = .init()
-            let key = "macos-icon-ghost-color"
-            guard ghostty_config_get(config, &v, key, UInt(key.lengthOfBytes(using: .utf8))) else { return nil }
-            return .init(ghostty: v)
-        }
-
         var macosIconScreenColor: [OSColor]? {
             guard let config = self.config else { return nil }
             var v: ghostty_config_color_list_s = .init()

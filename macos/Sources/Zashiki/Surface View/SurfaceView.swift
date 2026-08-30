@@ -214,7 +214,7 @@ extension Zashiki {
     struct SurfaceRendererUnhealthyView: View {
         var body: some View {
             HStack {
-                Image("AppIconImage")
+                zashikiIconImage()
                     .resizable()
                     .scaledToFit()
                     .frame(width: 128, height: 128)
@@ -236,7 +236,7 @@ extension Zashiki {
     struct SurfaceErrorView: View {
         var body: some View {
             HStack {
-                Image("AppIconImage")
+                zashikiIconImage()
                     .resizable()
                     .scaledToFit()
                     .frame(width: 128, height: 128)

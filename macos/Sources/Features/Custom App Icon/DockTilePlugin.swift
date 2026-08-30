@@ -49,20 +49,8 @@ class DockTilePlugin: NSObject, NSDockTilePlugIn {
 
     /// Reset the application icon and dock tile icon to the default.
     private func resetIcon(dockTile: NSDockTile) {
-        let appIcon: NSImage?
-        if #available(macOS 26.0, *) {
-            #if DEBUG
-            // Use the `Blueprint` icon to distinguish Debug from Release builds.
-            appIcon = pluginBundle.image(forResource: "BlueprintImage")!
-            #else
-            // Reset to Zashiki.icon
-            appIcon = nil
-            #endif
-        } else {
-            // Use the bundled icon to keep the corner radius consistent with pre-Tahoe apps.
-            appIcon = pluginBundle.image(forResource: "AppIconImage")!
-        }
-        dockTile.setIcon(appIcon)
+        // Reset to the Zashiki app icon.
+        dockTile.setIcon(nil)
     }
 }
 
