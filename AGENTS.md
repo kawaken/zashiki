@@ -75,6 +75,12 @@ user's perspective instead of simply copying PR titles.
 Plans start as local files in `plan/`, refined through discussion. Update the
 file directly whenever the plan changes.
 
+- Always write the plan file first, then create the issue from it — even for
+  a bug or finding discovered mid-task. There is no "this is urgent" or
+  "this is just a quick bug report" exception: this is a personal project,
+  not an on-call rotation, so nothing here is time-critical enough to skip
+  the plan file. Do not create a GitHub Issue directly without a plan file
+  backing it.
 - Once a plan is reasonably settled, create a GitHub Issue for it. Use the
   plan's title and content as the issue's title and body, and link back to
   the plan file from the issue.
