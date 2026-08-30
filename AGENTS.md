@@ -81,11 +81,17 @@ file directly whenever the plan changes.
 - The issue tracks progress; the plan file stays the source of truth for
   design. When the plan file changes, update the issue too — this doesn't
   have to happen in the same commit, but keep the two from drifting apart.
-- When starting work on an issue, add the `wip` label.
+- Before starting work, check the issue for an existing `wip` label and a
+  recent claim comment — if another agent already claimed it, don't pick it
+  up. This is how agents avoid clobbering each other's in-progress work.
+- When starting work, add the `wip` label and post a comment identifying who
+  is working on it: the agent/tool (e.g. Claude Code, Codex) and, if the
+  tool exposes one, a deep link to the session. This makes the claim visible
+  to both other agents and the human.
 - Findings and surprises discovered while implementing go into the plan file
   first, then into the issue (since the issue should reflect the plan).
-- When work completes, move the plan to `docs/history/`, remove it from
+- When work completes: move the plan to `docs/history/`, remove it from
   `plan/`, and append the implementation decisions or CI findings worth
-  keeping. Then close the issue.
+  keeping. Then remove the `wip` label and close the issue.
 - Don't let a PR auto-close the issue (e.g. via "Closes #123" in the PR
   body). Close the issue explicitly, as its own step.
