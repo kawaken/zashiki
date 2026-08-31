@@ -28,6 +28,7 @@ on:
     branches:
       - main
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch: {}
 
 concurrency:
@@ -136,10 +137,13 @@ jobs:
     name: zig build (macOS app)
     runs-on: macos-15
     timeout-minutes: 30
-    # macOSランナーは無料枠消費が重いので、.appの実ビルドはリリース
-    # 準備の時だけ手動実行(workflow_dispatch)する。push/PRでは走らせない。
-    # リリース戦略自体は別途検討する。
-    if: github.event_name == 'workflow_dispatch'
+    # macOSランナーは無料枠消費が重いので、.appの実ビルドは通常走らせない。
+    # 例外はリリース準備の手動確認(workflow_dispatch)と、PRに
+    # `needs-verification`ラベルが付いている場合。後者は実機での動作
+    # 確認(見た目・操作感など、CIだけでは確認できない変更)が必要なPRを、
+    # リリースを切らずに手元で試せるようにするためのもの。ビルド成果物
+    # はworkflow artifactとしてアップロードする。
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'needs-verification')
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -178,6 +182,20 @@ jobs:
 
       - name: Build Zashiki.app
         run: zig build -Doptimize=ReleaseFast -Dxcframework-target=native
+
+      - name: Zip Zashiki.app
+        if: github.event_name == 'pull_request'
+        run: |
+          cd zig-out
+          zip -9 -r --symlinks "../Zashiki-pr${{ github.event.pull_request.number }}.zip" Zashiki.app
+
+      - name: Upload build artifact
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Zashiki-pr${{ github.event.pull_request.number }}
+          path: Zashiki-pr${{ github.event.pull_request.number }}.zip
+          retention-days: 14
 
   lint:
     name: just lint
