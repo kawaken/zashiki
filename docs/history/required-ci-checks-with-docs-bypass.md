@@ -15,7 +15,7 @@ Pendingのままマージできなくなる。
 ## Issue
 
 - https://github.com/kawaken/zashiki/issues/115
-- プランファイル: https://github.com/kawaken/zashiki/blob/ci-required-checks/plan/required-ci-checks-with-docs-bypass.md
+- プランファイル: https://github.com/kawaken/zashiki/blob/main/docs/history/required-ci-checks-with-docs-bypass.md
 
 ## 現状
 
@@ -79,3 +79,11 @@ Pendingのままマージできなくなる。
 - コード変更PRはCI完了前にマージされない
 - docs-only PRの高速マージが維持されている
 - Ruleset変更と検証結果をIssueへ記録する
+
+## 実装後の記録
+
+- `.github/workflows/test.yml`の`pull_request`にあった`paths-ignore`を削除し、workflowを常時起動するようにした
+- `detect code changes` jobで差分を判定し、docs-onlyのときだけ`just lint`/`just test-fast`をjob-level skipする構成にした
+- `main` RulesetへPull Request必須と`just lint`/`just test-fast`のrequired status checksを設定した
+- PR #118でworkflow変更をmainへ反映し、Ruleset設定前はchecksがqueuedのまま先にmergeされることを確認した
+- ローカルではYAML構文、Zig/Swiftのlint、`just test-fast`（Swift/macOS buildを含む）が成功した
