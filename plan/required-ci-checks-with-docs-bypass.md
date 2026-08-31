@@ -14,7 +14,8 @@ Pendingのままマージできなくなる。
 
 ## Issue
 
-作成予定。
+- https://github.com/kawaken/zashiki/issues/115
+- プランファイル: https://github.com/kawaken/zashiki/blob/ci-required-checks/plan/required-ci-checks-with-docs-bypass.md
 
 ## 現状
 
