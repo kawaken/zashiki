@@ -49,3 +49,10 @@ Ghostty本家のヘルプページへリンクしている。現状はZashiki独
 実装が完了したら、このプランを`docs/history/`へ移動する。実装上の判断や検証結果に
 記録価値がある場合は、短い履歴として追記する。その後、Issueの`wip`ラベルを外して
 Issueを明示的にクローズする。
+
+## 実装結果
+
+- `AboutView`からGhostty本家のDocs URLとDocsボタンを削除した
+- GitHubボタンとVersion・Build・Commit表示は変更していない
+- `just lint`（Zig format check / SwiftLint）を実行し、違反0件を確認した
+- Issueの指定どおり、BuildとUIの実機確認は実施していない
