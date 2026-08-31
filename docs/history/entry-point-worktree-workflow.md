@@ -59,3 +59,18 @@ rebaseの前に差分と未コミット変更を確認する。変更を破棄�
 - `git diff --check`
 - `AGENTS.md`のGit Worktree節を読み返し、`main`の直接操作禁止、専用worktree、
   `entry-point`同期、サンドボックス権限の扱いが矛盾しないことを確認する。
+
+## 実装時の知見（2026-08-31）
+
+- linked worktreeからの`git fetch`は、作業ディレクトリが書き込み可能でも共有
+  Gitメタデータ側の`FETCH_HEAD`更新で権限エラーになった。権限を付与するとfetch
+  自体は成功したため、`entry-point`運用ではなく環境の書き込み境界が原因だと確認
+  できた。
+- `git commit`は実行できた一方、push後のremote-tracking refとbranch設定の更新、
+  `git mv`によるindex lockの作成でも同じ権限エラーが発生した。Git操作ごとに必要な
+  メタデータ書き込みが異なるため、個別の回避策ではなくcheckout全体の権限を確認
+  する必要がある。
+- `entry-point`をbootstrap用checkoutで同期し、Codexなどから割り当てられたtask
+  worktreeでは入れ子のworktreeを作らない方針を`AGENTS.md`へ反映した。
+- ドキュメント変更のため、`git diff --check origin/main HEAD`を実行した。ビルドと
+  テストは実施していない。
