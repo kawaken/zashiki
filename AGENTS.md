@@ -45,33 +45,13 @@ ongoing product rather than a one-off patch set:
 This repository supports multiple agents and tasks running in parallel. Use the
 following rule: `1 task = 1 branch = 1 worktree`.
 
-- `entry-point` is the standard local bootstrap branch for starting new work. It
-  is a base branch, not a shared task branch. In a writable bootstrap checkout,
-  start each task with this sequence:
-
-  ```sh
-  git status --short
-  git fetch origin main
-  git switch main
-  git pull --ff-only origin main
-  git switch entry-point
-  git rebase main
-  git worktree add <worktree-path> -b <task-branch> entry-point
-  ```
-
-  The first command must show no changes before updating the base branches. If
-  `entry-point` has local commits, `git rebase main` keeps them while bringing
-  the branch up to date. Do not discard uncommitted changes or rewrite shared
-  history without explicit approval.
-
-- Keep `entry-point` checked out only in the bootstrap checkout while it is being
-  synchronized. Do not use it as the worktree for a task or share it between
-  concurrent tasks.
-- Start each task from the resulting `entry-point`. If the environment already
-  provides an assigned task worktree, use that worktree directly instead of
-  creating a nested worktree. In that case, do not update `main` or
-  `entry-point` from the assigned worktree; use the latest `origin/main` as the
-  fallback base when the bootstrap checkout is unavailable.
+- If an assigned task worktree is already available, use it; do not create a new
+  worktree or nest one inside it.
+- Git tooling or an agent may provide a worktree in a detached HEAD state. For
+  tasks that require commits or pushes, create a dedicated flat branch from the
+  current worktree at the start of the work. From the CLI, use
+  `git switch -c <task-branch>`.
+- If you are already in a task worktree with a dedicated branch, use it.
 - Do not share a branch or worktree between multiple tasks or agents at the same
   time.
 - Use a flat, descriptive branch name without prefixes such as `codex/` or
@@ -81,13 +61,6 @@ following rule: `1 task = 1 branch = 1 worktree`.
 - Keep `main` free of feature changes. Updating it with the fast-forward-only
   command above is allowed; all feature changes belong on a dedicated task
   branch and must be submitted through a PR.
-- A branch/worktree sequence cannot change sandbox permissions. A linked
-  worktree may have writable source files while its shared Git metadata (for
-  example `FETCH_HEAD`, the index, refs, or the commit objects) is outside the
-  allowed write scope. If `fetch`, index updates, `commit`, or `push` fails with
-  a permission error, use a checkout whose Git metadata is writable too, or ask
-  the environment to provide a standalone clone inside the allowed scope. Do
-  not try to bypass the sandbox by editing another worktree or its metadata.
 - After creating a PR, enable GitHub AutoMerge with
   `gh pr merge --auto --merge` so the PR is merged with a regular merge commit
   once its required checks and review requirements are satisfied. Do not use
