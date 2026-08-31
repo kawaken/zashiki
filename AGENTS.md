@@ -127,8 +127,12 @@ file directly whenever the plan changes.
   `plan/`, and append the implementation decisions or CI findings worth
   keeping. Then remove the `wip` label.
 - Don't close the issue yourself unless it's a documentation-only change
-  with nothing to verify. Anything with behavior to verify (code, CI,
-  workflow changes) gets the `needs-verification` label instead — leave the
-  close itself to the human, whether they close it directly or tell you to.
+  with nothing to verify. For other changes, leave the close itself to the
+  human, whether they close it directly or tell you to. Add the
+  `needs-verification` label only when a concrete manual check remains after
+  automated tests, CI, and review; do not add it merely because the change
+  touches code, CI, or workflow files. When adding it, describe the exact
+  check and expected result in the Issue, and remove the label once that
+  check is complete.
 - Don't let a PR auto-close the issue (e.g. via "Closes #123" in the PR
   body). Close the issue explicitly, as its own step.
