@@ -54,10 +54,12 @@ following rule: `1 task = 1 branch = 1 worktree`.
   worktree assigned to the current task.
 - Keep `main` read-only. Make changes on a dedicated branch and submit them
   through a PR.
-- After creating a PR, enable GitHub AutoMerge with `gh pr merge --auto` so the
-  PR is merged automatically once its required checks and review requirements
-  are satisfied. If AutoMerge cannot be enabled, check the reason and report it
-  instead of merging manually without confirmation.
+- After creating a PR, enable GitHub AutoMerge with
+  `gh pr merge --auto --merge` so the PR is merged with a regular merge commit
+  once its required checks and review requirements are satisfied. Do not use
+  squash or rebase merges unless the user explicitly requests one. If
+  AutoMerge cannot be enabled, check the reason and report it instead of
+  merging manually without confirmation.
 
 ## Public-Facing Work
 
