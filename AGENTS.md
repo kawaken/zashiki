@@ -96,6 +96,11 @@ file directly whenever the plan changes.
   to both other agents and the human.
 - Findings and surprises discovered while implementing go into the plan file
   first, then into the issue (since the issue should reflect the plan).
+- Once a plan has been created and committed, continue through implementation,
+  verification, PR creation, and merge unless the user explicitly asks for
+  planning-only work. After creating the PR, enable AutoMerge and monitor it
+  until it is merged. If required checks, reviews, permissions, or another
+  external condition prevent the merge, report the blocker clearly.
 - When work completes, move the plan to `docs/history/`, remove it from
   `plan/`, and append the implementation decisions or CI findings worth
   keeping. Then remove the `wip` label.
