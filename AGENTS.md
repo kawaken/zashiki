@@ -79,6 +79,13 @@ Before creating a release tag (`v*.*.*`), review the user-facing changes since
 the previous release and update `CHANGELOG.md`. Summarize the changes from the
 user's perspective instead of simply copying PR titles.
 
+Version bumps follow a loose rule, not strict semver: a release that includes
+any `feature`-labeled work bumps MINOR; a release with only `fix`-labeled or
+internal changes bumps PATCH. Batch multiple merged features and fixes into a
+single release freely — there is no need to cut a release per merged PR, and
+release timing is independent of verification (hands-on verification happens
+via PR build artifacts; see `needs-verification` below).
+
 ## Plan and Issue Lifecycle
 
 Plans start as local files in `plan/`, refined through discussion. Update the
@@ -92,7 +99,11 @@ file directly whenever the plan changes.
   backing it.
 - Once a plan is reasonably settled, create a GitHub Issue for it. Use the
   plan's title and content as the issue's title and body, and link back to
-  the plan file from the issue.
+  the plan file from the issue. Also label it `feature` or `fix` based on
+  whether it adds user-visible functionality or fixes/cleans up existing
+  behavior — this decides whether a release including it bumps MINOR or
+  PATCH (see Release above). Unlike `wip`, this label stays after the work
+  is done; it is not removed on completion.
 - Creating or updating an Issue is not the same as starting implementation.
   However, when this session owns the Issue while creating, refining,
   committing, or moving its plan, add `wip` and a claim comment as a temporary
@@ -128,11 +139,15 @@ file directly whenever the plan changes.
   keeping. Then remove the `wip` label.
 - Don't close the issue yourself unless it's a documentation-only change
   with nothing to verify. For other changes, leave the close itself to the
-  human, whether they close it directly or tell you to. Add the
-  `needs-verification` label only when a concrete manual check remains after
-  automated tests, CI, and review; do not add it merely because the change
-  touches code, CI, or workflow files. When adding it, describe the exact
-  check and expected result in the Issue, and remove the label once that
-  check is complete.
+  human, whether they close it directly or tell you to.
 - Don't let a PR auto-close the issue (e.g. via "Closes #123" in the PR
   body). Close the issue explicitly, as its own step.
+- If a PR carries a large enough change that it needs hands-on verification
+  (visual/behavioral, beyond what CI already checks), add the
+  `needs-verification` label to the PR itself, not the issue — it doesn't
+  need to be removed afterward. This label makes the `build` job in
+  `test.yml` build `Zashiki.app` and upload it as a workflow artifact, so
+  the change can be downloaded and tested by hand without cutting a
+  release. Mention the related issue number in the PR body so they stay
+  linked (without a `Closes #123` keyword, per the rule above). Keep
+  AutoMerge enabled as usual — this label doesn't change the merge flow.
