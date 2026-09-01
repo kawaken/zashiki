@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.0 (2026-09-01)
+
+- `gw` Worktree Statusサイドパネルを追加し、worktreeの状態確認と`gw clean`の実行に対応
+- GitHub PRを`#123`形式のリンクとして表示
+- Aboutウィンドウの不要なDocsボタンを削除
+
 ## v0.2.1 (2026-08-31)
 
 - Aboutウィンドウで表示されていたGhosttyロゴへの切り替えアニメーションを廃止し、Zashikiロゴに固定
