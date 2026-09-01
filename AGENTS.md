@@ -114,6 +114,7 @@ decisions.
   user adds `needs-verification` to the PR. If the user explicitly asks for
   planning-only work, release this session's `wip` claim after the Plan PR is
   handed off; do not remove another agent's label or claim.
+- When creating a PR, write its body according to the PR template.
 - Findings and surprises discovered during implementation go into the Plan
   first. Summarize important progress or decisions in the Issue, but do not
   require the Issue body to mirror the Plan.
