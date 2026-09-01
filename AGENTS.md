@@ -88,55 +88,44 @@ via PR build artifacts; see `needs-verification` below).
 
 ## Plan and Issue Lifecycle
 
-Plans start as local files in `plan/`, refined through discussion. Update the
-file directly whenever the plan changes.
+Issues are the starting point for work. The user selects an Issue and asks an
+agent to handle it; creating a Plan is not a prerequisite for creating an
+Issue. The Issue should prioritize and describe the problem or desired outcome,
+while the Plan is the source of truth for detailed design and implementation
+decisions.
 
-- Always write the plan file first, then create the issue from it — even for
-  a bug or finding discovered mid-task. There is no "this is urgent" or
-  "this is just a quick bug report" exception: this is a personal project,
-  not an on-call rotation, so nothing here is time-critical enough to skip
-  the plan file. Do not create a GitHub Issue directly without a plan file
-  backing it.
-- Once a plan is reasonably settled, create a GitHub Issue for it. Use the
-  plan's title and content as the issue's title and body, and link back to
-  the plan file from the issue. Also label it `feature` or `fix` based on
-  whether it adds user-visible functionality or fixes/cleans up existing
-  behavior — this decides whether a release including it bumps MINOR or
-  PATCH (see Release above). Unlike `wip`, this label stays after the work
-  is done; it is not removed on completion.
-- Creating or updating an Issue is not the same as starting implementation.
-  However, when this session owns the Issue while creating, refining,
-  committing, or moving its plan, add `wip` and a claim comment as a temporary
-  ownership lock. The `wip` label means that the Issue is actively held by a
-  session; it does not imply that implementation has already started.
-  If the Issue is only being reported for someone else, do not claim it.
-- The issue tracks progress; the plan file stays the source of truth for
-  design. When the plan file changes, update the issue too — this doesn't
-  have to happen in the same commit, but keep the two from drifting apart.
 - Before starting work on an Issue, check it for an existing `wip` label and a
   recent claim comment — if another agent already claimed it, don't pick it up
-  without an explicit handoff. This check applies even when the existing work
-  is still plan-only, so multiple sessions don't start from the same Issue.
+  without an explicit handoff. This check applies while the work is still
+  plan-only, so multiple sessions don't start from the same Issue.
 - When claiming an Issue, add `wip` and post a comment identifying who is
   working on it: the agent/tool (e.g. Claude Code, Codex) and, if the tool
-  exposes one, a deep link to the session. When implementation starts after
-  plan-only work, keep the existing `wip` claim and update the comment if
-  needed.
-- Findings and surprises discovered while implementing go into the plan file
-  first, then into the issue (since the issue should reflect the plan).
-- Once a plan has been created and committed, continue through implementation,
-  verification, PR creation, and merge unless the user explicitly asks for
-  planning-only work. After creating the PR, enable AutoMerge and monitor it
-  until it is merged. If required checks, reviews, permissions, or another
-  external condition prevent the merge, report the blocker clearly.
-- If the user explicitly asks for planning-only work, or implementation has
-  not started after the plan is committed, keep the Issue open and remove this
-  session's `wip` label so another session can take it. Post a short comment
-  stating that the planning claim has been released; do not remove another
-  agent's label or claim.
-- When work completes, move the plan to `docs/history/`, remove it from
-  `plan/`, and append the implementation decisions or CI findings worth
-  keeping. Then remove the `wip` label.
+  exposes one, a deep link to the session. If the Issue is only being reported
+  for someone else, do not claim it. Add `feature` or `fix` when the Issue is
+  created or updated, based on whether the change is user-visible or fixes/
+  cleans up existing behavior; unlike `wip`, that label stays after the work
+  is done.
+- After reviewing the Issue, create or update the Plan in `plan/` and refine it
+  directly as the design changes. Commit and push the Plan, then open a draft
+  PR for the user's review. Keep the `wip` claim while this expected review
+  step is in progress.
+- After the Plan review, implement and verify the change, commit and push it,
+  and mark the PR ready for review. If hands-on verification is needed, the
+  user adds `needs-verification` to the PR. If the user explicitly asks for
+  planning-only work, release this session's `wip` claim after the Plan PR is
+  handed off; do not remove another agent's label or claim.
+- Findings and surprises discovered during implementation go into the Plan
+  first. Summarize important progress or decisions in the Issue, but do not
+  require the Issue body to mirror the Plan.
+- When implementation is complete, append the implementation decisions and CI
+  findings worth keeping to the Plan, then move it from `plan/` to
+  `docs/history/` in the same PR. Do not create a separate PR only to move the
+  Plan. After creating the PR, enable AutoMerge and monitor it until it is
+  merged. If required checks, reviews, permissions, or another external
+  condition prevent the merge, report the blocker clearly. Remove `wip` after
+  the work completes.
+- If the user asks to handle the Issue end-to-end, the draft-PR Plan review
+  step may be folded into the same implementation flow.
 - Don't close the issue yourself unless it's a documentation-only change
   with nothing to verify. For other changes, leave the close itself to the
   human, whether they close it directly or tell you to.
