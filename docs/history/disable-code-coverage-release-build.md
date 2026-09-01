@@ -77,3 +77,16 @@ Xcodeには共通のコードカバレッジ設定とClang系・Swift系の設�
 
 実装と検証が完了したら、このプランを削除する。通常ビルドとprofiling用途の挙動に
 差が残る場合のみ、判断内容を`docs/history/`へ記録する。
+
+## 実装結果
+
+PR #84（2026-08-29マージ）で対応済み。
+
+- pbxprojの`ReleaseLocal`設定に`ENABLE_CODE_COVERAGE`/`CLANG_ENABLE_CODE_COVERAGE`/
+  `SWIFT_ENABLE_CODE_COVERAGE`を`NO`で追加した
+- Zig側は当初案（`xcodebuild`呼び出しへのビルド設定注入）ではなく、通常ビルドを
+  scheme指定からZashiki target直接指定に変更する形で対応した
+- 検証時、`zig build test`はXCTest実行中に長時間無応答となり中断した。本プランの
+  変更が原因かは切り分けていないが、既知の事象として記録する
+- このプラン自体はPRマージ後も`plan/`に残ったままになっていたため、2026-09-01に
+  `docs/history/`へ移動した
