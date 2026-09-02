@@ -75,6 +75,69 @@ struct GwWorktree: Decodable, Identifiable {
         return (path as NSString).lastPathComponent
     }
 
+    /// Human-readable details for the branch/HEAD label. The full path is
+    /// useful when multiple worktrees have similar branch names.
+    var displayNameHelp: String {
+        let location = "Path: \(path)"
+        if detached || branch == nil || branch?.isEmpty == true {
+            return "\(displayName)\nDetached HEAD\n\(location)"
+        }
+        return "\(displayName)\n\(location)"
+    }
+
+    var gitStatusHelp: String {
+        if let statusError = git.statusError?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !statusError.isEmpty {
+            return "Git: Unable to determine status\nError: \(statusError)"
+        }
+        return git.clean ? "Git: Clean (no changes)" : "Git: Dirty (uncommitted changes)"
+    }
+
+    var upstreamHelp: String {
+        let ahead = git.ahead ?? 0
+        let behind = git.behind ?? 0
+        guard ahead > 0 || behind > 0 else { return "Upstream: Up to date" }
+
+        var changes: [String] = []
+        if ahead > 0 { changes.append("\(ahead) ahead") }
+        if behind > 0 { changes.append("\(behind) behind") }
+        return "Upstream: \(changes.joined(separator: ", "))"
+    }
+
+    var agentHelp: String {
+        let provider = agent.provider.map(Self.humanized) ?? "None detected"
+        return "Agent: \(provider)\nLifecycle: \(Self.humanized(agent.lifecycle))\nActivity: \(Self.humanized(agent.activity))"
+    }
+
+    var pullRequestHelp: String? {
+        guard let pr = github.pr else { return nil }
+        let title = pr.title.isEmpty ? "Untitled" : pr.title
+        return "Pull request #\(pr.number): \(title)\nState: \(Self.humanized(pr.state))\nGitHub: \(Self.humanized(github.status))"
+    }
+
+    var lockHelp: String {
+        "Locked: this worktree is protected from cleanup"
+    }
+
+    var cleanupHelp: String {
+        let recommendation = Self.humanized(cleanup.recommendation)
+        let reasons = cleanup.reasons?.compactMap { reason -> String? in
+            let trimmed = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : Self.humanized(trimmed)
+        } ?? []
+        let reasonText = reasons.isEmpty ? "None provided" : reasons.joined(separator: ", ")
+        return "Cleanup: \(recommendation)\nReason: \(reasonText)"
+    }
+
+    /// Converts enum-like values from gw without assuming a fixed set of
+    /// values. This keeps tooltips useful when gw adds a new value.
+    static func humanized(_ value: String) -> String {
+        value
+            .split { $0 == "_" || $0 == "-" || $0 == " " }
+            .map { $0.lowercased().capitalized }
+            .joined(separator: " ")
+    }
+
     enum CodingKeys: String, CodingKey {
         case path, branch, head, detached, locked, git, github, agent, cleanup
     }

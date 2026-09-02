@@ -57,7 +57,8 @@ struct WorktreeStatusPane: View {
             }
             .buttonStyle(.plain)
             .disabled(model.recommendedCleanupCount == 0 || model.isCleaning)
-            .help("Run \"gw clean\" (\(model.recommendedCleanupCount) recommended)")
+            .help(cleanupButtonHelp)
+            .accessibilityValue(cleanupButtonHelp)
 
             Button {
                 model.close()
@@ -116,6 +117,31 @@ struct WorktreeStatusPane: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(8)
         .background(Color.orange.opacity(0.1))
+    }
+
+    private var cleanupButtonHelp: String {
+        if model.isCleaning {
+            return "Removing recommended worktrees…"
+        }
+        if directory == nil {
+            return "No focused worktree repository is available"
+        }
+        if model.isLoading && model.worktrees.isEmpty {
+            return "Loading worktrees…"
+        }
+
+        let recommended = model.recommendedCleanupCount
+        if recommended > 0 {
+            let noun = recommended == 1 ? "worktree" : "worktrees"
+            return "Run \"gw clean\" to remove \(recommended) recommended \(noun)"
+        }
+
+        let review = model.reviewCleanupCount
+        if review > 0 {
+            let noun = review == 1 ? "worktree needs" : "worktrees need"
+            return "No worktrees are recommended for removal. \(review) \(noun) review, but none are eligible for automatic cleanup"
+        }
+        return "No worktrees are recommended for removal"
     }
 
     private func statusMessage(systemImage: String?, message: String, isProgress: Bool = false) -> some View {

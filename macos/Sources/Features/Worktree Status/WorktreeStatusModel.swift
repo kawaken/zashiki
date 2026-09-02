@@ -52,6 +52,12 @@ class WorktreeStatusModel: ObservableObject {
         worktrees.filter { $0.cleanup.recommendation == "recommended" }.count
     }
 
+    /// Worktrees that need a human decision but are not eligible for the
+    /// automatic gw clean pass.
+    var reviewCleanupCount: Int {
+        worktrees.filter { $0.cleanup.recommendation == "review" }.count
+    }
+
     func open() {
         isVisible = true
     }
