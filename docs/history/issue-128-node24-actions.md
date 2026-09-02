@@ -28,7 +28,17 @@ GitHub Actions の CI 実行時に表示される `Node.js 20 is deprecated.` �
 - `action.yml` の Node 24 対応を公式リポジトリのコミットと照合する。
 - ワークフロー変更を含むため、GitHub Actions の `test` ジョブが実行されることを確認する。
 
-## 完了後
+## 実装結果
 
-実装完了後、この内容に実装結果と CI の確認結果を追記して
-`docs/history/issue-128-node24-actions.md` へ移動する。
+- `test.yml` の test/build/lint ジョブで `setup-zig` を Node 24 対応コミットへ更新した。
+- `release.yml` のリリースジョブも同じコミットへ更新した。
+- Issue の警告対象になり得る `actions/cache` も、Node 24 対応の v6.1.0 へ更新した。
+- いずれも Action の参照は SHA 固定を維持した。
+
+## 検証結果
+
+- 全ワークフローファイルを Ruby YAML パーサーで検証し、正常に読み込めた。
+- `git diff --check` が成功した。
+- `just lint` が成功した（Zig フォーマット、SwiftLint 182 ファイル・0 violations）。
+- `setup-zig` の対象コミットが `runs.using: node24`、`actions/cache` v6.1.0 も
+  `runs.using: node24` であることを公式リポジトリ上で確認した。
