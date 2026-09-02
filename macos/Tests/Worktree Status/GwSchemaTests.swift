@@ -55,6 +55,39 @@ struct GwSchemaTests {
         #expect(worktree.cleanup.reasons == ["pull_request_merged", "worktree_clean"])
     }
 
+    @Test func providesHumanReadableTooltips() throws {
+        let output = try decode(GwListOutput.self, json: Self.listFixture)
+        let worktree = try #require(output.worktrees.first { $0.branch == "done-feature" })
+
+        #expect(worktree.displayNameHelp == "done-feature\nPath: /tmp/example-worktrees/done-feature")
+        #expect(worktree.gitStatusHelp == "Git: Clean (no changes)")
+        #expect(worktree.upstreamHelp == "Upstream: Up to date")
+        #expect(worktree.agentHelp == "Agent: Codex\nLifecycle: Ended\nActivity: Unknown")
+        #expect(worktree.pullRequestHelp == "Pull request #84: Ship the thing\nState: Merged\nGitHub: Available")
+        #expect(worktree.lockHelp == "Locked: this worktree is protected from cleanup")
+        #expect(worktree.cleanupHelp == "Cleanup: Recommended\nReason: Pull Request Merged, Worktree Clean")
+    }
+
+    @Test func tooltipsExplainUnknownAndErrorStates() throws {
+        let json = """
+        {
+          "path": "/tmp/dirty-worktree",
+          "branch": "dirty-worktree",
+          "git": { "clean": false, "status_error": "permission denied", "ahead": 2, "behind": 1 },
+          "github": { "pr": null, "status": "degraded" },
+          "agent": { "lifecycle": "hibernating", "activity": "mystery" },
+          "cleanup": { "recommendation": "quarantine", "reasons": ["needs_manual_review"] }
+        }
+        """
+        let worktree = try decode(GwWorktree.self, json: json)
+
+        #expect(worktree.gitStatusHelp == "Git: Unable to determine status\nError: permission denied")
+        #expect(worktree.upstreamHelp == "Upstream: 2 ahead, 1 behind")
+        #expect(worktree.agentHelp == "Agent: None detected\nLifecycle: Hibernating\nActivity: Mystery")
+        #expect(worktree.pullRequestHelp == nil)
+        #expect(worktree.cleanupHelp == "Cleanup: Quarantine\nReason: Needs Manual Review")
+    }
+
     @Test func displayNameFallsBackToShortHeadWhenDetached() throws {
         let json = """
         {

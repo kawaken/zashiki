@@ -15,11 +15,12 @@ struct WorktreeStatusRowView: View {
                 .font(.system(.body, design: .monospaced))
                 .lineLimit(1)
                 .truncationMode(.middle)
+                .help(worktree.displayNameHelp)
 
             if worktree.locked {
                 Image(systemName: "lock.fill")
                     .foregroundStyle(.secondary)
-                    .help("locked")
+                    .help(worktree.lockHelp)
             }
 
             Spacer(minLength: 4)
@@ -34,14 +35,19 @@ struct WorktreeStatusRowView: View {
 
     @ViewBuilder
     private var gitStateIcon: some View {
-        if worktree.git.clean {
+        if let statusError = worktree.git.statusError,
+           !statusError.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+                .help(worktree.gitStatusHelp)
+        } else if worktree.git.clean {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)
-                .help("working tree clean")
+                .help(worktree.gitStatusHelp)
         } else {
             Image(systemName: "circle.fill")
                 .foregroundStyle(.orange)
-                .help("working tree has changes")
+                .help(worktree.gitStatusHelp)
         }
     }
 
@@ -60,17 +66,15 @@ struct WorktreeStatusRowView: View {
             }
             .font(.caption2)
             .foregroundStyle(.secondary)
-            .help("\(ahead) ahead, \(behind) behind")
+            .help(worktree.upstreamHelp)
         }
     }
 
     @ViewBuilder
     private var agentIcon: some View {
-        if let provider = worktree.agent.provider {
-            Image(systemName: Self.agentSymbolName(for: provider))
-                .foregroundStyle(Self.agentColor(for: worktree.agent.lifecycle))
-                .help("\(provider) · \(worktree.agent.lifecycle)")
-        }
+        Image(systemName: Self.agentSymbolName(for: worktree.agent.provider))
+            .foregroundStyle(Self.agentColor(for: worktree.agent.lifecycle))
+            .help(worktree.agentHelp)
     }
 
     @ViewBuilder
@@ -81,33 +85,35 @@ struct WorktreeStatusRowView: View {
                     .font(.caption)
                     .foregroundStyle(Self.pullRequestColor(for: pr.state))
             }
-            .help(pr.title)
+            .help(worktree.pullRequestHelp ?? "Pull request")
         }
     }
 
     @ViewBuilder
     private var cleanupIcon: some View {
-        switch worktree.cleanup.recommendation {
-        case "recommended":
-            Image(systemName: "trash.circle.fill")
-                .foregroundStyle(.red)
-                .help("cleanup recommended: \(reasonsText)")
-        case "review":
-            Image(systemName: "exclamationmark.circle.fill")
-                .foregroundStyle(.yellow)
-                .help("review recommended: \(reasonsText)")
-        default:
-            EmptyView()
+        Group {
+            switch worktree.cleanup.recommendation {
+            case "recommended":
+                Image(systemName: "trash.circle.fill")
+                    .foregroundStyle(.red)
+            case "review":
+                Image(systemName: "exclamationmark.circle.fill")
+                    .foregroundStyle(.yellow)
+            case "keep":
+                Image(systemName: "checkmark.circle")
+                    .foregroundStyle(.secondary)
+            default:
+                Image(systemName: "questionmark.circle")
+                    .foregroundStyle(.secondary)
+            }
         }
-    }
-
-    private var reasonsText: String {
-        (worktree.cleanup.reasons ?? []).joined(separator: ", ")
+        .help(worktree.cleanupHelp)
     }
 
     /// `provider` is a raw string from `gw` (see `GwSchema.swift`); unknown
     /// values fall back to a generic icon rather than failing to render.
-    private static func agentSymbolName(for provider: String) -> String {
+    private static func agentSymbolName(for provider: String?) -> String {
+        guard let provider else { return "person.crop.circle" }
         switch provider {
         case "claude": return "sparkles"
         case "codex": return "cpu"
