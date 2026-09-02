@@ -42,3 +42,10 @@ GitHub Actions の CI 実行時に表示される `Node.js 20 is deprecated.` �
 - `just lint` が成功した（Zig フォーマット、SwiftLint 182 ファイル・0 violations）。
 - `setup-zig` の対象コミットが `runs.using: node24`、`actions/cache` v6.1.0 も
   `runs.using: node24` であることを公式リポジトリ上で確認した。
+
+## 追加確認
+
+Node.js 24 対応後の CI に残った Annotation は、macOS runner の Homebrew に登録された
+未使用の `aws/tap` が未信頼扱いになった warning だった。`test.yml` の just/lint
+ジョブで Homebrew パッケージをインストールする前にこの tap を外し、不要な Annotation
+を出さないようにした。
