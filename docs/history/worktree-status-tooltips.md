@@ -33,3 +33,7 @@ Issue #129の対応として、狭いWorktree Statusサイドパネルのアイ�
 - just test-fast: 成功
 - just lint: 成功（Swift 182ファイル、違反0）
 - 実機でのマウスホバー表示と、無効化されたcleanupボタン上でのtooltip表示は未確認。
+
+## 再検証
+
+PR #133のマージ後に実機確認用artifactを再取得する場合は、コード変更を含まない再検証用PRを作成し、`needs-verification`ラベルを付与する。GitHub Actionsの`zig build (macOS app)`ジョブが`Zashiki-pr<N>` artifactを生成するため、ダウンロードしたアプリでホバー表示とcleanupボタンのtooltipを確認する。
