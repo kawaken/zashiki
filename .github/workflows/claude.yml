@@ -1,0 +1,63 @@
+name: Claude Code Assignee Trigger
+
+on:
+  issues:
+    types: [assigned]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  group: claude-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  claude:
+    # publicリポジトリのため、Issueを自分でアサインした場合のみ起動する。
+    # `allowed_non_write_users`は使わない(actionの公式ドキュメントでRISKYと
+    # 明記されている)。アサイン先が正しいbotかどうかはaction側の
+    # `assignee_trigger`が検証する。
+    if: github.actor == 'kawaken'
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          assignee_trigger: "claude"
+          prompt: |
+            作業を始める前に、必ず `.github/claude/CI-NOTES.md` を読み、
+            そこに書かれているCI実行時のルールに従ってください。
+
+      - name: Authenticate to Google Cloud
+        if: always() && steps.claude.outputs.execution_file != ''
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Python
+        if: always() && steps.claude.outputs.execution_file != ''
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Record usage to BigQuery
+        if: always() && steps.claude.outputs.execution_file != ''
+        run: |
+          pip install --quiet google-cloud-bigquery
+          python3 .github/scripts/record_usage.py \
+            --execution-file "${{ steps.claude.outputs.execution_file }}" \
+            --run-id "${{ github.run_id }}" \
+            --issue-number "${{ github.event.issue.number }}" \
+            --project "${{ secrets.GCP_PROJECT_ID }}"
