@@ -111,12 +111,12 @@ decisions.
 - After reviewing the Issue, create or update the Plan in `plan/` and refine it
   directly as the design changes. Commit and push the Plan, then open a draft
   PR for the user's review. Keep the `wip` claim while this expected review
-  step is in progress.
+  step and the draft PR are in progress.
 - After the Plan review, implement and verify the change, commit and push it,
   and mark the PR ready for review. If hands-on verification is needed, the
   user adds `needs-verification` to the PR. If the user explicitly asks for
-  planning-only work, release this session's `wip` claim after the Plan PR is
-  handed off; do not remove another agent's label or claim.
+  planning-only work, keep `wip` until the Plan PR is merged; do not remove
+  another agent's label or claim.
 - When creating a PR, write its body according to the PR template.
 - Findings and surprises discovered during implementation go into the Plan
   first. Summarize important progress or decisions in the Issue, but do not
@@ -128,8 +128,14 @@ decisions.
   merged unless the PR has `needs-verification`; keep that PR open and do not
   enable AutoMerge until hands-on verification is complete and the label is
   removed. If required checks, reviews, permissions, or another external
-  condition prevent the merge, report the blocker clearly. Remove `wip` after
-  the work completes.
+  condition prevent the merge, report the blocker clearly. Keep `wip` until
+  the associated PR is actually merged; implementation completion, marking a
+  PR ready, CI completion, or hands-on verification completion are not reasons
+  to remove it. Remove `wip` as the final cleanup step after the PR merge.
+- If work is intentionally cancelled, handed off to another agent, or closed
+  without an implementation PR, record the reason and current status in the
+  Issue before releasing `wip`. Do not remove `wip` merely because the current
+  session or implementation work has ended.
 - If the user asks to handle the Issue end-to-end, the draft-PR Plan review
   step may be folded into the same implementation flow.
 - Don't close the issue yourself unless it's a documentation-only change
