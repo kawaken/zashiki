@@ -1,10 +1,12 @@
 # Changelog
 
-## v0.3.0 (2026-09-01)
+## v0.3.0 (2026-09-04)
 
 - `gw` Worktree Statusサイドパネルを追加し、worktreeの状態確認と`gw clean`の実行に対応
 - GitHub PRを`#123`形式のリンクとして表示
 - Aboutウィンドウの不要なDocsボタンを削除
+- Worktree Statusの各アイコン・状態表示に詳細なホバーツールチップを追加
+- Claude Code / CodexのAgent状態をWorktree Statusに表示し、対象Surfaceへフォーカスできるように
 
 ## v0.2.1 (2026-08-31)
 
