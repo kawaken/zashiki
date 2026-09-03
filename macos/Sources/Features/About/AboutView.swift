@@ -77,7 +77,7 @@ struct AboutView: View {
         VStack(alignment: .center) {
             zashikiIconImage()
                 .resizable()
-                .aspectRatio(contentMode: .fit)
+                .scaledToFit()
                 .frame(height: 128)
 
             VStack(alignment: .center, spacing: 32) {
