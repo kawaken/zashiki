@@ -186,18 +186,12 @@ jobs:
       - name: Build Zashiki.app
         run: zig build -Doptimize=ReleaseFast -Dxcframework-target=native
 
-      - name: Zip Zashiki.app
-        if: github.event_name == 'pull_request'
-        run: |
-          cd zig-out
-          zip -9 -r --symlinks "../Zashiki-pr${{ github.event.pull_request.number }}.zip" Zashiki.app
-
       - name: Upload build artifact
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: Zashiki-pr${{ github.event.pull_request.number }}
-          path: Zashiki-pr${{ github.event.pull_request.number }}.zip
+          path: zig-out/Zashiki.app
           retention-days: 14
 
   lint:

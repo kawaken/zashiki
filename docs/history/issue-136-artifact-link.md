@@ -17,6 +17,8 @@ artifactを案内する。
   成功済みの`Test` runを取得する
 - 対象PRであること、`Test`が成功していること、PR番号に対応する
   `Zashiki-pr<N>` artifactが存在し期限切れでないことをすべて確認する
+- `Zashiki.app`は追加のZIPを作らず、artifactへディレクトリのままアップロードする
+  ことで、ダウンロード後の展開を一段階にする
 - PR本文の同一リポジトリIssue参照を対象とし、対象IssueへartifactページのURLを
   コメントする
 - コメントにはartifactの有効期限と、GitHubログイン・アクセス権が必要なことを案内する
