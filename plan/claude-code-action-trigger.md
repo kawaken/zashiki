@@ -36,40 +36,29 @@ zashiki (public repo) で、GitHub Issueに担当者としてClaudeをアサイ�
 
 ### 完了: BigQuery環境セットアップ
 
-- GCPプロジェクト: `zashiki-analytics`
-  - 課金アカウントを紐付け済み（想定利用量は無料枠内: クエリ月1TB / ストレージ
-    月10GB）
-  - 課金アカウントなしの BigQuery Sandbox は、データが60日で自動削除され
-    ストリーミングinsertも不可のため、継続的なトラッキング用途には不採用
-  - 有効化したAPI: `bigquery.googleapis.com`, `iam.googleapis.com`,
-    `iamcredentials.googleapis.com`, `sts.googleapis.com`,
-    `cloudresourcemanager.googleapis.com`
-- データセット: `claude_usage`（ロケーション: `asia-northeast1`）
-- テーブル: `claude_usage.raw_executions`
-  - よく使う値は列として持ち、生ログ全体もJSON列で保持するハイブリッド構成
-  - スキーマ:
-    - `run_id` STRING REQUIRED（GitHub Actions run ID）
-    - `executed_at` TIMESTAMP REQUIRED
-    - `issue_number` INTEGER NULLABLE
-    - `pr_number` INTEGER NULLABLE
-    - `total_cost_usd` FLOAT NULLABLE
-    - `payload` JSON NULLABLE（`execution_file`全体）
-- GitHub Actionsからの認証: Workload Identity連携（長期のSAキーJSONは発行
-  しない）
-  - サービスアカウント: `github-actions-bq-writer@zashiki-analytics.iam.gserviceaccount.com`
-    - ロール: `roles/bigquery.dataEditor`, `roles/bigquery.jobUser`
-      （プロジェクト単位。データセット単位のIAMバインディングは
-      allowlistingが必要な機能でCLIから設定できなかったため見送り）
-  - Workload Identity Pool: `github-actions-pool`
-  - OIDC Provider: `github-provider`
-    - issuer: `https://token.actions.githubusercontent.com`
-    - attribute mapping: `google.subject=assertion.sub`,
-      `attribute.repository=assertion.repository`,
-      `attribute.actor=assertion.actor`
-    - attribute condition: `assertion.repository=='kawaken/zashiki'`
-      （このリポジトリ以外からのimpersonationを拒否）
+専用のGCPプロジェクトを新規作成し、課金アカウントを紐付けた（想定利用量は
+無料枠内: クエリ月1TB / ストレージ月10GB）。課金アカウントなしの
+BigQuery Sandbox は、データが60日で自動削除されストリーミングinsertも
+不可のため、継続的なトラッキング用途には不採用。有効化したAPI:
+`bigquery.googleapis.com`, `iam.googleapis.com`, `iamcredentials.googleapis.com`,
+`sts.googleapis.com`, `cloudresourcemanager.googleapis.com`。
+
+- データセット・テーブルを作成した。よく使う値（`run_id`, `executed_at`,
+  `issue_number`, `pr_number`, `total_cost_usd`）は列として持ち、生ログ
+  全体（`execution_file`）もJSON列で保持するハイブリッド構成
+- GitHub Actionsからの認証はWorkload Identity連携（長期のSAキーJSONは
+  発行しない）。サービスアカウントに `roles/bigquery.dataEditor` /
+  `roles/bigquery.jobUser` を付与し、OIDC provider側の attribute
+  condition でこのリポジトリ（`kawaken/zashiki`）以外からのimpersonation
+  を拒否している。データセット単位のIAMバインディングはallowlistingが
+  必要な機能でCLIから設定できなかったため、プロジェクト単位の付与に
+  留めた
+  - プロジェクトID・サービスアカウント名・Workload Identity Pool/Provider
+    の具体的な識別子は、publicリポジトリに載せないためこの文書には
+    記載しない（GCPコンソールで確認できる）
   - リポジトリSecrets登録済み: `GCP_WORKLOAD_IDENTITY_PROVIDER`,
-    `GCP_SERVICE_ACCOUNT`
+    `GCP_SERVICE_ACCOUNT`（ワークフローからは`google-github-actions/auth`
+    にこれらのSecretsを渡して利用する）
 
 ### 未着手
 
