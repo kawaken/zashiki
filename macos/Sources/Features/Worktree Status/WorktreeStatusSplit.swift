@@ -15,6 +15,8 @@ struct WorktreeStatusSplit<Content: View>: View {
     /// The directory to refresh against; forwarded to `WorktreeStatusPane`.
     let directory: URL?
 
+    let surfaces: [Zashiki.SurfaceView]
+
     @ViewBuilder let content: () -> Content
 
     /// The fractional width of the pane vs. the terminal content.
@@ -26,7 +28,7 @@ struct WorktreeStatusSplit<Content: View>: View {
                 content()
             } else {
                 SplitView(.horizontal, $split, dividerColor: ghostty.config.splitDividerColor, left: {
-                    WorktreeStatusPane(model: model, directory: directory)
+                    WorktreeStatusPane(model: model, directory: directory, surfaces: surfaces)
                 }, right: {
                     content()
                 }, onEqualize: {

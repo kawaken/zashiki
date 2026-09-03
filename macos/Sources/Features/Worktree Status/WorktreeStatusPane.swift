@@ -11,6 +11,12 @@ struct WorktreeStatusPane: View {
     /// isn't known.
     let directory: URL?
 
+    /// Every Surface in the terminal window. Agent detection is Surface-based,
+    /// unlike the worktree list which is repository-based.
+    let surfaces: [Zashiki.SurfaceView]
+
+    @StateObject private var agentStatus = AgentStatusModel()
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -18,6 +24,12 @@ struct WorktreeStatusPane: View {
             content
         }
         .background(Color(nsColor: .textBackgroundColor))
+        .task(id: surfaces.map(\.id)) {
+            await monitorAgents()
+        }
+        .onDisappear {
+            agentStatus.clear()
+        }
     }
 
     private var header: some View {
@@ -75,23 +87,90 @@ struct WorktreeStatusPane: View {
     @ViewBuilder
     private var content: some View {
         if let errorMessage = model.errorMessage, model.worktrees.isEmpty {
-            statusMessage(systemImage: "exclamationmark.triangle", message: errorMessage)
+            VStack(spacing: 0) {
+                agentSection
+                statusMessage(systemImage: "exclamationmark.triangle", message: errorMessage)
+            }
         } else if model.isLoading && model.worktrees.isEmpty {
-            statusMessage(systemImage: nil, message: "Loading…", isProgress: true)
+            VStack(spacing: 0) {
+                agentSection
+                statusMessage(systemImage: nil, message: "Loading…", isProgress: true)
+            }
         } else if model.worktrees.isEmpty {
-            statusMessage(
-                systemImage: directory == nil ? "questionmark.folder" : "square.stack.3d.up.slash",
-                message: directory == nil
-                    ? "No focused surface's directory is known yet."
-                    : "No worktrees found.")
+            VStack(spacing: 0) {
+                agentSection
+                statusMessage(
+                    systemImage: directory == nil ? "questionmark.folder" : "square.stack.3d.up.slash",
+                    message: directory == nil
+                        ? "No focused surface's directory is known yet."
+                        : "No worktrees found.")
+            }
         } else {
             VStack(spacing: 0) {
                 if let errorMessage = model.errorMessage {
                     warningBanner(errorMessage)
                 }
+                agentSection
                 worktreeList
             }
         }
+    }
+
+    @ViewBuilder
+    private var agentSection: some View {
+        if !agentStatus.agents.isEmpty {
+            agentsSection
+            Divider()
+        }
+    }
+
+    private var agentsSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "person.2.fill")
+                    .foregroundStyle(.secondary)
+                Text("Agents")
+                    .font(.subheadline.weight(.semibold))
+                Text("\(agentStatus.agents.count)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(agentStatus.agents) { agent in
+                        AgentStatusRowView(agent: agent) {
+                            focus(agent.surface)
+                        }
+                        .padding(.horizontal, 8)
+                        Divider()
+                    }
+                }
+            }
+            .frame(maxHeight: 190)
+        }
+    }
+
+    private func monitorAgents() async {
+        while !Task.isCancelled {
+            agentStatus.refresh(surfaces: surfaces)
+            do {
+                try await Task.sleep(nanoseconds: 750_000_000)
+            } catch {
+                return
+            }
+        }
+    }
+
+    private func focus(_ surface: Zashiki.SurfaceView) {
+        surface.window?.makeKeyAndOrderFront(nil)
+        if !NSApp.isActive {
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        Zashiki.moveFocus(to: surface)
     }
 
     private var worktreeList: some View {
