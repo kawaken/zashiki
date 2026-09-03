@@ -1,8 +1,9 @@
 name: Comment build artifact
 
-# needs-verification付きPRのCI artifactを、マージ後に関連Issueから辿れるようにする。
-# CIが先に終わる場合とPRのマージが先になる場合の両方を扱うため、2つのイベントを
-# 入口にする。実際のコメント条件はジョブ内のGitHub API確認で判定する。
+# needs-verification付きPRのCI artifactを、関連Issueから辿れるようにする。
+# CI完了時にコメントするほか、CIが先に終わる場合とPRのマージが先になる場合の
+# 両方を扱うため、2つのイベントを入口にする。実際のコメント条件はジョブ内の
+# GitHub API確認で判定する。
 on:
   pull_request:
     types: [closed]
@@ -58,10 +59,15 @@ jobs:
                 .filter(
                   (item) =>
                     item.base.ref === "main" &&
-                    item.head.sha === workflowRun.head_sha &&
-                    item.merged_at,
+                    item.head.sha === workflowRun.head_sha,
                 )
-                .sort((a, b) => new Date(b.merged_at) - new Date(a.merged_at))[0];
+                .sort((a, b) => {
+                  // 同じコミットに複数のPRが紐づく場合は、openなPRを優先する。
+                  // それ以外では、マージ済みのPRを新しい順に選ぶ。
+                  if (a.state === "open" && b.state !== "open") return -1;
+                  if (a.state !== "open" && b.state === "open") return 1;
+                  return new Date(b.merged_at || 0) - new Date(a.merged_at || 0);
+                })[0];
               candidateRuns = [workflowRun];
             } else {
               pullRequest = context.payload.pull_request;

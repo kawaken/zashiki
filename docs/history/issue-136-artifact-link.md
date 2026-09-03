@@ -1,9 +1,10 @@
-# PRマージ後のビルドartifact URL案内
+# ビルドartifact URLのIssue案内
 
 ## 目的
 
 `needs-verification`付きPRで生成した`Zashiki.app`のGitHub Actions artifactを、
-PRマージ後も関連Issueからダウンロードできるようにする。
+関連Issueからダウンロードできるようにする。実機確認のため、PRがopenの間にも
+artifactを案内する。
 
 ## 実装内容
 
@@ -14,7 +15,7 @@ PRマージ後も関連Issueからダウンロードできるようにする。
     の両方を処理する
 - `workflow_run`のhead SHAから関連PRを取得し、または`pull_request`のhead SHAから
   成功済みの`Test` runを取得する
-- マージ済みであること、`Test`が成功していること、PR番号に対応する
+- 対象PRであること、`Test`が成功していること、PR番号に対応する
   `Zashiki-pr<N>` artifactが存在し期限切れでないことをすべて確認する
 - PR本文の同一リポジトリIssue参照を対象とし、対象IssueへartifactページのURLを
   コメントする
@@ -26,6 +27,12 @@ PRマージ後も関連Issueからダウンロードできるようにする。
 - `needs-verification`が付いていないPRへのartifact生成
 - CI失敗時やartifactが存在しない場合のIssueコメント
 - 期限切れartifactの再公開・長期保存
+
+## 再検証時の修正
+
+- 初版は`workflow_run`でマージ済みPRだけを対象にしていたため、実機確認用artifactをマージ前にIssueへ案内できなかった。
+- `workflow_run`完了時はopenなPRも対象にし、CI成功とartifact生成が完了した時点で関連Issueへリンクをコメントするように修正した。
+- `pull_request`のクローズ時にマージ済みPRを再確認する既存の経路は維持し、CI完了とマージの順序がどちらでもコメントできるようにした。
 
 ## 検証
 
