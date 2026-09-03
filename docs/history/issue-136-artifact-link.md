@@ -33,3 +33,7 @@ PRマージ後も関連Issueからダウンロードできるようにする。
 - `actions/github-script`の埋め込みJavaScriptを構文チェック
 - GitHub APIレスポンスを模したモックで、成功済みartifactのコメント生成を確認
 - `git diff --check`を実行
+
+CIではSwiftLintの更新により既存の`aspectRatio(contentMode: .fit)` 2箇所が新しい
+`legacy_swiftui_aspect_ratio`違反になったため、同等の`scaledToFit()`へ置換して
+必須lintを通過させた。
