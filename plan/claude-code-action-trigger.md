@@ -60,14 +60,36 @@ BigQuery Sandbox は、データが60日で自動削除されストリーミン�
     `GCP_SERVICE_ACCOUNT`（ワークフローからは`google-github-actions/auth`
     にこれらのSecretsを渡して利用する）
 
+### 完了: ワークフロー実装
+
+- `.github/workflows/claude.yml`: `issues.assigned`イベントをトリガーに、
+  `github.actor == 'kawaken'`の場合のみ`claude-code-action@v1`を実行する。
+  実行後、`execution_file`が出力されていれば
+  `google-github-actions/auth@v2`でWorkload Identity連携により認証し、
+  `record_usage.py`でBigQueryに記録する（`if: always()`で、Claude Code側が
+  失敗してもusageは記録する）
+- `.github/claude/CI-NOTES.md`: CI実行時はworktree/ブランチ作成ルールを
+  適用外とする旨、Issue/Planライフサイクルの多段階フローをCI向けに
+  簡略化する旨、GCP識別子を含む公開情報の扱いを明記した
+- `.github/scripts/record_usage.py`: `execution_file`（単一JSONまたは
+  JSON Lines）をパースし、`type == "result"`のレコードから
+  `total_cost_usd`を取り出す。BigQueryへは`load_table_from_json`で
+  バッチロードする（ストリーミングinsertは無料枠外の課金対象になるため
+  採用しなかった）
+  - 実装時の落とし穴: JSON型カラムには生のPythonオブジェクト（dict/list）
+    をそのまま渡す必要がある。事前に`json.dumps()`で文字列化して渡すと、
+    その文字列自体が1つのJSON値として二重にエンコードされてしまう
+    （`payload`が`"\"{...}\""`のような形になる）。ローカルでテスト
+    insertして`JSON_EXTRACT_SCALAR`で検証し、この不具合を発見・修正した
+  - `claude -p --output-format json`の実際のトップレベルフィールドを
+    ローカル実行で確認済み: `total_cost_usd`, `usage`, `num_turns`,
+    `duration_ms`, `type`, `subtype`, `result`, `session_id` 等
+
 ### 未着手
 
-- `.github/workflows/claude.yml` の実装
-- `.github/claude/CI-NOTES.md` の作成
-- BigQueryへのinsert処理（`execution_file`パース、
-  `google-github-actions/auth` + `google-github-actions/upload-bigquery-data`
-  or `bq load` の実装）
 - GitHub App「Claude」のインストールと `CLAUDE_CODE_OAUTH_TOKEN` の登録
+  （ブラウザでの手動操作が必要）
+- 上記のセットアップ後、実際にIssueをアサインしてのE2E動作確認
 - dbtプロジェクトの構築（後回し。当面はBigQuery上の直接SQLで集計する）
 
 ## 完了条件
