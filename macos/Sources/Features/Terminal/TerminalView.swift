@@ -82,7 +82,11 @@ struct TerminalView<ViewModel: TerminalViewModel>: View {
         case .error:
             ErrorView()
         case .ready:
-            WorktreeStatusSplit(ghostty: ghostty, model: viewModel.worktreeStatus, directory: pwdURL) {
+            WorktreeStatusSplit(
+                ghostty: ghostty,
+                model: viewModel.worktreeStatus,
+                directory: pwdURL,
+                surfaces: Array(viewModel.surfaceTree)) {
                 MarkdownPreviewSplit(ghostty: ghostty, model: viewModel.markdownPreview) {
                     ZStack {
                         VStack(spacing: 0) {
