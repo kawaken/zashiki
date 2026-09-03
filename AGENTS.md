@@ -63,10 +63,13 @@ following rule: `1 task = 1 branch = 1 worktree`.
   branch and must be submitted through a PR.
 - After creating a PR, enable GitHub AutoMerge with
   `gh pr merge --auto --merge` so the PR is merged with a regular merge commit
-  once its required checks and review requirements are satisfied. Do not use
-  squash or rebase merges unless the user explicitly requests one. If
-  AutoMerge cannot be enabled, check the reason and report it instead of
-  merging manually without confirmation.
+  once its required checks and review requirements are satisfied, except when
+  the PR has the `needs-verification` label. A PR with `needs-verification`
+  must remain open without AutoMerge until the human completes hands-on
+  verification and removes the label. Do not use squash or rebase merges
+  unless the user explicitly requests one. If AutoMerge cannot be enabled,
+  check the reason and report it instead of merging manually without
+  confirmation.
 
 ## Public-Facing Work
 
@@ -122,7 +125,9 @@ decisions.
   findings worth keeping to the Plan, then move it from `plan/` to
   `docs/history/` in the same PR. Do not create a separate PR only to move the
   Plan. After creating the PR, enable AutoMerge and monitor it until it is
-  merged. If required checks, reviews, permissions, or another external
+  merged unless the PR has `needs-verification`; keep that PR open and do not
+  enable AutoMerge until hands-on verification is complete and the label is
+  removed. If required checks, reviews, permissions, or another external
   condition prevent the merge, report the blocker clearly. Remove `wip` after
   the work completes.
 - If the user asks to handle the Issue end-to-end, the draft-PR Plan review
@@ -134,10 +139,11 @@ decisions.
   body). Close the issue explicitly, as its own step.
 - If a PR carries a large enough change that it needs hands-on verification
   (visual/behavioral, beyond what CI already checks), add the
-  `needs-verification` label to the PR itself, not the issue — it doesn't
-  need to be removed afterward. This label makes the `build` job in
+  `needs-verification` label to the PR itself, not the issue. This label makes
+  the `build` job in
   `test.yml` build `Zashiki.app` and upload it as a workflow artifact, so
   the change can be downloaded and tested by hand without cutting a
   release. Mention the related issue number in the PR body so they stay
-  linked (without a `Closes #123` keyword, per the rule above). Keep
-  AutoMerge enabled as usual — this label doesn't change the merge flow.
+  linked (without a `Closes #123` keyword, per the rule above). Keep the PR
+  open without AutoMerge while the label is present. After hands-on
+  verification, remove the label and proceed with the normal merge flow.
