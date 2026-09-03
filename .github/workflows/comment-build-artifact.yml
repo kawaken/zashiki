@@ -1,0 +1,199 @@
+name: Comment build artifact
+
+# needs-verification付きPRのCI artifactを、マージ後に関連Issueから辿れるようにする。
+# CIが先に終わる場合とPRのマージが先になる場合の両方を扱うため、2つのイベントを
+# 入口にする。実際のコメント条件はジョブ内のGitHub API確認で判定する。
+on:
+  pull_request:
+    types: [closed]
+  workflow_run:
+    workflows: [Test]
+    types: [completed]
+
+concurrency:
+  group: comment-build-artifact-${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha || github.run_id }}
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  comment:
+    name: comment build artifact URL
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment artifact URL on linked issues
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const workflowRun = context.payload.workflow_run;
+            let pullRequest;
+            let candidateRuns;
+
+            if (context.eventName === "workflow_run") {
+              if (
+                workflowRun.name !== "Test" ||
+                workflowRun.event !== "pull_request" ||
+                workflowRun.conclusion !== "success"
+              ) {
+                core.info("The completed workflow is not a successful pull_request Test run.");
+                return;
+              }
+
+              const associatedPullRequests = await github.paginate(
+                github.rest.repos.listPullRequestsAssociatedWithCommit,
+                {
+                  owner,
+                  repo,
+                  commit_sha: workflowRun.head_sha,
+                  per_page: 100,
+                },
+              );
+              pullRequest = associatedPullRequests
+                .filter(
+                  (item) =>
+                    item.base.ref === "main" &&
+                    item.head.sha === workflowRun.head_sha &&
+                    item.merged_at,
+                )
+                .sort((a, b) => new Date(b.merged_at) - new Date(a.merged_at))[0];
+              candidateRuns = [workflowRun];
+            } else {
+              pullRequest = context.payload.pull_request;
+              if (!pullRequest.merged) {
+                core.info("The pull request was closed without being merged.");
+                return;
+              }
+
+              const { data } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner,
+                repo,
+                event: "pull_request",
+                head_sha: pullRequest.head.sha,
+                status: "completed",
+                per_page: 100,
+              });
+              candidateRuns = data.workflow_runs
+                .filter(
+                  (run) =>
+                    run.name === "Test" &&
+                    run.event === "pull_request" &&
+                    run.conclusion === "success",
+                )
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            }
+
+            if (!pullRequest) {
+              core.info("No merged pull request was associated with the completed workflow.");
+              return;
+            }
+
+            // PRテンプレートの「## Issue」欄で使う同一リポジトリの #123 参照を拾う。
+            // 外部リポジトリの owner/repo#123 は対象にしない。
+            const issueNumbers = new Set();
+            const body = pullRequest.body || "";
+            for (const match of body.matchAll(/(?:^|[^A-Za-z0-9_/#])#(\d+)\b/g)) {
+              issueNumbers.add(Number(match[1]));
+            }
+            const sameRepo = `${owner}/${repo}`.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            for (const match of body.matchAll(new RegExp(`${sameRepo}#(\\d+)\\b`, "gi"))) {
+              issueNumbers.add(Number(match[1]));
+            }
+            for (const match of body.matchAll(
+              new RegExp(`https://github\\.com/${sameRepo}/issues/(\\d+)\\b`, "gi"),
+            )) {
+              issueNumbers.add(Number(match[1]));
+            }
+
+            const linkedIssues = [];
+            for (const issueNumber of issueNumbers) {
+              try {
+                const { data: issue } = await github.rest.issues.get({
+                  owner,
+                  repo,
+                  issue_number: issueNumber,
+                });
+                if (!issue.pull_request) linkedIssues.push(issue);
+              } catch (error) {
+                if (error.status === 404) {
+                  core.info(`Referenced issue #${issueNumber} does not exist.`);
+                  continue;
+                }
+                throw error;
+              }
+            }
+            if (linkedIssues.length === 0) {
+              core.info(`No issue reference found in PR #${pullRequest.number}.`);
+              return;
+            }
+
+            const artifactName = `Zashiki-pr${pullRequest.number}`;
+            let artifact;
+            let artifactRun;
+            for (const run of candidateRuns) {
+              const artifacts = await github.paginate(
+                github.rest.actions.listWorkflowRunArtifacts,
+                { owner, repo, run_id: run.id, per_page: 100 },
+              );
+              const found = artifacts.find(
+                (item) => item.name === artifactName && !item.expired && item.size_in_bytes > 0,
+              );
+              if (found) {
+                artifact = found;
+                artifactRun = run;
+                break;
+              }
+            }
+
+            if (!artifact) {
+              core.info(`No active ${artifactName} artifact was found.`);
+              return;
+            }
+
+            const artifactUrl =
+              `${context.serverUrl}/${owner}/${repo}/actions/runs/` +
+              `${artifactRun.id}/artifacts/${artifact.id}`;
+            const expiresAt = new Intl.DateTimeFormat("ja-JP", {
+              dateStyle: "long",
+              timeStyle: "short",
+              timeZone: "Asia/Tokyo",
+            }).format(new Date(artifact.expires_at));
+            const marker =
+              `<!-- zashiki-build-artifact: pr=${pullRequest.number} ` +
+              `run=${artifactRun.id} artifact=${artifact.id} -->`;
+            const commentBody = [
+              marker,
+              "## 実機確認用ビルド",
+              "",
+              `PR #${pullRequest.number} のCIで生成された \`${artifactName}\` です。`,
+              "",
+              `[${artifactName} をダウンロード](${artifactUrl})`,
+              "",
+              `- 有効期限: ${expiresAt}（日本時間）。期限を過ぎるとダウンロードできません。`,
+              "- GitHub Actionsのartifactのため、GitHubへのログインとリポジトリへのアクセス権が必要です。",
+            ].join("\n");
+
+            for (const issue of linkedIssues) {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner,
+                repo,
+                issue_number: issue.number,
+                per_page: 100,
+              });
+              if (comments.some((comment) => (comment.body || "").includes(marker))) {
+                core.info(`Artifact ${artifact.id} is already mentioned on issue #${issue.number}.`);
+                continue;
+              }
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: issue.number,
+                body: commentBody,
+              });
+              core.info(`Commented artifact ${artifact.id} on issue #${issue.number}.`);
+            }
