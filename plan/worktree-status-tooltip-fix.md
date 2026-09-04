@@ -1,0 +1,47 @@
+# Worktree Status 一覧のツールチップ修正
+
+## 関連
+
+- Issue #148: サイドバーのWorktree一覧のアイコンツールチップが表示されない
+- 直前の実装: PR #133 / `docs/history/worktree-status-tooltips.md`
+
+## 問題
+
+Worktree Status の一覧行では、SwiftUI の `help` modifier を個々の
+`Image`、`Text`、`Link` に付けている。しかし、実アプリのスクロールされた
+Worktree 一覧上でホバーしても、期待する macOS の help tag が表示されない。
+文言の生成と Codable の状態変換は既存テストで検証済みであり、問題は一覧内の
+SwiftUI view から AppKit の tooltip へ伝わる表示経路にあると考えられる。
+
+## 方針
+
+- Worktree 行の表示は維持し、tooltip だけを AppKit の `NSView.toolTip` に
+  接続する小さな SwiftUI bridge を追加する。
+- 行内の各状態表示が持つ既存の詳細文言を再利用し、branch/HEAD、Git、upstream、
+  agent、PR、lock、cleanup の個別 tooltip を維持する。
+- Link のクリックやスクロールを妨げないよう、tooltip bridge は表示だけを担当し、
+  SwiftUI の本来の hit testing を奪わない構成にする。
+- 既存の `.help` はアクセシビリティ向けの補助として残すか、bridge 側の
+  `accessibilityHelp` と重複する場合は整理する。
+
+## 実装
+
+1. Worktree Status 専用の AppKit tooltip bridge / View modifier を追加する。
+2. `WorktreeStatusRowView` の各 tooltip を bridge 経由に置き換える。
+3. tooltip 文言の既存テストを維持し、必要なら bridge の更新・空文字処理をテストする。
+4. `docs/history/` に実装判断と検証結果を追記して plan を移動する。
+
+## 検証
+
+- `just test-fast`
+- `just lint`
+- macOS app build
+- 実アプリの Worktree Status 一覧で、各アイコンと branch/PR にホバーして
+  tooltip が表示されることを確認する（既存のローカルビルドを対象にし、別の
+  アプリを終了しない）。
+
+## 完了条件
+
+- Issue #148 の報告症状が実アプリで解消している。
+- 既存の Worktree Status 表示・PR リンク・スクロール操作を壊していない。
+- Plan に実装判断と CI/実機検証結果を記録し、実装 PR で `docs/history/` に移動する。
