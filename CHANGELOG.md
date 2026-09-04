@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.3.1 (2026-09-04)
+
+- Worktree Statusのアイコン・状態表示でホバーツールチップが表示されるように修正
+- Claude CodeのIdle / Waiting状態を正しく検出し、状態判定の誤表示を修正
+
 ## v0.3.0 (2026-09-04)
 
 - `gw` Worktree Statusサイドパネルを追加し、worktreeの状態確認と`gw clean`の実行に対応
