@@ -26,10 +26,15 @@ SwiftUI view から AppKit の tooltip へ伝わる表示経路にあると考�
 
 ## 実装
 
-1. Worktree Status 専用の AppKit tooltip bridge / View modifier を追加する。
-2. `WorktreeStatusRowView` の各 tooltip を bridge 経由に置き換える。
-3. tooltip 文言の既存テストを維持し、必要なら bridge の更新・空文字処理をテストする。
-4. `docs/history/` に実装判断と検証結果を追記して plan を移動する。
+1. Worktree Status 専用の AppKit tooltip bridge / View modifier を追加した。
+   `NSView.toolTip` を設定した透明な `NSViewRepresentable` を overlay として
+   配置し、`hitTest` は `nil` を返して本来の SwiftUI 操作を通過させる。
+2. `WorktreeStatusRowView` の branch/HEAD、Git、upstream、agent、PR、lock、
+   cleanup の各 tooltip を bridge 経由にした。既存の `.help` はアクセシビリティ
+   用に残している。
+3. tooltip 文言の既存テストは変更せず、macOS target に新規 bridge が含まれて
+   build できることを確認した。
+4. 実装判断と検証結果をこの文書へ追記し、`docs/history/` に移動する。
 
 ## 検証
 
@@ -40,8 +45,17 @@ SwiftUI view から AppKit の tooltip へ伝わる表示経路にあると考�
   tooltip が表示されることを確認する（既存のローカルビルドを対象にし、別の
   アプリを終了しない）。
 
+### 実施結果
+
+- `just test-fast`: 成功
+- `just lint`: 成功（0 violations / 0 serious）
+- `just test-fast` に含まれる Debug macOS app build: 成功
+- ローカル build の bundle path は `macos/build/Debug/Zashiki.app`。
+- 実アプリのホバー確認: Mac がロック中で自動解除できなかったため未実施。
+  GUI の起動・終了は行っておらず、別ビルドを終了する操作もしていない。
+
 ## 完了条件
 
-- Issue #148 の報告症状が実アプリで解消している。
+- Issue #148 の報告症状が実アプリで解消している（人手確認待ち）。
 - 既存の Worktree Status 表示・PR リンク・スクロール操作を壊していない。
 - Plan に実装判断と CI/実機検証結果を記録し、実装 PR で `docs/history/` に移動する。

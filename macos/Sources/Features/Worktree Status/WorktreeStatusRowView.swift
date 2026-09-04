@@ -16,11 +16,13 @@ struct WorktreeStatusRowView: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .help(worktree.displayNameHelp)
+                .appKitTooltip(worktree.displayNameHelp)
 
             if worktree.locked {
                 Image(systemName: "lock.fill")
                     .foregroundStyle(.secondary)
                     .help(worktree.lockHelp)
+                    .appKitTooltip(worktree.lockHelp)
             }
 
             Spacer(minLength: 4)
@@ -40,14 +42,17 @@ struct WorktreeStatusRowView: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
                 .help(worktree.gitStatusHelp)
+                .appKitTooltip(worktree.gitStatusHelp)
         } else if worktree.git.clean {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)
                 .help(worktree.gitStatusHelp)
+                .appKitTooltip(worktree.gitStatusHelp)
         } else {
             Image(systemName: "circle.fill")
                 .foregroundStyle(.orange)
                 .help(worktree.gitStatusHelp)
+                .appKitTooltip(worktree.gitStatusHelp)
         }
     }
 
@@ -67,6 +72,7 @@ struct WorktreeStatusRowView: View {
             .font(.caption2)
             .foregroundStyle(.secondary)
             .help(worktree.upstreamHelp)
+            .appKitTooltip(worktree.upstreamHelp)
         }
     }
 
@@ -75,6 +81,7 @@ struct WorktreeStatusRowView: View {
         Image(systemName: Self.agentSymbolName(for: worktree.agent.provider))
             .foregroundStyle(Self.agentColor(for: worktree.agent.lifecycle))
             .help(worktree.agentHelp)
+            .appKitTooltip(worktree.agentHelp)
     }
 
     @ViewBuilder
@@ -86,6 +93,7 @@ struct WorktreeStatusRowView: View {
                     .foregroundStyle(Self.pullRequestColor(for: pr.state))
             }
             .help(worktree.pullRequestHelp ?? "Pull request")
+            .appKitTooltip(worktree.pullRequestHelp ?? "Pull request")
         }
     }
 
@@ -108,6 +116,7 @@ struct WorktreeStatusRowView: View {
             }
         }
         .help(worktree.cleanupHelp)
+        .appKitTooltip(worktree.cleanupHelp)
     }
 
     /// `provider` is a raw string from `gw` (see `GwSchema.swift`); unknown
