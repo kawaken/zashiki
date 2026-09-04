@@ -40,8 +40,7 @@ final class AgentStatusModel: ObservableObject {
             let detection = AgentDetector.detect(.init(
                 processName: processName,
                 screenContents: screenContents,
-                inputLine: inputLine,
-                previousScreenContents: previous?.screenContents))
+                inputLine: inputLine))
 
             guard let detection else { continue }
             activeIDs.insert(surface.id)

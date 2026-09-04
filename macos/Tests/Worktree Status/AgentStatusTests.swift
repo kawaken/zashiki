@@ -7,8 +7,7 @@ struct AgentStatusTests {
         let result = AgentDetector.detect(.init(
             processName: "claude",
             screenContents: "Claude Code\n❯",
-            inputLine: "",
-            previousScreenContents: nil))
+            inputLine: ""))
 
         #expect(result == .init(provider: .claude, activity: .idle))
     }
@@ -17,18 +16,25 @@ struct AgentStatusTests {
         let result = AgentDetector.detect(.init(
             processName: "/opt/homebrew/bin/codex",
             screenContents: "OpenAI Codex\n›",
-            inputLine: "",
-            previousScreenContents: nil))
+            inputLine: ""))
 
         #expect(result == .init(provider: .codex, activity: .idle))
+    }
+
+    @Test func detectsClaudeBarePromptAsIdle() {
+        let result = AgentDetector.detect(.init(
+            processName: "claude",
+            screenContents: "* Churned for 1m 17s · done 0:00\n>",
+            inputLine: ""))
+
+        #expect(result == .init(provider: .claude, activity: .idle))
     }
 
     @Test func detectsWrappedClaudeFromScreenBranding() {
         let result = AgentDetector.detect(.init(
             processName: "node",
             screenContents: "Claude Code\nWorking…",
-            inputLine: "",
-            previousScreenContents: nil))
+            inputLine: ""))
 
         #expect(result == .init(provider: .claude, activity: .working))
     }
@@ -37,8 +43,7 @@ struct AgentStatusTests {
         let result = AgentDetector.detect(.init(
             processName: "/Users/test/.local/share/claude/versions/2.1.259",
             screenContents: "Thinking…",
-            inputLine: "",
-            previousScreenContents: nil))
+            inputLine: ""))
 
         #expect(result == .init(provider: .claude, activity: .working))
     }
@@ -47,8 +52,7 @@ struct AgentStatusTests {
         let result = AgentDetector.detect(.init(
             processName: "codex",
             screenContents: "Allow this command?\nPermission required: allow / deny",
-            inputLine: "",
-            previousScreenContents: nil))
+            inputLine: ""))
 
         #expect(result == .init(provider: .codex, activity: .waiting))
     }
@@ -57,38 +61,47 @@ struct AgentStatusTests {
         let result = AgentDetector.detect(.init(
             processName: "claude",
             screenContents: "Claude Code\n❯ inspect this",
-            inputLine: "inspect this",
-            previousScreenContents: nil))
+            inputLine: "inspect this"))
 
         #expect(result == .init(provider: .claude, activity: .waiting))
     }
 
-    @Test func detectsRecentScreenChangeAsWorking() {
-        let result = AgentDetector.detect(.init(
-            processName: "codex",
-            screenContents: "OpenAI Codex\nApplying patch",
-            inputLine: "",
-            previousScreenContents: "OpenAI Codex\nReading files"))
-
-        #expect(result == .init(provider: .codex, activity: .working))
-    }
-
-    @Test func returnsUnknownForUnrecognizedKnownAgentScreen() {
+    @Test func detectsClaudeSelectionPromptAsWaiting() {
         let result = AgentDetector.detect(.init(
             processName: "claude",
-            screenContents: "Claude Code\nA new UI we do not know yet",
-            inputLine: "",
-            previousScreenContents: nil))
+            screenContents: "選択式で質問してもらって良いですか？\n" +
+                "次のアクション\n" +
+                "1. そのままコミットする\n" +
+                "2. コミットメッセージを提案してから確認\n" +
+                "Enter to select · ↑/↓ to navigate · Esc to cancel",
+            inputLine: ""))
+
+        #expect(result == .init(provider: .claude, activity: .waiting))
+    }
+
+    @Test func returnsUnknownForUnrecognizedScreen() {
+        let result = AgentDetector.detect(.init(
+            processName: "claude",
+            screenContents: "Claude Code\n新しい出力",
+            inputLine: ""))
 
         #expect(result == .init(provider: .claude, activity: .unknown))
+    }
+
+    @Test func detectsKnownWorkingScreen() {
+        let result = AgentDetector.detect(.init(
+            processName: "codex",
+            screenContents: "OpenAI Codex\nThinking…",
+            inputLine: ""))
+
+        #expect(result == .init(provider: .codex, activity: .working))
     }
 
     @Test func ignoresNonAgentProcess() {
         let result = AgentDetector.detect(.init(
             processName: "zsh",
             screenContents: "❯",
-            inputLine: "",
-            previousScreenContents: nil))
+            inputLine: ""))
 
         #expect(result == nil)
     }

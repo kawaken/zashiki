@@ -43,7 +43,6 @@ struct AgentDetectionInput: Equatable {
     let processName: String?
     let screenContents: String
     let inputLine: String
-    let previousScreenContents: String?
 }
 
 enum AgentDetector {
@@ -58,13 +57,12 @@ enum AgentDetector {
             return .init(provider: provider, activity: .waiting)
         }
 
-        if isWorking(lowerBottom: lowerBottom) ||
-            hasChangedRecently(input) && inputLine.isEmpty && !isIdle(lowerBottom: lowerBottom) {
-            return .init(provider: provider, activity: .working)
-        }
-
         if isIdle(lowerBottom: lowerBottom) {
             return .init(provider: provider, activity: .idle)
+        }
+
+        if isWorking(lowerBottom: lowerBottom) {
+            return .init(provider: provider, activity: .working)
         }
 
         return .init(provider: provider, activity: .unknown)
@@ -99,6 +97,14 @@ enum AgentDetector {
     private static func isWaiting(lowerBottom: String, inputLine: String) -> Bool {
         if !inputLine.isEmpty { return true }
 
+        // Claude Code's selection UI puts the question above the choices and
+        // leaves this footer on the last line, so the question mark is not a
+        // reliable indicator by itself.
+        if lowerBottom.contains("enter to select") &&
+            lowerBottom.contains("esc to cancel") {
+            return true
+        }
+
         let hasPermissionWord = lowerBottom.contains("permission") ||
             lowerBottom.contains("approve") ||
             lowerBottom.contains("approval")
@@ -123,21 +129,14 @@ enum AgentDetector {
             "generating",
             "running",
             "esc to interrupt",
-            "esc to cancel",
             "ctrl+c to stop",
-            "press esc to cancel",
         ].contains { lowerBottom.contains($0) }
     }
 
     private static func isIdle(lowerBottom: String) -> Bool {
         guard let lastLine = lowerBottom.split(whereSeparator: \.isNewline).last else { return false }
         let last = lastLine.trimmingCharacters(in: .whitespaces)
-        return last.contains("❯") || last.contains("›") || last.hasPrefix("> ")
-    }
-
-    private static func hasChangedRecently(_ input: AgentDetectionInput) -> Bool {
-        guard let previous = input.previousScreenContents else { return false }
-        return previous != input.screenContents
+        return last.contains("❯") || last.contains("›") || last == ">" || last.hasPrefix("> ")
     }
 }
 
