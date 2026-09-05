@@ -209,9 +209,34 @@ Phase 2で予定していた「PR作成をワークフロー側に移す」を�
 (`--issue-number`/`--pr-number`は空文字列を渡されることがあるため、
 `int`ではなく空文字列をNoneとして扱うカスタム型に変更した)。
 
+### 完了: E2E動作確認4回目、PR自動作成成功。ビルド確認とCI未トリガー問題
+
+PR自動作成を反映して再度E2E実行したところ、実際にPR(#161)が自動作成
+され、BigQueryにもissue_number/pr_numberが正しく記録された。Issue #124
+の完了条件(claudeラベル付与でClaude Codeが起動しPRを作成できる、
+cost/usageがBigQueryに記録される)を達成した。
+
+残課題としてビルド確認(`just`/`zig`/`xcodebuild`がGitHub Actions runner
+環境にない)を検討したが、ユーザーの判断で「Issue経由のclaude.ymlでは
+実装のみ行い、ビルド確認は既存のPR向けCI(test.yml)に任せればよい」と
+した。ただし、実際にPR #161のCIチェックを確認したところ
+「no checks reported」で**test.ymlが全くトリガーされていなかった**。
+
+原因はGitHub Actionsの既知の制約: `GITHUB_TOKEN`で作成したPRは、その
+イベント自体が新しいワークフロー実行をトリガーしない。`Create Pull
+Request`ステップで`GH_TOKEN: ${{ github.token }}`を使っていたことが
+原因。actionのoutput`github_token`(GitHub App token。inputの
+`github_token`が空の場合にactionが自動設定する)に切り替え、
+`${{ steps.claude.outputs.github_token || github.token }}`とした。
+ただし、claude-code-action内部の最後のステップで
+installation tokenをrevokeしているログを確認しているため、この
+outputが後続ステップでまだ有効か(revokeが完了する前にoutputとして
+セットされるか)は実機で要検証。
+
 ### 未着手
 
-- 上記(PR自動作成)を反映した状態での再E2E確認
+- 上記(`github_token`使用)を反映した状態での再E2E確認。ダメならPAT
+  (Personal Access Token)方式など別の回避策を検討する
 - Phase 2(git/gh関連コマンドの禁止、コミット・ブランチ作成もワーク
   フロー側に移す)、Phase 3(wipラベルをPRマージ時に外す)の実装
 - dbtプロジェクトの構築（後回し。当面はBigQuery上の直接SQLで集計する）
