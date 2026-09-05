@@ -16,9 +16,6 @@ concurrency:
 
 jobs:
   claude:
-    # サードパーティのGitHub Appはissueのassignee候補になれないため、
-    # assignee_triggerは使えない(実機検証で `Bot does not have access to
-    # the repository` エラーを確認)。label_triggerに切り替える。
     # publicリポジトリのため、自分がラベルを付けた場合のみ起動する。
     # `allowed_non_write_users`は使わない(actionの公式ドキュメントでRISKYと
     # 明記されている)。
