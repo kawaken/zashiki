@@ -82,12 +82,18 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
         run: |
-          echo "::group::Debug: git state at commit step start"
-          echo "expected branch: ${{ steps.branch.outputs.branch_name }}"
-          git branch --show-current
-          git rev-parse HEAD
-          git status --porcelain
-          echo "::endgroup::"
+          # Claude Code Actionが、ワークフロー側で作った作業ブランチとは
+          # 別に、独自の新しいブランチを作成してそこにスイッチすることが
+          # ある(実機で確認済み)。`git push origin <name>`は「現在のHEAD」
+          # ではなく「ローカルにある<name>という名前のブランチの内容」を
+          # pushするため、ブランチがずれたままpushすると、Claudeが行った
+          # 変更を含まない空のブランチをpushしてしまう。コミット前に
+          # 必ずワークフロー側の作業ブランチへ明示的に戻す。
+          current_branch="$(git branch --show-current)"
+          if [ "$current_branch" != "${{ steps.branch.outputs.branch_name }}" ]; then
+            echo "Claude Code Actionが別ブランチ($current_branch)に切り替えていたため、${{ steps.branch.outputs.branch_name }}に戻します"
+            git switch "${{ steps.branch.outputs.branch_name }}"
+          fi
           if [ -z "$(git status --porcelain)" ]; then
             echo "変更がないためコミットをスキップします"
             echo "has_changes=false" >> "$GITHUB_OUTPUT"

@@ -297,18 +297,42 @@ E2Eテスト用に軽量なIssue #166を新規作成して確認したところ�
 `git remote set-url`でPAT(`GH_PAT_PR_CREATE`)を使い、push前に明示的に
 認証情報を再設定するよう修正した。
 
-### Phase 2の不具合修正2: PR作成のレースコンディション
+### Phase 2の不具合修正2: PR作成のレースコンディション(誤診断)
 
 認証修正後に再度E2E確認(Issue #166)したところ、`git push`自体は成功
 したが、直後の`gh pr create`が
-`GraphQL: No commits between main and <branch>`で失敗した。`git push`
-直後はGitHub側のレプリケーションが追いついておらず、GraphQL API側では
-まだ新しいコミットが認識されないタイミング問題(既知のレースコンディ
-ション)。`gh pr create`に最大5回・5秒間隔のリトライを追加した。
+`GraphQL: No commits between main and <branch>`で失敗した。当初は
+「`git push`直後のレプリケーション遅延」と判断し、`gh pr create`に
+最大5回・5秒間隔のリトライを追加したが、これは誤診断だった(後述の
+根本原因により、5回リトライしても常に失敗し続けた)。
+
+### Phase 2の不具合修正3: ブランチのずれでコミットがpushされない(根本原因)
+
+リトライ追加後も同じエラーが続いたため、`git branch --show-current`/
+`git rev-parse HEAD`をステップの要所でログ出力するデバッグを追加して
+再検証した結果、根本原因が判明した。
+
+- ワークフロー側の`Create working branch`ステップで作業ブランチ
+  (`claude/issue-<番号>-<タイムスタンプ1>`)を作成しているが、**Claude
+  Code Action自体が内部で独自に別の新しいブランチ
+  (`claude/issue-<番号>-<タイムスタンプ2>`、命名パターンは似ているが
+  別物)を作成し、そこにスイッチしていた**
+- `git commit`は現在チェックアウトされているブランチ(actionが作った
+  別ブランチ)に対して行われる。一方`git push -u origin "<name>"`は、
+  「現在のHEAD」ではなく「ローカルに存在する`<name>`という名前の
+  ブランチの内容」をpushする。ワークフロー側が覚えている元のブランチ
+  名(まだmainのまま、コミットなし)を指定してpushしていたため、
+  Claudeの変更を含む新しいコミットは一切pushされず、空のブランチが
+  pushされていた。これが`gh pr create`の「No commits between」の
+  真因だった
+- 対処: `Commit and push changes`ステップの先頭で
+  `git branch --show-current`を確認し、ワークフロー側が作った
+  ブランチ名と異なっていれば`git switch`で明示的に戻してから
+  コミット・プッシュするよう修正した
 
 ### 未着手
 
-- 上記(PR作成リトライ)を反映した状態での再E2E確認
+- 上記(ブランチのずれ修正)を反映した状態での再E2E確認
 - Phase 3(wipラベルをPRマージ時に外す。別途`pull_request: closed`
   イベントのワークフローが必要)の実装
 - dbtプロジェクトの構築（後回し。当面はBigQuery上の直接SQLで集計する）
