@@ -57,11 +57,16 @@ jobs:
       # PR送信ページへのリンク提供までしか行わない(公式FAQで明記)。
       # 「claudeラベルを付けるとPRができる」というUXを実現するため、
       # ここでワークフロー側がgh pr createを実行する。
+      #
+      # GH_TOKENには`github.token`(標準のGITHUB_TOKEN)ではなく、actionの
+      # `github_token` output(Claude App token)を使う。GITHUB_TOKENで
+      # 作成したPRは、そのイベント自体が新しいワークフロー実行(test.yml
+      # 等)をトリガーしないというGitHub Actions既知の制約があるため。
       - name: Create Pull Request
         id: create-pr
         if: always() && steps.claude.outputs.branch_name != ''
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.claude.outputs.github_token || github.token }}
           BRANCH_NAME: ${{ steps.claude.outputs.branch_name }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
