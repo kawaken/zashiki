@@ -58,15 +58,18 @@ jobs:
       # 「claudeラベルを付けるとPRができる」というUXを実現するため、
       # ここでワークフロー側がgh pr createを実行する。
       #
-      # GH_TOKENには`github.token`(標準のGITHUB_TOKEN)ではなく、actionの
-      # `github_token` output(Claude App token)を使う。GITHUB_TOKENで
-      # 作成したPRは、そのイベント自体が新しいワークフロー実行(test.yml
-      # 等)をトリガーしないというGitHub Actions既知の制約があるため。
+      # GH_TOKENには`github.token`(標準のGITHUB_TOKEN)を使わない。
+      # GITHUB_TOKENで作成したPRは、そのイベント自体が新しいワークフロー
+      # 実行(test.yml等)をトリガーしないというGitHub Actions既知の制約が
+      # あるため。actionの`github_token` output(Claude App token)も試したが、
+      # action内部で最後にrevoke済みで401エラーになった。このリポジトリ
+      # 限定・Contents+Pull requests write権限のfine-grained PATを
+      # `GH_PAT_PR_CREATE`として発行し、それを使う。
       - name: Create Pull Request
         id: create-pr
         if: always() && steps.claude.outputs.branch_name != ''
         env:
-          GH_TOKEN: ${{ steps.claude.outputs.github_token || github.token }}
+          GH_TOKEN: ${{ secrets.GH_PAT_PR_CREATE }}
           BRANCH_NAME: ${{ steps.claude.outputs.branch_name }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
