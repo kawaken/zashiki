@@ -38,6 +38,9 @@ jobs:
             作業を始める前に、必ず `.github/claude/CI-NOTES.md` を読み、
             そこに書かれているCI実行時のルールに従ってください。
 
+            Issue #${{ github.event.issue.number }} の内容を実装し、
+            完了したらPRを作成してください。
+
       - name: Authenticate to Google Cloud
         if: always() && steps.claude.outputs.execution_file != ''
         uses: google-github-actions/auth@v2

@@ -110,9 +110,33 @@ BigQuery Sandbox は、データが60日で自動削除されストリーミン�
   新規作成した。Issueに`claude`ラベルを付ける操作は通常のwrite権限で
   行えるため、Botのassignee候補問題とは無関係に動作する見込み
 
+### 完了: E2E動作確認1回目、2件の不具合を修正
+
+Issue #155(テスト用)に`claude`ラベルを付け、初回のE2E実行を行った。
+2つの不具合が見つかり修正した。
+
+- **promptにIssue内容を実装する指示がなかった**: `prompt`
+  にはCI-NOTES.mdを読む指示のみを書いており、「このIssueを実装して
+  ください」という指示がなかった。claude-code-actionは`prompt`を
+  指定すると、それだけが唯一の指示になり、Issue本文は自動注入され
+  ない(ドキュメントに明記はないが実機で確認)。結果、Claudeは
+  CI-NOTES.mdを読んだだけで2ターン・6秒足らずで終了し、実装は
+  行われなかった。Issue本文を直接prompt埋め込むとinjectionの
+  リスクがあるため、`Issue #${{ github.event.issue.number }} の
+  内容を実装してください`と番号だけを渡し、Claude自身に
+  `gh issue view`等のツールでIssue詳細を取得させる形にした
+- **`record_usage.py`が実際のexecution_file形式に対応していなかった**:
+  ローカルテストでは単一のJSONオブジェクトを想定していたが、実際の
+  `execution_file`は複数メッセージを含むJSON配列全体として書き出されて
+  おり、`AttributeError: 'list' object has no attribute 'get'`で失敗
+  した。単一のJSON値(オブジェクトまたは配列)としてまずパースを試み、
+  配列ならフラット化するよう`load_records()`を修正し、配列形式の
+  execution_fileでローカル実insert・`JSON_EXTRACT_SCALAR`抽出まで
+  再検証した
+
 ### 未着手
 
-- `claude`ラベルを付けてのE2E動作確認
+- 上記修正を反映した状態での再E2E確認
 - dbtプロジェクトの構築（後回し。当面はBigQuery上の直接SQLで集計する）
 
 ## 完了条件
