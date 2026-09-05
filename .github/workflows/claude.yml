@@ -74,6 +74,7 @@ jobs:
         id: commit
         if: always()
         env:
+          GH_TOKEN: ${{ secrets.GH_PAT_PR_CREATE }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
         run: |
@@ -82,6 +83,10 @@ jobs:
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          # Claude Code Action実行後、remoteの認証情報が無効化されている
+          # (action終了時のtoken revokeが影響していると見られる)ため、
+          # PATで明示的に再設定してからpushする。
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
           git add -A
           git commit -m "$ISSUE_TITLE
 

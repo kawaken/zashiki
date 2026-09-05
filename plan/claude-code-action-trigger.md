@@ -287,11 +287,19 @@ GitHub API経由で直接コミットを作る`mcp__github_file_ops__commit_file
   branch_name`から`steps.branch.outputs.branch_name`(ワークフロー側で
   作成したブランチ)に変更した
 
+### Phase 2の不具合修正: git push認証エラー
+
+E2Eテスト用に軽量なIssue #166を新規作成して確認したところ、
+`Commit and push changes`ステップで`git push`が
+`Invalid username or token. Password authentication is not supported`
+で失敗した。想定通り、Claude Code Action実行中にremoteの認証情報が
+書き換えられ、action終了時のtoken revoke処理の影響で無効化されていた。
+`git remote set-url`でPAT(`GH_PAT_PR_CREATE`)を使い、push前に明示的に
+認証情報を再設定するよう修正した。
+
 ### 未着手
 
-- 上記(Phase 2)を反映した状態での再E2E確認。特に`git push`の認証
-  (actions/checkoutが設定するGITHUB_TOKEN認証情報がaction実行後も
-  有効かどうか)が未検証
+- 上記(認証修正)を反映した状態での再E2E確認
 - Phase 3(wipラベルをPRマージ時に外す。別途`pull_request: closed`
   イベントのワークフローが必要)の実装
 - dbtプロジェクトの構築（後回し。当面はBigQuery上の直接SQLで集計する）
