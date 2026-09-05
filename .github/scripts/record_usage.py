@@ -44,12 +44,18 @@ def load_records(execution_file: str) -> list[dict]:
     return records
 
 
+def _optional_int(value: str) -> int | None:
+    """空文字列を渡された場合はNoneとして扱う(ワークフロー側でPR番号が
+    未確定の場合など)。"""
+    return int(value) if value else None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--execution-file", required=True)
     parser.add_argument("--run-id", required=True)
-    parser.add_argument("--issue-number", type=int, default=None)
-    parser.add_argument("--pr-number", type=int, default=None)
+    parser.add_argument("--issue-number", type=_optional_int, default=None)
+    parser.add_argument("--pr-number", type=_optional_int, default=None)
     parser.add_argument("--project", required=True)
     parser.add_argument("--dataset", default="claude_usage")
     parser.add_argument("--table", default="raw_executions")

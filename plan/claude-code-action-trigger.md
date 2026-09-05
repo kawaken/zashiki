@@ -183,10 +183,37 @@ Issue #155(テスト用)に`claude`ラベルを付け、初回のE2E実行を行
     分離は、今回のIssue #124のスコープを超えるため保留。必要になれば
     別Issueとして切り出す
 
+### 完了: E2E動作確認3回目、PR自動作成の欠如を発見・自動化
+
+Phase 1(tagモード化)を反映して再度E2E実行したところ、Claudeが実際に
+Issue内容(Cmd+Yショートカット)を正しく実装し、コミット・プッシュまで
+成功した(24ターン、$0.42)。tagモード化は効果があった。ただし、
+`gh pr create`相当のPR作成はできず、Issueコメントに「Create PRリンク」
+(GitHubのcompareページURL)を貼るだけに留まった。
+
+最初はGitHub Actionsのリポジトリ設定「Allow GitHub Actions to create
+and approve pull requests」が無効(個人アカウントのデフォルト)なことが
+原因かと疑い、`can_approve_pull_request_reviews`を`true`に変更したが
+効果がなかった。改めてclaude-code-actionの公式FAQを確認したところ、
+**これは仕様だった**: 「Claudeはデフォルトで自動PRを作成しない。
+ブランチにコミットをプッシュし、事前入力されたPR送信ページへの
+リンクを提供するだけ」と明記されている。ブランチ保護ルールの尊重と、
+PR作成の最終決定権をユーザーに残すための意図的な設計とのこと。
+
+「`claude`ラベルを付けるとPRができる」というUXを実現するため、
+Phase 2で予定していた「PR作成をワークフロー側に移す」を前倒しで実装
+した。Claude Code Action実行後、`steps.claude.outputs.branch_name`が
+あれば`gh pr create`を実行するステップを追加した(既にPRが存在する
+場合や、変更がなく作成に失敗する場合はスキップする)。作成したPR番号
+は`record_usage.py`の`--pr-number`にも渡すようにした
+(`--issue-number`/`--pr-number`は空文字列を渡されることがあるため、
+`int`ではなく空文字列をNoneとして扱うカスタム型に変更した)。
+
 ### 未着手
 
-- Phase 1(tagモード化+CLAUDE.md差し替え)を反映した状態での再E2E確認
-- Phase 2, 3の実装
+- 上記(PR自動作成)を反映した状態での再E2E確認
+- Phase 2(git/gh関連コマンドの禁止、コミット・ブランチ作成もワーク
+  フロー側に移す)、Phase 3(wipラベルをPRマージ時に外す)の実装
 - dbtプロジェクトの構築（後回し。当面はBigQuery上の直接SQLで集計する）
 
 ## 完了条件

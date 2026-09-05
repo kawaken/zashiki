@@ -53,6 +53,34 @@ jobs:
           git update-index --no-skip-worktree AGENTS.md
           git checkout -- AGENTS.md
 
+      # claude-code-actionは仕様上PRを自動作成せず、ブランチへのpushと
+      # PR送信ページへのリンク提供までしか行わない(公式FAQで明記)。
+      # 「claudeラベルを付けるとPRができる」というUXを実現するため、
+      # ここでワークフロー側がgh pr createを実行する。
+      - name: Create Pull Request
+        id: create-pr
+        if: always() && steps.claude.outputs.branch_name != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH_NAME: ${{ steps.claude.outputs.branch_name }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          existing_pr=$(gh pr view "$BRANCH_NAME" --json number -q .number 2>/dev/null || true)
+          if [ -n "$existing_pr" ]; then
+            echo "PRは既に存在します: #$existing_pr"
+            pr_number="$existing_pr"
+          else
+            gh pr create \
+              --base main \
+              --head "$BRANCH_NAME" \
+              --title "$ISSUE_TITLE" \
+              --body "Related to #${ISSUE_NUMBER}" \
+              || echo "PR作成に失敗しました(変更なしの可能性があります)"
+            pr_number=$(gh pr view "$BRANCH_NAME" --json number -q .number 2>/dev/null || true)
+          fi
+          echo "pr_number=$pr_number" >> "$GITHUB_OUTPUT"
+
       - name: Authenticate to Google Cloud
         if: always() && steps.claude.outputs.execution_file != ''
         uses: google-github-actions/auth@v2
@@ -74,4 +102,5 @@ jobs:
             --execution-file "${{ steps.claude.outputs.execution_file }}" \
             --run-id "${{ github.run_id }}" \
             --issue-number "${{ github.event.issue.number }}" \
+            --pr-number "${{ steps.create-pr.outputs.pr_number }}" \
             --project "${{ secrets.GCP_PROJECT_ID }}"
