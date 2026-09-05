@@ -28,6 +28,17 @@ jobs:
         with:
           fetch-depth: 1
 
+      # wipラベルの付与・claimコメント投稿もClaudeにやらせず、ワーク
+      # フロー側で行う(Phase 3)。外すのはPRマージ時(別ワークフロー
+      # remove-wip-on-merge.yml)に行う。
+      - name: Claim issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue edit ${{ github.event.issue.number }} --add-label wip
+          gh issue comment ${{ github.event.issue.number }} --body \
+            "Claude Code (GitHub Actions) が着手します。実行ログ: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
       # git/PR操作をClaudeにやらせず、ワークフロー側で行う(Phase 2)。
       # Claudeが自分でコミット・プッシュ・PR作成まで行うと、そのぶん
       # トークンを消費する上、gitやPR操作の失敗パターンに引きずられ
@@ -67,10 +78,6 @@ jobs:
       - name: Restore CLAUDE.md
         if: always()
         run: |
-          echo "::group::Debug: git state before restore"
-          git branch --show-current
-          git rev-parse HEAD
-          echo "::endgroup::"
           git update-index --no-skip-worktree AGENTS.md
           git checkout -- AGENTS.md
 
@@ -153,6 +160,19 @@ jobs:
             pr_number=$(gh pr view "$BRANCH_NAME" --json number -q .number 2>/dev/null || true)
           fi
           echo "pr_number=$pr_number" >> "$GITHUB_OUTPUT"
+
+      # CLAUDE.mdの運用ルールに従い、PR作成後はAutoMergeを有効にする。
+      # 通常のPR向けCI(test.yml)がビルド・lintを検証するため、それが
+      # 通ることを条件にマージされる。見た目の確認等が必要な変更かの
+      # 判断はワークフロー側ではできないため、要検証と判断した場合は
+      # 人間が`needs-verification`ラベルを付けてAutoMergeを解除する。
+      - name: Enable AutoMerge
+        if: always() && steps.create-pr.outputs.pr_number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT_PR_CREATE }}
+        run: |
+          gh pr merge "${{ steps.create-pr.outputs.pr_number }}" --auto --merge \
+            || echo "AutoMergeの設定に失敗しました"
 
       - name: Authenticate to Google Cloud
         if: always() && steps.claude.outputs.execution_file != ''
