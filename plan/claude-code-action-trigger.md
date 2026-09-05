@@ -1,10 +1,10 @@
-# GitHub IssueアサインでClaude Codeを起動するAction
+# GitHub Issueへの`claude`ラベル付与でClaude Codeを起動するAction
 
 関連: [Issue #124](https://github.com/kawaken/zashiki/issues/124)
 
 ## 目的
 
-zashiki (public repo) で、GitHub Issueに担当者としてClaudeをアサインすると、
+zashiki (public repo) で、GitHub Issueに`claude`ラベルを付けると、
 `claude-code-action` が起動しClaude Codeが作業を開始する仕組みを導入する。
 実行のたびにcost/usageをBigQueryへ記録し、集計・可視化できるようにする。
 
@@ -13,9 +13,14 @@ zashiki (public repo) で、GitHub Issueに担当者としてClaudeをアサイ�
 - **認証（Claude側）:** `claude setup-token` で発行したOAuthトークンを
   `CLAUDE_CODE_OAUTH_TOKEN` としてリポジトリSecretsに登録する。Pro/Maxサブスクの
   利用枠内で完結させ、API従量課金は使わない。
-- **トリガー:** Issueアサイン。`claude-code-action` の `assignee_trigger`
-  パラメータを使う。GitHub App「Claude」をインストールすると、assigneeに設定
-  できるbotユーザーが使えるようになる。
+- **トリガー:** Issueへの`claude`ラベル付与。`claude-code-action` の
+  `label_trigger` パラメータを使う。当初はIssueアサイン
+  （`assignee_trigger`）を予定していたが、サードパーティのGitHub App
+  はGitHub上でissueのassignee候補になれない制約があり
+  （`Bot does not have access to the repository`エラーを実機で確認）、
+  断念した。公式のセットアップウィザード`/install-github-app`が生成する
+  デフォルトテンプレートも`assignee_trigger`を使っておらず、Anthropic側も
+  同じ制約を把握して回避していると考えられる
 - **起動者制限:** publicリポジトリのため、ワークフロー側で
   `if: github.actor == 'kawaken'` 等により自分がアサインした場合のみ起動する
   よう絞る。actionの `allowed_non_write_users` は使わない（公式にRISKYと
@@ -62,8 +67,9 @@ BigQuery Sandbox は、データが60日で自動削除されストリーミン�
 
 ### 完了: ワークフロー実装
 
-- `.github/workflows/claude.yml`: `issues.assigned`イベントをトリガーに、
-  `github.actor == 'kawaken'`の場合のみ`claude-code-action@v1`を実行する。
+- `.github/workflows/claude.yml`: `issues.labeled`イベントをトリガーに、
+  付与されたラベルが`claude`かつ`github.actor == 'kawaken'`の場合のみ
+  `claude-code-action@v1`を実行する（`label_trigger: "claude"`）。
   実行後、`execution_file`が出力されていれば
   `google-github-actions/auth@v2`でWorkload Identity連携により認証し、
   `record_usage.py`でBigQueryに記録する（`if: always()`で、Claude Code側が
@@ -85,15 +91,32 @@ BigQuery Sandbox は、データが60日で自動削除されストリーミン�
     ローカル実行で確認済み: `total_cost_usd`, `usage`, `num_turns`,
     `duration_ms`, `type`, `subtype`, `result`, `session_id` 等
 
+### 完了: GitHub App・トークン設定、トリガー方式の見直し
+
+- GitHub App「Claude」のインストール、`CLAUDE_CODE_OAUTH_TOKEN`の発行・
+  登録が完了した
+- `assignee_trigger`でのE2E確認時、テスト用Issueにclaude/claude[bot]を
+  アサインしようとしたところ両方とも失敗した。`claude[bot]`
+  （実際のBotアカウント、type: Bot）は`Bot does not have access to the
+  repository`エラーとなり、リポジトリのRepository accessにzashikiが
+  含まれていても解決しなかった
+- 検証のため公式の`/install-github-app`ウィザードを試したところ、
+  自動生成されたPRのテンプレートは`assignee_trigger`を使わず
+  `trigger_phrase`（コメントでの`@claude`メンション）方式だった。これは
+  Anthropic自身がassigneeアサイン方式の制約を把握し、標準テンプレートで
+  回避していることの裏付けと判断し、そのPRは取り込まずクローズした
+  （BigQuery記録処理も削除されてしまうため）
+- `label_trigger: "claude"`に切り替え、リポジトリに`claude`ラベルを
+  新規作成した。Issueに`claude`ラベルを付ける操作は通常のwrite権限で
+  行えるため、Botのassignee候補問題とは無関係に動作する見込み
+
 ### 未着手
 
-- GitHub App「Claude」のインストールと `CLAUDE_CODE_OAUTH_TOKEN` の登録
-  （ブラウザでの手動操作が必要）
-- 上記のセットアップ後、実際にIssueをアサインしてのE2E動作確認
+- `claude`ラベルを付けてのE2E動作確認
 - dbtプロジェクトの構築（後回し。当面はBigQuery上の直接SQLで集計する）
 
 ## 完了条件
 
-- Issueに担当者としてClaudeをアサインすると、上記制約下でClaude Codeが起動し
-  PRを作成できる
+- Issueに`claude`ラベルを付けると、上記制約下でClaude Codeが起動しPRを
+  作成できる
 - 実行のたびにcost/usageがBigQueryに記録され、集計・可視化ができる

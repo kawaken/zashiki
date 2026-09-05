@@ -1,8 +1,8 @@
-name: Claude Code Assignee Trigger
+name: Claude Code Label Trigger
 
 on:
   issues:
-    types: [assigned]
+    types: [labeled]
 
 permissions:
   contents: write
@@ -16,11 +16,10 @@ concurrency:
 
 jobs:
   claude:
-    # publicリポジトリのため、Issueを自分でアサインした場合のみ起動する。
+    # publicリポジトリのため、自分がラベルを付けた場合のみ起動する。
     # `allowed_non_write_users`は使わない(actionの公式ドキュメントでRISKYと
-    # 明記されている)。アサイン先が正しいbotかどうかはaction側の
-    # `assignee_trigger`が検証する。
-    if: github.actor == 'kawaken'
+    # 明記されている)。
+    if: github.event.label.name == 'claude' && github.actor == 'kawaken'
     runs-on: macos-15
     timeout-minutes: 60
     steps:
@@ -34,7 +33,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          assignee_trigger: "claude"
+          label_trigger: "claude"
           prompt: |
             作業を始める前に、必ず `.github/claude/CI-NOTES.md` を読み、
             そこに書かれているCI実行時のルールに従ってください。
