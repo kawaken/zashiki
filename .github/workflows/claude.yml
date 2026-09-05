@@ -28,18 +28,30 @@ jobs:
         with:
           fetch-depth: 1
 
+      # `prompt`を指定するとissuesイベントは無条件でagentモードになり、
+      # Issue本文などのGitHubコンテキストが自動注入されなくなる(実機検証で
+      # 確認済み)。tagモードを維持してコンテキストを自動的に渡すため、
+      # `prompt`は指定しない。CI実行時のルール(CI-NOTES.md)は、CLAUDE.mdを
+      # 一時的に差し替えることでClaude Code標準の自動読み込みに乗せる。
+      # `CLAUDE.md`は`AGENTS.md`へのシンボリックリンクのため、実体である
+      # `AGENTS.md`の方を差し替える。
+      - name: Prepare CI-specific CLAUDE.md
+        run: |
+          git update-index --skip-worktree AGENTS.md
+          { echo ""; cat .github/claude/CI-NOTES.md; } >> AGENTS.md
+
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           label_trigger: "claude"
-          prompt: |
-            作業を始める前に、必ず `.github/claude/CI-NOTES.md` を読み、
-            そこに書かれているCI実行時のルールに従ってください。
 
-            Issue #${{ github.event.issue.number }} の内容を実装し、
-            完了したらPRを作成してください。
+      - name: Restore CLAUDE.md
+        if: always()
+        run: |
+          git update-index --no-skip-worktree AGENTS.md
+          git checkout -- AGENTS.md
 
       - name: Authenticate to Google Cloud
         if: always() && steps.claude.outputs.execution_file != ''

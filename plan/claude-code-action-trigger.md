@@ -134,9 +134,59 @@ Issue #155(テスト用)に`claude`ラベルを付け、初回のE2E実行を行
   execution_fileでローカル実insert・`JSON_EXTRACT_SCALAR`抽出まで
   再検証した
 
+### 完了: E2E動作確認2回目、agent/tagモードの根本原因を特定
+
+前回の修正(Issue番号をpromptに追記)を反映して再度E2E実行したところ、
+23ターン・cost $0.37まで動いたが、Issueの内容取得もPR作成もできずに
+終了した。Claudeの最終応答(BigQueryのpayloadから確認)によると、
+`gh`/`curl`/`git ls-remote`/`WebFetch`など、ネットワークに触れる
+操作がすべて「要承認」のまま拒否され、承認が得られなかった。
+
+`anthropics/claude-code-action`のソースコード
+(`src/modes/detector.ts`, `src/create-prompt/index.ts`)を直接確認し、
+根本原因を特定した。
+
+- `issues`イベントで`prompt`入力を指定すると、`checkContainsTrigger`
+  (label_trigger等のトリガー判定)による分岐を経由せず、**無条件で
+  "agent"モード**になる
+- "agent"モードでは`context.prompt`の文字列だけがそのまま使われ、
+  GitHub Issueの本文・タイトルなどのコンテキストは一切自動注入されない
+  (これが実装できなかった直接の原因)
+- `prompt`を指定しなければ、`issues`イベント+`labeled`アクション+
+  ラベル名一致の条件で"tag"モードになり、GitHub Issueのコンテキストが
+  自動的にdefaultPromptへ含まれる。これがAnthropicの想定する標準的な
+  動作ルートと考えられる
+
+### 決定: プロンプト差し替え方式とPhase分けした設計変更
+
+- `prompt`入力は削除し、tagモードを維持する
+- CI実行時のルール(CI-NOTES.md)は、`prompt`の代わりに`CLAUDE.md`
+  (実体は`AGENTS.md`へのシンボリックリンク)を一時的に差し替えることで
+  Claude Code標準の自動読み込みに乗せる。Claude Code Action実行前に
+  `git update-index --skip-worktree AGENTS.md`してからCI-NOTES.mdの
+  内容を追記し、実行後に`--no-skip-worktree`+`git checkout --`で復元
+  する。`--skip-worktree`によりClaudeが`git add -A`等をしても差し替え
+  分がステージングされず、コミットに紛れ込まない
+- 併せて今後の設計変更をPhase分けして決定した(今回のPRはPhase 1のみ
+  実装する)
+  - **Phase 1(今回)**: 上記のtagモード化+CLAUDE.md差し替え方式を導入し、
+    Issueコンテキストが正しく渡ることをE2Eで確認する。Claudeが自律的に
+    コミット・PR作成する現行の設計はそのまま維持する
+  - **Phase 2**: git/gh関連のBashコマンドを`claude_args`の
+    `--disallowedTools`で禁止し、コミット・ブランチ作成・PR作成を
+    ワークフロー側のステップに移す。Claudeには実装(ファイル編集)のみ
+    させ、トークン消費を実装作業に集中させる
+  - **Phase 3**: `wip`ラベルの管理を見直す。付与は引き続きClaude(または
+    ワークフロー)が作業開始時に行うが、外すのはPRマージ時に移す(別途
+    `pull_request: closed`イベントのワークフローが必要)
+  - GitHub Projectsを使ったIssueステータス管理とClaudeの作業管理の
+    分離は、今回のIssue #124のスコープを超えるため保留。必要になれば
+    別Issueとして切り出す
+
 ### 未着手
 
-- 上記修正を反映した状態での再E2E確認
+- Phase 1(tagモード化+CLAUDE.md差し替え)を反映した状態での再E2E確認
+- Phase 2, 3の実装
 - dbtプロジェクトの構築（後回し。当面はBigQuery上の直接SQLで集計する）
 
 ## 完了条件
