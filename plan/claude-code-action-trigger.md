@@ -297,9 +297,18 @@ E2Eテスト用に軽量なIssue #166を新規作成して確認したところ�
 `git remote set-url`でPAT(`GH_PAT_PR_CREATE`)を使い、push前に明示的に
 認証情報を再設定するよう修正した。
 
+### Phase 2の不具合修正2: PR作成のレースコンディション
+
+認証修正後に再度E2E確認(Issue #166)したところ、`git push`自体は成功
+したが、直後の`gh pr create`が
+`GraphQL: No commits between main and <branch>`で失敗した。`git push`
+直後はGitHub側のレプリケーションが追いついておらず、GraphQL API側では
+まだ新しいコミットが認識されないタイミング問題(既知のレースコンディ
+ション)。`gh pr create`に最大5回・5秒間隔のリトライを追加した。
+
 ### 未着手
 
-- 上記(認証修正)を反映した状態での再E2E確認
+- 上記(PR作成リトライ)を反映した状態での再E2E確認
 - Phase 3(wipラベルをPRマージ時に外す。別途`pull_request: closed`
   イベントのワークフローが必要)の実装
 - dbtプロジェクトの構築（後回し。当面はBigQuery上の直接SQLで集計する）
