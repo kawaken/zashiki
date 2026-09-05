@@ -28,6 +28,18 @@ jobs:
         with:
           fetch-depth: 1
 
+      # git/PR操作をClaudeにやらせず、ワークフロー側で行う(Phase 2)。
+      # Claudeが自分でコミット・プッシュ・PR作成まで行うと、そのぶん
+      # トークンを消費する上、gitやPR操作の失敗パターンに引きずられ
+      # やすい。Claudeには実装(ファイル編集)だけをさせ、コミット以降は
+      # 決定的なロジックに任せる。
+      - name: Create working branch
+        id: branch
+        run: |
+          branch_name="claude/issue-${{ github.event.issue.number }}-$(date +%Y%m%d%H%M%S)"
+          git switch -c "$branch_name"
+          echo "branch_name=$branch_name" >> "$GITHUB_OUTPUT"
+
       # `prompt`を指定するとissuesイベントは無条件でagentモードになり、
       # Issue本文などのGitHubコンテキストが自動注入されなくなる(実機検証で
       # 確認済み)。tagモードを維持してコンテキストを自動的に渡すため、
@@ -46,12 +58,36 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           label_trigger: "claude"
+          # コミット・プッシュに使われるBashコマンド(実行ログで確認済み)と
+          # GitHub API経由の直接コミット用MCPツールを禁止し、実装(ファイル
+          # 編集)のみをさせる。
+          claude_args: |
+            --disallowedTools "Bash(git add:*)" "Bash(git commit:*)" "Bash(git rm:*)" "Bash(git push:*)" "mcp__github_file_ops__commit_files" "mcp__github_file_ops__delete_files"
 
       - name: Restore CLAUDE.md
         if: always()
         run: |
           git update-index --no-skip-worktree AGENTS.md
           git checkout -- AGENTS.md
+
+      - name: Commit and push changes
+        id: commit
+        if: always()
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "変更がないためコミットをスキップします"
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git add -A
+          git commit -m "$ISSUE_TITLE
+
+          Related to #${ISSUE_NUMBER}"
+          git push -u origin "${{ steps.branch.outputs.branch_name }}"
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
 
       # claude-code-actionは仕様上PRを自動作成せず、ブランチへのpushと
       # PR送信ページへのリンク提供までしか行わない(公式FAQで明記)。
@@ -67,10 +103,10 @@ jobs:
       # `GH_PAT_PR_CREATE`として発行し、それを使う。
       - name: Create Pull Request
         id: create-pr
-        if: always() && steps.claude.outputs.branch_name != ''
+        if: always() && steps.commit.outputs.has_changes == 'true'
         env:
           GH_TOKEN: ${{ secrets.GH_PAT_PR_CREATE }}
-          BRANCH_NAME: ${{ steps.claude.outputs.branch_name }}
+          BRANCH_NAME: ${{ steps.branch.outputs.branch_name }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
@@ -84,7 +120,7 @@ jobs:
               --head "$BRANCH_NAME" \
               --title "$ISSUE_TITLE" \
               --body "Related to #${ISSUE_NUMBER}" \
-              || echo "PR作成に失敗しました(変更なしの可能性があります)"
+              || echo "PR作成に失敗しました"
             pr_number=$(gh pr view "$BRANCH_NAME" --json number -q .number 2>/dev/null || true)
           fi
           echo "pr_number=$pr_number" >> "$GITHUB_OUTPUT"

@@ -247,16 +247,61 @@ fine-grained PAT(Personal Access Token)を発行し、`GH_PAT_PR_CREATE`
 直接貼り付けてもらった)。`Create Pull Request`ステップの`GH_TOKEN`を
 これに切り替える。
 
+### 完了: E2E動作確認6回目、PAT方式でPR作成・CIトリガーとも成功
+
+PAT(`GH_PAT_PR_CREATE`)方式に切り替えて再度E2E実行したところ、PR(#164)
+が正常に作成され、かつ`test.yml`のCI(`just lint`, `just test-fast`)が
+正常にトリガーされ全部passした。Issue #124の完了条件(claudeラベル付与
+でClaude Codeが起動しPRを作成できる、cost/usageがBigQueryに記録される、
+PRのCIも正常に動く)を達成した。テスト用に使っていたIssue #155・
+PR #164は実装内容として妥当だったためそのままマージ・クローズした。
+
+### 決定: Phase 2, 3もIssue #124のスコープに含めて実装する
+
+ユーザーから「全部やってほしい」との指示があり、Phase 2(git操作の
+分離)・Phase 3(wipラベル管理の見直し)も本Issueの中で実装する。
+
+### Phase 2実装: git/PR操作をワークフロー側に分離
+
+`Run Claude Code`ステップの実行ログから、Claudeが実際にファイルの
+コミット・プッシュに使っているツールを特定した:
+`Bash(git add:*)`, `Bash(git commit:*)`, `Bash(git rm:*)`,
+`Bash(.../scripts/git-push.sh:*)`(専用スクリプト経由のpush)。加えて
+GitHub API経由で直接コミットを作る`mcp__github_file_ops__commit_files`/
+`delete_files`というMCPツールも存在する(`use_commit_signing: true`の
+場合に使われると推測、デフォルトはfalseなので通常は前者のBash系が
+使われる)。
+
+- `claude.yml`にワークフロー側で作業用ブランチを作成するステップ
+  (`Create working branch`)を追加した。Claude実行前に
+  `claude/issue-<番号>-<タイムスタンプ>`ブランチへ切り替える
+- `Run Claude Code`ステップに`claude_args`の`--disallowedTools`を追加し、
+  上記のgit系コマンドとMCPツールを禁止した。Claudeにはファイル編集
+  (Edit/Write等、常時許可される基本ツール)のみを行わせる
+- 実行後、`Commit and push changes`ステップを追加。`git status
+  --porcelain`で変更の有無を確認し、あれば`git add -A && git commit &&
+  git push`を行う。コミットメッセージはIssueタイトル+
+  `Related to #<番号>`とする、変更がなければスキップする
+  (`has_changes` outputで後続のPR作成ステップに伝える)
+- `Create Pull Request`ステップの参照先を`steps.claude.outputs.
+  branch_name`から`steps.branch.outputs.branch_name`(ワークフロー側で
+  作成したブランチ)に変更した
+
 ### 未着手
 
-- 上記(PAT使用)を反映した状態での再E2E確認。PRのCIが正常にトリガー
-  されるかも合わせて確認する
-- Phase 2(git/gh関連コマンドの禁止、コミット・ブランチ作成もワーク
-  フロー側に移す)、Phase 3(wipラベルをPRマージ時に外す)の実装
+- 上記(Phase 2)を反映した状態での再E2E確認。特に`git push`の認証
+  (actions/checkoutが設定するGITHUB_TOKEN認証情報がaction実行後も
+  有効かどうか)が未検証
+- Phase 3(wipラベルをPRマージ時に外す。別途`pull_request: closed`
+  イベントのワークフローが必要)の実装
 - dbtプロジェクトの構築（後回し。当面はBigQuery上の直接SQLで集計する）
 
 ## 完了条件
 
 - Issueに`claude`ラベルを付けると、上記制約下でClaude Codeが起動しPRを
-  作成できる
+  作成できる (Phase 1の範囲で達成済み)
 - 実行のたびにcost/usageがBigQueryに記録され、集計・可視化ができる
+  (達成済み)
+- Claudeの作業はファイル編集のみとし、git/PR操作はワークフロー側の
+  決定的なロジックで行う (Phase 2、実装中)
+- `wip`ラベルはPRマージ時に外れる (Phase 3、未着手)
