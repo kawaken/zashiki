@@ -94,6 +94,11 @@ struct WorktreeStatusRowView: View {
             }
             .help(worktree.pullRequestHelp ?? "Pull request")
             .appKitTooltip(worktree.pullRequestHelp ?? "Pull request")
+        } else {
+            Image(systemName: Self.pullRequestStatusSymbolName(for: worktree.github.status))
+                .foregroundStyle(Self.pullRequestStatusColor(for: worktree.github.status))
+                .help(worktree.githubStatusHelp)
+                .appKitTooltip(worktree.githubStatusHelp)
         }
     }
 
@@ -143,6 +148,26 @@ struct WorktreeStatusRowView: View {
         case "OPEN": return .green
         case "MERGED": return .purple
         case "CLOSED": return .red
+        default: return .secondary
+        }
+    }
+
+    private static func pullRequestStatusSymbolName(for status: String) -> String {
+        switch status {
+        case "found": return "checkmark.circle.fill"
+        case "not_found": return "minus.circle"
+        case "unknown": return "questionmark.circle.fill"
+        case "unavailable": return "exclamationmark.triangle.fill"
+        default: return "questionmark.circle"
+        }
+    }
+
+    private static func pullRequestStatusColor(for status: String) -> Color {
+        switch status {
+        case "found": return .green
+        case "not_found": return .secondary
+        case "unknown": return .orange
+        case "unavailable": return .red
         default: return .secondary
         }
     }

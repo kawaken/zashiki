@@ -11,7 +11,7 @@ struct GwSchemaTests {
     @Test func decodesFullListOutput() throws {
         let output = try decode(GwListOutput.self, json: Self.listFixture)
 
-        #expect(output.schemaVersion == 1)
+        #expect(output.schemaVersion == 2)
         #expect(output.repository.path == "/Users/kawaken/projects/example")
         #expect(output.repository.branch == "main")
         #expect(output.worktrees.count == 3)
@@ -63,7 +63,7 @@ struct GwSchemaTests {
         #expect(worktree.gitStatusHelp == "Git: Clean (no changes)")
         #expect(worktree.upstreamHelp == "Upstream: Up to date")
         #expect(worktree.agentHelp == "Agent: Codex\nLifecycle: Ended\nActivity: Unknown")
-        #expect(worktree.pullRequestHelp == "Pull request #84: Ship the thing\nState: Merged\nGitHub: Available")
+        #expect(worktree.pullRequestHelp == "Pull request #84: Ship the thing\nState: Merged\nGitHub: Found")
         #expect(worktree.lockHelp == "Locked: this worktree is protected from cleanup")
         #expect(worktree.cleanupHelp == "Cleanup: Recommended\nReason: Pull Request Merged, Worktree Clean")
     }
@@ -85,7 +85,48 @@ struct GwSchemaTests {
         #expect(worktree.upstreamHelp == "Upstream: 2 ahead, 1 behind")
         #expect(worktree.agentHelp == "Agent: None detected\nLifecycle: Hibernating\nActivity: Mystery")
         #expect(worktree.pullRequestHelp == nil)
+        #expect(worktree.githubStatusHelp == "GitHub: Degraded")
         #expect(worktree.cleanupHelp == "Cleanup: Quarantine\nReason: Needs Manual Review")
+    }
+
+    @Test func explainsGitHubLookupStatuses() throws {
+        let expected: [(String, String)] = [
+            ("found", "GitHub: Pull request found"),
+            ("not_found", "GitHub: No pull request found"),
+            ("unknown", "GitHub: Pull request status unknown"),
+            ("unavailable", "GitHub: Pull request lookup unavailable"),
+        ]
+
+        for (status, help) in expected {
+            let json = """
+            {
+              "path": "/tmp/example",
+              "git": { "clean": true },
+              "github": { "pr": null, "status": "\(status)" },
+              "agent": { "lifecycle": "unknown", "activity": "unknown" },
+              "cleanup": { "recommendation": "review" }
+            }
+            """
+            let worktree = try decode(GwWorktree.self, json: json)
+            #expect(worktree.githubStatusHelp == help)
+        }
+    }
+
+    @Test func decodesSchemaV2SourcesAndErrors() throws {
+        let json = """
+        {
+          "schema_version": 2,
+          "repository": { "path": "/tmp/example", "branch": "main" },
+          "sources": { "github": "unavailable", "agent": "local-state" },
+          "errors": [{ "source": "github", "code": "lookup_failed", "message": "network unavailable" }]
+        }
+        """
+        let output = try decode(GwListOutput.self, json: json)
+
+        #expect(output.schemaVersion == 2)
+        #expect(output.sources?.github == "unavailable")
+        #expect(output.errors?.first?.source == "github")
+        #expect(output.errors?.first?.code == "lookup_failed")
     }
 
     @Test func displayNameFallsBackToShortHeadWhenDetached() throws {
@@ -95,7 +136,7 @@ struct GwSchemaTests {
           "detached": true,
           "head": "cef7975bb9a55ad0c4b6a730675e43c8b014104f",
           "git": { "clean": true },
-          "github": { "pr": null, "status": "available" },
+          "github": { "pr": null, "status": "unknown" },
           "agent": { "lifecycle": "unknown", "activity": "unknown" },
           "cleanup": { "recommendation": "review" }
         }
@@ -110,7 +151,7 @@ struct GwSchemaTests {
     @Test func decodesCleanDryRunOutput() throws {
         let json = """
         {
-          "schema_version": 1,
+          "schema_version": 2,
           "repository": { "path": "/tmp/example", "branch": "main" },
           "mode": "dry-run",
           "candidates": [\(Self.doneFeatureWorktreeFixture)]
@@ -126,7 +167,7 @@ struct GwSchemaTests {
     @Test func decodesCleanApplyOutput() throws {
         let json = """
         {
-          "schema_version": 1,
+          "schema_version": 2,
           "repository": { "path": "/tmp/example", "branch": "main" },
           "mode": "apply",
           "removed": ["/tmp/example-worktrees/done-feature"]
@@ -177,7 +218,7 @@ struct GwSchemaTests {
               "url": "https://github.com/kawaken/example/pull/84",
               "head_branch": "done-feature"
             },
-            "status": "available"
+            "status": "found"
           },
           "agent": {
             "provider": "codex",
@@ -192,7 +233,7 @@ struct GwSchemaTests {
 
     private static let listFixture = """
         {
-          "schema_version": 1,
+          "schema_version": 2,
           "repository": { "path": "/Users/kawaken/projects/example", "branch": "main" },
           "sources": { "github": "gh", "agent": "local-state" },
           "worktrees": [
@@ -202,7 +243,7 @@ struct GwSchemaTests {
               "branch": "review-me",
               "head": "cef7975bb9a55ad0c4b6a730675e43c8b014104f",
               "git": { "clean": true, "last_commit_at": "2026-08-27T01:28:34+09:00" },
-              "github": { "pr": null, "status": "available" },
+              "github": { "pr": null, "status": "not_found" },
               "agent": { "lifecycle": "unknown", "activity": "unknown" },
               "cleanup": { "recommendation": "review", "reasons": ["no_pull_request"] }
             },
@@ -212,7 +253,7 @@ struct GwSchemaTests {
               "head": "53c6c1d6d8266bb24bce0eff2f0841947eb816fe",
               "locked": true,
               "git": { "clean": true, "ahead": 0, "behind": 0, "last_commit_at": "2026-08-31T00:04:39+09:00" },
-              "github": { "pr": null, "status": "available" },
+              "github": { "pr": null, "status": "not_found" },
               "agent": {
                 "provider": "claude",
                 "session_id": "6828ae27-5186-5469-ac33-4990e550ac5e",

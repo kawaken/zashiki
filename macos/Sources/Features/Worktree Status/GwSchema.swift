@@ -115,6 +115,25 @@ struct GwWorktree: Decodable, Identifiable {
         return "Pull request #\(pr.number): \(title)\nState: \(Self.humanized(pr.state))\nGitHub: \(Self.humanized(github.status))"
     }
 
+    /// Explains the result of gw's per-worktree GitHub PR lookup when there
+    /// is no PR link to show. Unlike the old `available` value, v2 statuses
+    /// distinguish a successful no-PR lookup from an indeterminate or failed
+    /// lookup.
+    var githubStatusHelp: String {
+        switch github.status {
+        case "found":
+            return "GitHub: Pull request found"
+        case "not_found":
+            return "GitHub: No pull request found"
+        case "unknown":
+            return "GitHub: Pull request status unknown"
+        case "unavailable":
+            return "GitHub: Pull request lookup unavailable"
+        default:
+            return "GitHub: \(Self.humanized(github.status))"
+        }
+    }
+
     var lockHelp: String {
         "Locked: this worktree is protected from cleanup"
     }
@@ -174,7 +193,8 @@ struct GwGitState: Decodable {
 
 struct GwGitHubState: Decodable {
     let pr: GwPullRequest?
-    /// Raw string, e.g. `"available"`. See file header.
+    /// Raw string, e.g. `"found"`, `"not_found"`, `"unknown"`, or
+    /// `"unavailable"`. See file header.
     let status: String
 }
 
