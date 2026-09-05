@@ -2,7 +2,8 @@
 """claude-code-actionのexecution_fileを読み、BigQueryのraw_executionsテーブルに記録する。
 
 execution_fileは`claude -p --output-format json`相当のJSON実行ログ。
-複数ターンにわたる場合はJSON Lines形式になりうるため、両方に対応する。
+実際にはメッセージ全体を含むJSON配列、単一のJSONオブジェクト、JSON Linesの
+いずれの形式でも書き出されうるため、すべてに対応する。
 """
 
 from __future__ import annotations
@@ -22,13 +23,24 @@ def load_records(execution_file: str) -> list[dict]:
     if not content:
         return []
 
-    lines = [line for line in content.splitlines() if line.strip()]
-    records = []
+    # まず単一のJSON値(オブジェクトまたは配列)としてパースを試みる。
+    # claude-code-actionのexecution_fileは、メッセージ全体を1つのJSON配列
+    # として書き出す場合がある。
     try:
-        for line in lines:
-            records.append(json.loads(line))
+        parsed = json.loads(content)
+        if isinstance(parsed, list):
+            return parsed
+        return [parsed]
     except json.JSONDecodeError:
-        records = [json.loads(content)]
+        pass
+
+    # 単一のJSON値としてパースできない場合はJSON Lines形式とみなす。
+    records = []
+    for line in content.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        records.append(json.loads(line))
     return records
 
 
