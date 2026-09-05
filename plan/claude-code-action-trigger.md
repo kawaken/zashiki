@@ -233,10 +233,24 @@ installation tokenをrevokeしているログを確認しているため、こ�
 outputが後続ステップでまだ有効か(revokeが完了する前にoutputとして
 セットされるか)は実機で要検証。
 
+### 完了: E2E動作確認5回目、github_token outputは使えず。PATに切り替え
+
+`github_token` outputに切り替えて再度E2E実行したところ、予想通り
+`HTTP 401: Bad credentials`でPR作成に失敗した。claude-code-action
+内部の最後のステップでinstallation tokenをrevokeしており、`||`による
+`github.token`へのフォールバックは値が空でないため発動しなかった
+(revoke済みの無効なトークン文字列自体は空文字列ではないため)。
+
+このリポジトリに限定し、Contents/Pull requestsをwriteに絞った
+fine-grained PAT(Personal Access Token)を発行し、`GH_PAT_PR_CREATE`
+としてSecretsに登録した(値はこの会話を経由せず、GitHubの管理画面に
+直接貼り付けてもらった)。`Create Pull Request`ステップの`GH_TOKEN`を
+これに切り替える。
+
 ### 未着手
 
-- 上記(`github_token`使用)を反映した状態での再E2E確認。ダメならPAT
-  (Personal Access Token)方式など別の回避策を検討する
+- 上記(PAT使用)を反映した状態での再E2E確認。PRのCIが正常にトリガー
+  されるかも合わせて確認する
 - Phase 2(git/gh関連コマンドの禁止、コミット・ブランチ作成もワーク
   フロー側に移す)、Phase 3(wipラベルをPRマージ時に外す)の実装
 - dbtプロジェクトの構築（後回し。当面はBigQuery上の直接SQLで集計する）
