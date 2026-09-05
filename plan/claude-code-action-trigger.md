@@ -330,19 +330,48 @@ E2Eテスト用に軽量なIssue #166を新規作成して確認したところ�
   ブランチ名と異なっていれば`git switch`で明示的に戻してから
   コミット・プッシュするよう修正した
 
+### 完了: Phase 2最終確認、E2E成功
+
+ブランチのずれ修正を反映して軽量なテスト用Issue(#166、CHANGELOG.mdへの
+1行追記)で再度E2E確認したところ、PR(#171)が正しく自動作成され、`test.yml`
+のCIも正常にトリガーされ、BigQueryにもissue_number/pr_number/costが
+正しく記録された。Phase 2(Claudeにはファイル編集のみさせ、git/PR操作は
+ワークフロー側で行う)を達成した。テスト用のPR #171・Issue #166は動作
+確認後クローズした。
+
+### Phase 3実装: wipラベル管理とAutoMerge設定をワークフロー側に移す
+
+- `claude.yml`に`Claim issue`ステップを追加。`Checkout repository`の
+  直後で、対象Issueに`wip`ラベルを付与し、実行ログへのリンク付きの
+  claimコメントを投稿する(GITHUB_TOKENで十分、後続で新しいワークフロー
+  をトリガーする必要がない操作のため)
+- 新規ワークフロー`remove-wip-on-merge.yml`を追加。`pull_request:
+  types: [closed]`+`merged == true`をトリガーに、PR本文から`#\d+`
+  パターンで関連Issue番号を抽出し、`wip`ラベルが付いていれば外す。
+  Claude Code Action経由のPRに限定せず、通常の人間の作業によるPRにも
+  汎用的に効く実装にした
+- `Create Pull Request`ステップの後に`Enable AutoMerge`ステップを追加。
+  CLAUDE.mdの運用ルール通りAutoMergeを有効にする。見た目の確認等が
+  必要かどうかの判断はワークフロー側ではできないため、要検証だと
+  人間が判断した場合は`needs-verification`ラベルを付けてAutoMergeを
+  解除する運用とした
+- `CI-NOTES.md`を上記の変更に合わせて全面的に更新。「wipラベル管理は
+  Claude自身の仕事」という記述を削除し、「git操作・PR作成・wipラベル
+  管理はすべてワークフロー側が行う。Claudeの役割はファイル編集のみ」
+  という趣旨に書き換えた
+
 ### 未着手
 
-- 上記(ブランチのずれ修正)を反映した状態での再E2E確認
-- Phase 3(wipラベルをPRマージ時に外す。別途`pull_request: closed`
-  イベントのワークフローが必要)の実装
+- 上記(Phase 3)を反映した状態での再E2E確認。特に`wip`ラベルの付与・
+  claimコメント投稿、PRマージ後の`wip`解除、AutoMergeの3点を確認する
 - dbtプロジェクトの構築（後回し。当面はBigQuery上の直接SQLで集計する）
 
 ## 完了条件
 
 - Issueに`claude`ラベルを付けると、上記制約下でClaude Codeが起動しPRを
-  作成できる (Phase 1の範囲で達成済み)
+  作成できる (達成済み)
 - 実行のたびにcost/usageがBigQueryに記録され、集計・可視化ができる
   (達成済み)
 - Claudeの作業はファイル編集のみとし、git/PR操作はワークフロー側の
-  決定的なロジックで行う (Phase 2、実装中)
-- `wip`ラベルはPRマージ時に外れる (Phase 3、未着手)
+  決定的なロジックで行う (Phase 2、達成済み)
+- `wip`ラベルは着手時に付与され、PRマージ時に外れる (Phase 3、実装中)

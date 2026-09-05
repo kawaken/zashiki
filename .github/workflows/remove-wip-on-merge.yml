@@ -1,0 +1,31 @@
+name: Remove wip label on PR merge
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  remove-wip:
+    # PRの本文に記載された関連Issue(#123のような記述)から、マージ完了に
+    # 伴って`wip`ラベルを外す。CLAUDE.mdの運用ルールで「wipはPRがマージ
+    # されるまで保持し、マージ後に外す」と定めているが、そのタイミングの
+    # 検知自体を自動化する。
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Remove wip label from related issues
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          issue_numbers=$(echo "$PR_BODY" | grep -oE '#[0-9]+' | tr -d '#' | sort -u)
+          for issue in $issue_numbers; do
+            labels=$(gh issue view "$issue" --repo "${{ github.repository }}" --json labels -q '.labels[].name' 2>/dev/null || true)
+            if echo "$labels" | grep -qx "wip"; then
+              echo "Issue #$issue からwipラベルを外します"
+              gh issue edit "$issue" --repo "${{ github.repository }}" --remove-label wip
+            fi
+          done
