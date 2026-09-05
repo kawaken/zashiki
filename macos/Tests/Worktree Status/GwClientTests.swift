@@ -8,7 +8,7 @@ import Testing
 struct GwClientTests {
     private static let minimalListJSON = """
         {
-          "schema_version": 1,
+          "schema_version": 2,
           "repository": { "path": "/tmp/example", "branch": "main" },
           "worktrees": []
         }
@@ -76,7 +76,7 @@ struct GwClientTests {
     @Test func cleanDecodesRemovedList() async throws {
         let json = """
             {
-              "schema_version": 1,
+              "schema_version": 2,
               "repository": { "path": "/tmp/example", "branch": "main" },
               "mode": "apply",
               "removed": ["/tmp/example-worktrees/done-feature"]
