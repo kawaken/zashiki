@@ -49,3 +49,26 @@ Node.js 24 対応後の CI に残った Annotation は、macOS runner の Homebr
 未使用の `aws/tap` が未信頼扱いになった warning だった。`test.yml` の just/lint
 ジョブで Homebrew パッケージをインストールする前にこの tap を外し、不要な Annotation
 を出さないようにした。
+
+## Claude Code Label Trigger の再発対応（2026-09-06）
+
+その後、`claude.yml` の `Claude Code Label Trigger` で、次のActionがNode.js 20廃止
+警告を出していることを直近5件の実行で確認した。
+
+- `actions/checkout@v4`
+- `google-github-actions/auth@v2`
+- `actions/setup-python@v5`
+
+いずれもNode.js 24対応版へ更新し、既存のCI方針に合わせてSHA固定を維持した。
+
+- `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1`（v7.0.1）
+- `google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093`（v3.0.0）
+- `actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97`（v7.0.0）
+
+公式Actionの `action.yml` がすべて `runs.using: node24` であることを確認した。
+
+## 再発対応の検証
+
+- `claude.yml` をRuby YAMLパーサーで検証し、正常に読み込めた。
+- `just lint` が成功した。
+- `git diff --check` が成功した。
