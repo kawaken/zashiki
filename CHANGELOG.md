@@ -3,6 +3,8 @@
 
 ## Unreleased
 
+## v0.3.1 (2026-09-06)
+
 - Worktree Statusのアイコン・状態表示でホバーツールチップが表示されるように修正
 - Claude CodeのIdle / Waiting状態を正しく検出し、状態判定の誤表示を修正
 - `gw` GitHub PR status schema v2に対応
