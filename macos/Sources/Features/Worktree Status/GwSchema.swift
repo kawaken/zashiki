@@ -148,6 +148,18 @@ struct GwWorktree: Decodable, Identifiable {
         return "Cleanup: \(recommendation)\nReason: \(reasonText)"
     }
 
+    /// Details for the whole worktree row. Individual help properties remain
+    /// separate so each state can still be tested and reused independently.
+    var rowHelp: String {
+        var sections = [displayNameHelp, gitStatusHelp, upstreamHelp, agentHelp]
+        sections.append(pullRequestHelp ?? githubStatusHelp)
+        if locked {
+            sections.append(lockHelp)
+        }
+        sections.append(cleanupHelp)
+        return sections.joined(separator: "\n")
+    }
+
     /// Converts enum-like values from gw without assuming a fixed set of
     /// values. This keeps tooltips useful when gw adds a new value.
     static func humanized(_ value: String) -> String {

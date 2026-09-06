@@ -41,6 +41,7 @@ struct GwSchemaTests {
         #expect(worktree.agent.lifecycle == "active")
         #expect(worktree.cleanup.recommendation == "keep")
         #expect(worktree.cleanup.reasons == ["worktree_locked"])
+        #expect(worktree.rowHelp.contains(worktree.lockHelp))
     }
 
     @Test func decodesMergedPRRecommendedForCleanup() throws {
@@ -66,6 +67,7 @@ struct GwSchemaTests {
         #expect(worktree.pullRequestHelp == "Pull request #84: Ship the thing\nState: Merged\nGitHub: Found")
         #expect(worktree.lockHelp == "Locked: this worktree is protected from cleanup")
         #expect(worktree.cleanupHelp == "Cleanup: Recommended\nReason: Pull Request Merged, Worktree Clean")
+        #expect(worktree.rowHelp == "done-feature\nPath: /tmp/example-worktrees/done-feature\nGit: Clean (no changes)\nUpstream: Up to date\nAgent: Codex\nLifecycle: Ended\nActivity: Unknown\nPull request #84: Ship the thing\nState: Merged\nGitHub: Found\nCleanup: Recommended\nReason: Pull Request Merged, Worktree Clean")
     }
 
     @Test func tooltipsExplainUnknownAndErrorStates() throws {
@@ -87,6 +89,7 @@ struct GwSchemaTests {
         #expect(worktree.pullRequestHelp == nil)
         #expect(worktree.githubStatusHelp == "GitHub: Degraded")
         #expect(worktree.cleanupHelp == "Cleanup: Quarantine\nReason: Needs Manual Review")
+        #expect(worktree.rowHelp == "dirty-worktree\nPath: /tmp/dirty-worktree\nGit: Unable to determine status\nError: permission denied\nUpstream: 2 ahead, 1 behind\nAgent: None detected\nLifecycle: Hibernating\nActivity: Mystery\nGitHub: Degraded\nCleanup: Quarantine\nReason: Needs Manual Review")
     }
 
     @Test func explainsGitHubLookupStatuses() throws {
