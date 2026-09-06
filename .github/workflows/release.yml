@@ -126,13 +126,10 @@ jobs:
           RELEASE_VERSION: ${{ steps.target.outputs.release_tag }}
         run: |
           set -euo pipefail
-          # RCs use the Unreleased section. Stable releases use the matching
-          # version section, which should be finalized before the stable tag.
-          if [[ "$RELEASE_VERSION" == *-rc* ]]; then
-            changelog_heading="Unreleased"
-          else
-            changelog_heading="${RELEASE_VERSION%%-rc*}"
-          fi
+          # Both RCs and stable releases use the changes accumulated under
+          # Unreleased. Stable releases archive this section after the
+          # GitHub Release is created.
+          changelog_heading="Unreleased"
           awk -v version="$changelog_heading" '
             $0 ~ "^## " version "([[:space:]]|$)" {
               found = 1
@@ -251,3 +248,50 @@ jobs:
           generate_release_notes: false
           body_path: release-notes.md
           prerelease: ${{ contains(steps.target.outputs.release_tag, '-rc') }}
+
+      - name: Finalize stable CHANGELOG
+        if: ${{ !contains(steps.target.outputs.release_tag, '-rc') }}
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT_PR_CREATE }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::error::GH_PAT_PR_CREATE repository secret is required to update CHANGELOG.md."
+            exit 1
+          fi
+
+          git fetch --force origin "refs/heads/main:refs/remotes/origin/main"
+          git checkout --detach origin/main
+
+          if grep -Fq "## $RELEASE_TAG" CHANGELOG.md; then
+            echo "CHANGELOGは既に確定済みです: $RELEASE_TAG"
+            exit 0
+          fi
+
+          if ! grep -Fxq "## Unreleased" CHANGELOG.md; then
+            echo "::error::No Unreleased section found in CHANGELOG.md"
+            exit 1
+          fi
+
+          release_date="$(date -u +%Y-%m-%d)"
+          changelog_tmp="$(mktemp)"
+          trap 'rm -f "$changelog_tmp"' EXIT
+          awk -v release_tag="$RELEASE_TAG" -v release_date="$release_date" '
+            !inserted && $0 == "## Unreleased" {
+              print "## Unreleased"
+              print ""
+              print "## " release_tag " (" release_date ")"
+              inserted = 1
+              next
+            }
+            { print }
+          ' CHANGELOG.md > "$changelog_tmp"
+          mv "$changelog_tmp" CHANGELOG.md
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git commit -m "docs: finalize ${RELEASE_TAG} changelog"
+          gh auth setup-git
+          git push origin HEAD:refs/heads/main

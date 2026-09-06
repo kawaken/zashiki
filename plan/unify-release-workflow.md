@@ -22,7 +22,8 @@ Release名がずれる余地があった。実際に`v0.3.1-rc.2`で、タグ版
 - full testとbuildが成功した後だけPATで新規タグをpushする
 - 既存タグの場合はタグpushせず、同じcommitから公開する
 - Release名、zip名、appcast URL、prerelease判定は決定済みのタグから生成する
-- `CHANGELOG.md`もタグをcheckoutした状態から抽出する
+- RC・stableともに`CHANGELOG.md`の`Unreleased`からリリースノートを抽出する
+- stableのGitHub Release作成後、`Unreleased`を`vX.Y.Z (YYYY-MM-DD)`へ確定し、空の`Unreleased`を追加してmainへcommitする
 
 テスト前に新規タグをリモートへpushしないことで、テスト失敗時に未検証の
 タグを残さない。指定されたタグ名が存在しない場合は、入力された名前を
@@ -35,6 +36,7 @@ mainへ付ける仕様とするため、形式検証はworkflow内で行う。
 - `release.yml`に既存タグ利用・新規タグ作成の分岐を追加
 - 新規タグpushに既存の`GH_PAT_PR_CREATE` secretを使用
 - リリース成果物の全ての名前・URLを`RELEASE_TAG`へ統一
+- stableリリース後のCHANGELOG確定とmainへの反映を追加
 
 ## 検証
 
