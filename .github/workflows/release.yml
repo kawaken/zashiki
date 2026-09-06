@@ -13,17 +13,25 @@ name: Release
 # test.yml(push/PR)はCI時間短縮のため-Dmacos-app-xctest=falseで
 # xcodebuild test(macOSアプリ側のXCTest)を除外し、Swiftコンパイルの検証
 # (xcodebuild build)のみ行っている。XCTestを含む品質保証はここ
-# (タグpush時のフルテスト)で担保する。
+# (このworkflowのfull test)で担保する。
+#
+# このworkflowは手動起動を唯一のリリース入口とする。tagが既存ならその
+# commitを使い、存在しないtagならmainのHEADにローカルtagを作ってから
+# test/buildし、成功後にPATでtagをpushする。GITHUB_TOKENのイベント連鎖に
+# 依存せず、タグ作成からGitHub Release公開までを同じ実行で完了させる。
 
 on:
-  push:
-    tags:
-      - "v*.*.*"
   workflow_dispatch:
     inputs:
+      tag:
+        description: "既存タグ名。存在しなければmainにこの名前で新規作成 (例: v0.1.0-rc.1)"
+        required: false
       version:
-        description: "リリースバージョン（例: v0.1.0）"
-        required: true
+        description: "タグ未指定時の新規リリースバージョン (例: 0.1.0)"
+        required: false
+      rc:
+        description: "タグ未指定時のRC番号。正式リリースなら空欄 (例: 1)"
+        required: false
 
 concurrency:
   group: release-${{ github.ref }}
@@ -40,19 +48,73 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Determine version
-        id: version
+      - name: Select release target
+        id: target
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_RC: ${{ inputs.rc }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "value=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+
+          if [[ -n "$INPUT_TAG" ]]; then
+            TAG="$INPUT_TAG"
           else
-            echo "value=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            if [[ -z "$INPUT_VERSION" ]]; then
+              echo "::error::tagまたはversionのいずれかを指定してください。"
+              exit 1
+            fi
+            if ! [[ "$INPUT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::versionはX.Y.Z形式で指定してください (入力値: $INPUT_VERSION)"
+              exit 1
+            fi
+            if [[ -n "$INPUT_RC" ]] && ! [[ "$INPUT_RC" =~ ^[0-9]+$ ]]; then
+              echo "::error::rcは正の整数で指定してください (入力値: $INPUT_RC)"
+              exit 1
+            fi
+            if [[ -n "$INPUT_RC" ]]; then
+              TAG="v${INPUT_VERSION}-rc.${INPUT_RC}"
+            else
+              TAG="v${INPUT_VERSION}"
+            fi
           fi
+
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]]; then
+            echo "::error::tagはvX.Y.ZまたはvX.Y.Z-rc.N形式で指定してください (入力値: $TAG)"
+            exit 1
+          fi
+
+          git fetch --force origin "refs/heads/main:refs/remotes/origin/main"
+          if git ls-remote --exit-code origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+            TAG_SHA="$(git rev-list -n 1 "$TAG^{commit}")"
+            git checkout --detach "$TAG_SHA"
+            if [[ "$(git rev-parse HEAD)" != "$TAG_SHA" ]]; then
+              echo "::error::タグのcommitをcheckoutできませんでした。"
+              exit 1
+            fi
+            TAG_SOURCE="existing"
+            echo "既存タグを利用します: $TAG ($TAG_SHA)"
+          else
+            git checkout --detach origin/main
+            if git show-ref --verify --quiet "refs/tags/$TAG"; then
+              echo "::error::リモートにはないローカルタグが既に存在します: $TAG"
+              exit 1
+            fi
+            git tag -a "$TAG" -m "$TAG"
+            TAG_SOURCE="new"
+            echo "mainのcommit $(git rev-parse HEAD) に新規タグを作成します: $TAG"
+          fi
+
+          echo "release_tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "tag_source=$TAG_SOURCE" >> "$GITHUB_OUTPUT"
+          echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
 
       - name: Prepare release notes
         env:
-          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+          RELEASE_VERSION: ${{ steps.target.outputs.release_tag }}
         run: |
+          set -euo pipefail
           # RCs use the Unreleased section. Stable releases use the matching
           # version section, which should be finalized before the stable tag.
           if [[ "$RELEASE_VERSION" == *-rc* ]]; then
@@ -106,10 +168,23 @@ jobs:
       - name: Build Zashiki.app
         run: zig build -Doptimize=ReleaseFast -Dxcframework-target=native
 
+      - name: Push new tag
+        if: steps.target.outputs.tag_source == 'new'
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT_PR_CREATE }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::error::GH_PAT_PR_CREATE repository secret is required to push a new release tag."
+            exit 1
+          fi
+          gh auth setup-git
+          git push origin "refs/tags/$RELEASE_TAG"
+
       - name: Zip Zashiki.app
         run: |
           cd zig-out
-          zip -9 -r --symlinks "../Zashiki-${{ steps.version.outputs.value }}-macos.zip" Zashiki.app
+          zip -9 -r --symlinks "../Zashiki-${RELEASE_TAG}-macos.zip" Zashiki.app
 
       - name: Generate signed appcast
         env:
@@ -122,7 +197,7 @@ jobs:
 
           archives_dir="$RUNNER_TEMP/zashiki-sparkle-archives"
           mkdir -p "$archives_dir"
-          cp "Zashiki-${{ steps.version.outputs.value }}-macos.zip" "$archives_dir/"
+          cp "Zashiki-${RELEASE_TAG}-macos.zip" "$archives_dir/"
 
           # Preserve entries from the previous stable feed. On the first
           # release this URL is a 404, which is expected.
@@ -146,8 +221,8 @@ jobs:
           printf '%s' "$SPARKLE_PRIVATE_KEY" | \
             "$sparkle_derived_data/Build/Products/Release/generate_appcast" \
             --ed-key-file - \
-            --download-url-prefix "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.value }}/" \
-            --link "https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.value }}" \
+            --download-url-prefix "https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/" \
+            --link "https://github.com/${{ github.repository }}/releases/tag/${RELEASE_TAG}" \
             --maximum-versions 0 \
             --maximum-deltas 0 \
             -o "$archives_dir/appcast.xml" \
@@ -157,11 +232,11 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
-          tag_name: ${{ steps.version.outputs.value }}
-          name: Zashiki ${{ steps.version.outputs.value }}
+          tag_name: ${{ steps.target.outputs.release_tag }}
+          name: Zashiki ${{ steps.target.outputs.release_tag }}
           files: |
             Zashiki-*-macos.zip
             appcast.xml
           generate_release_notes: false
           body_path: release-notes.md
-          prerelease: ${{ contains(steps.version.outputs.value, '-rc') }}
+          prerelease: ${{ contains(steps.target.outputs.release_tag, '-rc') }}
