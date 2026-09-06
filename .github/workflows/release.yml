@@ -23,15 +23,15 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      tag:
-        description: "既存タグ名。存在しなければmainにこの名前で新規作成 (例: v0.1.0-rc.1)"
-        required: false
       version:
-        description: "タグ未指定時の新規リリースバージョン (例: 0.1.0)"
-        required: false
+        description: "リリースするバージョン (例: 0.1.0)"
+        required: true
+        type: string
       rc:
-        description: "タグ未指定時のRC番号。正式リリースなら空欄 (例: 1)"
-        required: false
+        description: "RCとしてリリースする（番号は自動採番）"
+        required: true
+        default: false
+        type: boolean
 
 concurrency:
   group: release-${{ github.ref }}
@@ -51,32 +51,43 @@ jobs:
       - name: Select release target
         id: target
         env:
-          INPUT_TAG: ${{ inputs.tag }}
           INPUT_VERSION: ${{ inputs.version }}
           INPUT_RC: ${{ inputs.rc }}
         run: |
           set -euo pipefail
 
-          if [[ -n "$INPUT_TAG" ]]; then
-            TAG="$INPUT_TAG"
-          else
-            if [[ -z "$INPUT_VERSION" ]]; then
-              echo "::error::tagまたはversionのいずれかを指定してください。"
-              exit 1
-            fi
-            if ! [[ "$INPUT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "::error::versionはX.Y.Z形式で指定してください (入力値: $INPUT_VERSION)"
-              exit 1
-            fi
-            if [[ -n "$INPUT_RC" ]] && ! [[ "$INPUT_RC" =~ ^[0-9]+$ ]]; then
-              echo "::error::rcは正の整数で指定してください (入力値: $INPUT_RC)"
-              exit 1
-            fi
-            if [[ -n "$INPUT_RC" ]]; then
-              TAG="v${INPUT_VERSION}-rc.${INPUT_RC}"
+          if [[ -z "$INPUT_VERSION" ]]; then
+            echo "::error::versionを指定してください。"
+            exit 1
+          fi
+          if ! [[ "$INPUT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::versionはX.Y.Z形式で指定してください (入力値: $INPUT_VERSION)"
+            exit 1
+          fi
+
+          if [[ "$INPUT_RC" == "true" ]]; then
+            git fetch --force --tags origin
+            rc_prefix="v${INPUT_VERSION}-rc."
+            latest_rc="$({
+              git tag -l "${rc_prefix}*" |
+                awk -v prefix="$rc_prefix" '
+                  index($0, prefix) == 1 {
+                    suffix = substr($0, length(prefix) + 1)
+                    if (suffix ~ /^[0-9]+$/) print suffix
+                  }
+                ' |
+                sort -n |
+                tail -n1
+            } || true)"
+            if [[ -n "$latest_rc" ]]; then
+              next_rc=$((10#$latest_rc + 1))
             else
-              TAG="v${INPUT_VERSION}"
+              next_rc=1
             fi
+            TAG="${rc_prefix}${next_rc}"
+            echo "次のRCタグを作成します: $TAG"
+          else
+            TAG="v${INPUT_VERSION}"
           fi
 
           if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]]; then
