@@ -274,6 +274,19 @@ jobs:
             exit 1
           fi
 
+          changelog_branch="release-changelog-${RELEASE_TAG}"
+          if git ls-remote --exit-code origin "refs/heads/$changelog_branch" >/dev/null 2>&1; then
+            git fetch --force origin "refs/heads/$changelog_branch:refs/remotes/origin/$changelog_branch"
+            git checkout --detach "origin/$changelog_branch"
+          else
+            git switch -c "$changelog_branch"
+          fi
+
+          if grep -Fq "## $RELEASE_TAG" CHANGELOG.md; then
+            echo "CHANGELOG PRのブランチですでに確定済みです: $RELEASE_TAG"
+            exit 0
+          fi
+
           release_date="$(date -u +%Y-%m-%d)"
           changelog_tmp="$(mktemp)"
           trap 'rm -f "$changelog_tmp"' EXIT
@@ -294,4 +307,27 @@ jobs:
           git add CHANGELOG.md
           git commit -m "docs: finalize ${RELEASE_TAG} changelog"
           gh auth setup-git
-          git push origin HEAD:refs/heads/main
+          git push origin "HEAD:refs/heads/$changelog_branch"
+
+          pr_number="$(gh pr list \
+            --repo "$GITHUB_REPOSITORY" \
+            --base main \
+            --head "$changelog_branch" \
+            --state open \
+            --json number \
+            --jq '.[0].number')"
+          if [[ -z "$pr_number" ]]; then
+            pr_body="$(printf '%s\n\n- stableリリース後のCHANGELOGを%sとして確定\n- 次の開発用にUnreleased見出しを維持\n\n## Issue\n\n#190\n' '## Summary' "$RELEASE_TAG")"
+            pr_url="$(gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base main \
+              --head "$changelog_branch" \
+              --title "docs: finalize ${RELEASE_TAG} changelog" \
+              --body "$pr_body")"
+            pr_number="${pr_url##*/}"
+          fi
+          gh pr merge "$pr_number" \
+            --repo "$GITHUB_REPOSITORY" \
+            --auto \
+            --merge
+          echo "CHANGELOG PR #$pr_number を作成または更新し、AutoMergeを有効化しました。"
