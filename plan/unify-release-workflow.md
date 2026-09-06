@@ -15,9 +15,10 @@ Release名がずれる余地があった。実際に`v0.3.1-rc.2`で、タグ版
 
 `release.yml`を唯一の手動入口にして、タグをリリース対象の正とする。
 
-- `tag`が指定され、リモートに存在する場合はそのタグのcommitをcheckoutする
-- `tag`が指定されていない場合は`version`/`rc`からタグ名を生成する
-- タグがリモートに存在しない場合はmainのHEADにローカルタグを作成する
+- `version`から正式版タグ（`vX.Y.Z`）を生成する
+- RCチェック時は、同じバージョンの既存RCタグを調べ、最大番号の次（`rc.1`、`rc.2`…）を生成する
+- 生成したタグがリモートに存在する場合はそのタグのcommitをcheckoutする
+- 生成したタグがリモートに存在しない場合はmainのHEADにローカルタグを作成する
 - full testとbuildが成功した後だけPATで新規タグをpushする
 - 既存タグの場合はタグpushせず、同じcommitから公開する
 - Release名、zip名、appcast URL、prerelease判定は決定済みのタグから生成する
