@@ -118,6 +118,7 @@ struct GwSchemaTests {
           "schema_version": 2,
           "repository": { "path": "/tmp/example", "branch": "main" },
           "sources": { "github": "unavailable", "agent": "local-state" },
+          "worktrees": [],
           "errors": [{ "source": "github", "code": "lookup_failed", "message": "network unavailable" }]
         }
         """
