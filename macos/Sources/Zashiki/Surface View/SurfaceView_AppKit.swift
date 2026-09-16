@@ -1309,7 +1309,15 @@ extension Zashiki {
             // Besides C-/, its important we don't process key equivalents if unfocused
             // because there are other event listeners for that (i.e. AppDelegate's
             // local event handler).
-            if !focused {
+            //
+            // We also require that we're actually the window's first responder.
+            // AppKit calls performKeyEquivalent on every view in the window, not
+            // just the first responder, and `focused` can lag behind the real
+            // first responder when another view in the same window (e.g. the
+            // Markdown preview pane) legitimately has focus. Without this check
+            // we'd swallow key equivalents like Copy before that view ever saw
+            // them.
+            if !focused || !isFirstResponder {
                 return false
             }
 
