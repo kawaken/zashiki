@@ -53,18 +53,25 @@ struct MarkdownPreviewPane: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
+            let parsed = MarkdownFrontMatter.parse(model.content)
             ScrollView {
-                StructuredText(
-                    markdown: model.content,
-                    baseURL: model.fileURL?.deletingLastPathComponent()
-                )
-                .textual.structuredTextStyle(.gitHub)
-                .textual.imageAttachmentLoader(
-                    MarkdownPreviewImageLoader(baseURL: model.fileURL?.deletingLastPathComponent())
-                )
-                .textual.textSelection(.enabled)
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(spacing: 0) {
+                    if !parsed.entries.isEmpty {
+                        FrontMatterTableView(entries: parsed.entries)
+                        Divider()
+                    }
+                    StructuredText(
+                        markdown: parsed.body,
+                        baseURL: model.fileURL?.deletingLastPathComponent()
+                    )
+                    .textual.structuredTextStyle(.gitHub)
+                    .textual.imageAttachmentLoader(
+                        MarkdownPreviewImageLoader(baseURL: model.fileURL?.deletingLastPathComponent())
+                    )
+                    .textual.textSelection(.enabled)
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
         }
     }
