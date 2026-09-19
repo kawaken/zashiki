@@ -3,8 +3,8 @@ import Textual
 import UniformTypeIdentifiers
 
 /// The right-hand pane shown when a terminal window's Markdown preview is
-/// visible. Shows a header (file name, close button) plus the rendered
-/// Markdown, an empty state, or an error state.
+/// visible. Shows a header (back/forward navigation, file name, close
+/// button) plus the rendered Markdown, an empty state, or an error state.
 struct MarkdownPreviewPane: View {
     @ObservedObject var model: MarkdownPreviewModel
 
@@ -19,6 +19,26 @@ struct MarkdownPreviewPane: View {
 
     private var header: some View {
         HStack {
+            Button {
+                model.goBack()
+            } label: {
+                Image(systemName: "chevron.left")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(model.canGoBack ? .primary : .tertiary)
+            .disabled(!model.canGoBack)
+            .help("Show Previous File")
+
+            Button {
+                model.goForward()
+            } label: {
+                Image(systemName: "chevron.right")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(model.canGoForward ? .primary : .tertiary)
+            .disabled(!model.canGoForward)
+            .help("Show Next File")
+
             Text(model.fileURL?.lastPathComponent ?? "Markdown Preview")
                 .font(.headline)
                 .lineLimit(1)
