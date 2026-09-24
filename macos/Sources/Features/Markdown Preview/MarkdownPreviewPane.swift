@@ -46,6 +46,12 @@ struct MarkdownPreviewPane: View {
 
             Spacer()
 
+            Button(action: openFile) {
+                Image(systemName: "folder")
+            }
+            .buttonStyle(.plain)
+            .help("Open File...")
+
             Button {
                 model.close()
             } label: {
