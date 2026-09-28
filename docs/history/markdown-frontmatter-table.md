@@ -70,3 +70,14 @@ Issueの要望は「FrontMatterだったらキーと値のテーブル表示に�
 - FrontMatterがない、または閉じタグがない不完全な`---`ブロックを含む
   ファイルは、現状と同じ表示(崩れた見た目も含め現状維持)のままになる。
 - `MarkdownFrontMatter`のパースロジックにユニットテストがある。
+
+## 実装結果
+
+方針どおりコミット `48f1b7b09`（"MarkdownプレビューでFrontMatterをテーブル表示する"）
+で実装済み。
+
+- `MarkdownFrontMatter.swift` / `FrontMatterTableView.swift` を新規追加、
+  `MarkdownPreviewPane.swift` を変更。
+- `macos/Tests/MarkdownPreview/MarkdownFrontMatterTests.swift` を新規追加。
+- このコミットはPRを経由せずmainへ直接pushされている。本来のPR運用から
+  外れた進め方だった旨をここに記録しておく。
