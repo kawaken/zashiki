@@ -435,7 +435,7 @@ extension Zashiki {
                 NSApp.activate(ignoringOtherApps: true)
             }
             Zashiki.moveFocus(to: self)
-            _ = surfaceModel?.perform(action: "scroll_to_row:\(entry.row)")
+            agentConversationHistory.focusAndScroll(to: entry, on: self)
         }
 
         override func focusDidChange(_ focused: Bool) {

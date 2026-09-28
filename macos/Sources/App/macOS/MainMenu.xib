@@ -24,6 +24,7 @@
                 <outlet property="menuCloseTab" destination="Obb-Mk-j8J" id="Gda-L0-gdz"/>
                 <outlet property="menuCloseWindow" destination="W5w-UZ-crk" id="6ff-BT-ENV"/>
                 <outlet property="menuCommandPalette" destination="et6-de-Mh7" id="53t-cu-dm5"/>
+                <outlet property="menuClaudeCodeHistoryAutoScroll" destination="cch-hr-as1" id="cch-hr-out"/>
                 <outlet property="menuCopy" destination="Jqf-pv-Zcu" id="bKd-1C-oy9"/>
                 <outlet property="menuDecreaseFontSize" destination="kzb-SZ-dOA" id="Y1B-Vh-6Z2"/>
                 <outlet property="menuEqualizeSplits" destination="3gH-VD-vL9" id="SiZ-ce-FOF"/>
@@ -353,6 +354,12 @@
                                 <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
                                 <connections>
                                     <action selector="toggleAgents:" target="-1" id="gW5-Ag-Act"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Claude Code履歴の自動スクロール" id="cch-hr-as1">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <connections>
+                                    <action selector="toggleClaudeCodeHistoryAutoScroll:" target="bbz-4X-AYv" id="cch-hr-act"/>
                                 </connections>
                             </menuItem>
                             <menuItem title="Change Tab Title..." id="iac-lh-Cl7">

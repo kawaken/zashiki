@@ -373,6 +373,8 @@ extension Notification.Name {
 
     /// Notification sent when scrollbar updates
     static let zashikiDidUpdateScrollbar = Notification.Name("dev.kawaken.zashiki.didUpdateScrollbar")
+    static let zashikiClaudeHistoryAutoScrollDidChange =
+        Notification.Name("dev.kawaken.zashiki.claudeCodeHistoryAutoScrollDidChange")
     static let ScrollbarKey = zashikiDidUpdateScrollbar.rawValue + ".scrollbar"
 
     /// Focus the search field

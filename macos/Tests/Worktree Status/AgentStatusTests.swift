@@ -181,6 +181,19 @@ struct AgentStatusTests {
         #expect(entries.map(\.row) == [17, 18])
     }
 
+    @Test func usesStableClaudeEntryIDsAcrossViewportRows() {
+        let first = AgentConversationParser.parse(
+            provider: .claude,
+            screenContents: "❯ inspect the build\n⏺ The build is clean",
+            totalRows: 2)
+        let second = AgentConversationParser.parse(
+            provider: .claude,
+            screenContents: "\n\n❯ inspect the build\n⏺ The build is clean",
+            totalRows: 4)
+
+        #expect(first.map(\.id) == second.map(\.id))
+    }
+
     @Test func parsesCodexMultiLineResponse() {
         let entries = AgentConversationParser.parse(
             provider: .codex,

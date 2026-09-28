@@ -75,7 +75,10 @@ enum AgentConversationParser {
         let preview = normalized(candidate.text)
         guard !preview.isEmpty else { return }
 
-        let id = "\(candidate.row):\(candidate.kind.rawValue):\(preview)"
+        // The row is relative to the currently rendered alternate-screen view and
+        // changes every time the TUI scrolls. Keep it as navigation metadata, but
+        // do not use it as the identity used to merge viewport snapshots.
+        let id = "\(provider.rawValue):\(candidate.kind.rawValue):\(preview)"
         result.append(.init(
             id: id,
             provider: provider,
@@ -136,6 +139,25 @@ final class AgentConversationHistory: ObservableObject {
     private var lastScreenContents: String?
     private var lastTotalRows: Int?
     private var lastDetection: AgentDetection?
+    private var captureTask: Task<Void, Never>?
+    private var settingsObserver: NSObjectProtocol?
+    private var lastCapturedSourceScreen: String?
+
+    init() {
+        settingsObserver = NotificationCenter.default.addObserver(
+            forName: .zashikiClaudeHistoryAutoScrollDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.cancelCapture()
+        }
+    }
+
+    deinit {
+        if let settingsObserver {
+            NotificationCenter.default.removeObserver(settingsObserver)
+        }
+    }
 
     func refresh(surface: Zashiki.SurfaceView) {
         guard let foregroundPID = surface.surfaceModel?.foregroundPID,
@@ -158,6 +180,21 @@ final class AgentConversationHistory: ObservableObject {
         }
 
         self.detection = detection
+        guard detection.provider == .claude else {
+            cancelCapture()
+            entries = []
+            lastScreenContents = nil
+            lastTotalRows = nil
+            lastDetection = detection
+            return
+        }
+
+        guard UserDefaults.zashiki.claudeCodeHistoryAutoScrollEnabled else {
+            cancelCapture()
+            updateEntries(screenContents: screenContents, totalRows: scrollbarTotalRows(surface))
+            return
+        }
+
         guard let scrollbar = surface.scrollbar else {
             entries = []
             lastScreenContents = nil
@@ -174,18 +211,184 @@ final class AgentConversationHistory: ObservableObject {
         lastDetection = detection
         lastScreenContents = screenContents
         lastTotalRows = totalRows
-        entries = AgentConversationParser.parse(
-            provider: detection.provider,
-            screenContents: screenContents,
-            totalRows: totalRows)
+        if entries.isEmpty {
+            entries = AgentConversationParser.parse(
+                provider: detection.provider,
+                screenContents: screenContents,
+                totalRows: totalRows)
+        }
+
+        if detection.activity == .idle,
+           captureTask == nil,
+           lastCapturedSourceScreen != screenContents {
+            captureTask = Task { @MainActor [weak self, weak surface] in
+                guard let self, let surface else { return }
+                await self.captureHistory(on: surface)
+            }
+        }
     }
 
     func clear() {
+        cancelCapture()
         detection = nil
         entries = []
         lastScreenContents = nil
         lastTotalRows = nil
         lastDetection = nil
+        lastCapturedSourceScreen = nil
+    }
+
+    func focusAndScroll(to entry: AgentConversationEntry, on surface: Zashiki.SurfaceView) {
+        guard UserDefaults.zashiki.claudeCodeHistoryAutoScrollEnabled,
+              detection?.provider == .claude,
+              detection?.activity == .idle,
+              surface.surfaceModel?.mouseCaptured == true,
+              captureTask == nil else { return }
+
+        captureTask = Task { @MainActor [weak self, weak surface] in
+            guard let self, let surface else { return }
+            await self.navigate(to: entry, on: surface)
+        }
+    }
+
+    private func updateEntries(screenContents: String, totalRows: Int) {
+        let parsed = AgentConversationParser.parse(
+            provider: .claude,
+            screenContents: screenContents,
+            totalRows: totalRows)
+        entries = parsed
+        lastScreenContents = screenContents
+        lastTotalRows = totalRows
+        lastDetection = detection
+    }
+
+    private func scrollbarTotalRows(_ surface: Zashiki.SurfaceView) -> Int {
+        Int(surface.scrollbar?.total ?? 0)
+    }
+
+    private func cancelCapture() {
+        captureTask?.cancel()
+        captureTask = nil
+        lastCapturedSourceScreen = nil
+    }
+
+    private func captureHistory(on surface: Zashiki.SurfaceView) async {
+        guard UserDefaults.zashiki.claudeCodeHistoryAutoScrollEnabled,
+              detection?.provider == .claude,
+              detection?.activity == .idle,
+              surface.surfaceModel?.mouseCaptured == true else {
+            captureTask = nil
+            return
+        }
+
+        let original = surface.cachedScreenContents.get()
+        lastCapturedSourceScreen = original
+        var previous = original
+        var unchangedCount = 0
+
+        defer {
+            Task { @MainActor [weak self, weak surface] in
+                guard let self, let surface else { return }
+                await self.restore(originalScreen: original, on: surface)
+                self.captureTask = nil
+            }
+        }
+
+        for _ in 0..<32 {
+            guard !Task.isCancelled,
+                  UserDefaults.zashiki.claudeCodeHistoryAutoScrollEnabled,
+                  detection?.provider == .claude,
+                  detection?.activity == .idle else { return }
+
+            surface.surfaceModel?.sendMouseScroll(.init(x: 0, y: 3))
+            guard await waitForScreenUpdate() else { return }
+
+            let screen = surface.cachedScreenContents.get()
+            let totalRows = scrollbarTotalRows(surface)
+            mergeEntries(from: screen, totalRows: totalRows, prepend: true)
+
+            if screen == previous {
+                unchangedCount += 1
+                if unchangedCount >= 2 { return }
+            } else {
+                unchangedCount = 0
+            }
+            previous = screen
+        }
+    }
+
+    private func navigate(to entry: AgentConversationEntry, on surface: Zashiki.SurfaceView) async {
+        defer { captureTask = nil }
+
+        var previous = surface.cachedScreenContents.get()
+        for _ in 0..<32 {
+            guard !Task.isCancelled,
+                  UserDefaults.zashiki.claudeCodeHistoryAutoScrollEnabled,
+                  detection?.provider == .claude,
+                  detection?.activity == .idle else { return }
+
+            let current = surface.cachedScreenContents.get()
+            if AgentConversationParser.parse(
+                provider: .claude,
+                screenContents: current,
+                totalRows: scrollbarTotalRows(surface)
+            ).contains(where: { $0.id == entry.id }) {
+                return
+            }
+
+            guard surface.surfaceModel?.mouseCaptured == true else { return }
+            surface.surfaceModel?.sendMouseScroll(.init(x: 0, y: 3))
+            guard await waitForScreenUpdate() else { return }
+
+            let next = surface.cachedScreenContents.get()
+            mergeEntries(from: next, totalRows: scrollbarTotalRows(surface), prepend: true)
+            if next == previous { return }
+            previous = next
+        }
+    }
+
+    private func restore(originalScreen: String, on surface: Zashiki.SurfaceView) async {
+        guard surface.surfaceModel?.mouseCaptured == true else { return }
+
+        var previous: String?
+        for _ in 0..<48 {
+            guard !Task.isCancelled else { return }
+            let current = surface.cachedScreenContents.get()
+            if current == originalScreen { return }
+            if let previous, current == previous { return }
+
+            surface.surfaceModel?.sendMouseScroll(.init(x: 0, y: -3))
+            guard await waitForScreenUpdate() else { return }
+            previous = current
+        }
+    }
+
+    private func mergeEntries(from screenContents: String, totalRows: Int, prepend: Bool = false) {
+        let parsed = AgentConversationParser.parse(
+            provider: .claude,
+            screenContents: screenContents,
+            totalRows: totalRows)
+        guard !parsed.isEmpty else { return }
+
+        var knownIDs = Set(entries.map(\.id))
+        let newEntries = parsed.filter { knownIDs.insert($0.id).inserted }
+        if prepend {
+            entries.insert(contentsOf: newEntries, at: 0)
+        } else {
+            entries.append(contentsOf: newEntries)
+        }
+        lastScreenContents = screenContents
+        lastTotalRows = totalRows
+        lastDetection = detection
+    }
+
+    private func waitForScreenUpdate() async -> Bool {
+        do {
+            try await Task.sleep(nanoseconds: 700_000_000)
+            return true
+        } catch {
+            return false
+        }
     }
 }
 

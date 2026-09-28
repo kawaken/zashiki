@@ -34,7 +34,6 @@ struct AgentConversationHistoryOverlay: View {
                         .onHover { isHovered in
                             hoveredEntry = isHovered ? entry : nil
                         }
-                        .help(entry.preview)
                         .accessibilityLabel(
                             "\(entry.kind.displayName): \(entry.preview)")
                     }
@@ -73,4 +72,3 @@ struct AgentConversationHistoryOverlay: View {
         }
     }
 }
-

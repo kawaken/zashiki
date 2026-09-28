@@ -74,6 +74,7 @@ class AppDelegate: NSObject,
     @IBOutlet private var menuReadonly: NSMenuItem?
     @IBOutlet private var menuQuickTerminal: NSMenuItem?
     @IBOutlet private var menuCommandPalette: NSMenuItem?
+    @IBOutlet private var menuClaudeCodeHistoryAutoScroll: NSMenuItem?
 
     @IBOutlet private var menuEqualizeSplits: NSMenuItem?
     @IBOutlet private var menuMoveSplitDividerUp: NSMenuItem?
@@ -188,6 +189,10 @@ class AppDelegate: NSObject,
             // Disable the automatic full screen menu item because we handle
             // it manually.
             "NSFullScreenMenuItemEverywhere": false,
+
+            // Claude Code history capture can send scroll events to the TUI. Keep it
+            // opt-in so a broken provider interaction can never disturb a new install.
+            UserDefaults.claudeCodeHistoryAutoScrollKey: false,
 
             // On macOS 26 RC1, the autofill heuristic controller causes unusable levels
             // of slowdowns and CPU usage in the terminal window under certain [unknown]
@@ -1177,6 +1182,12 @@ class AppDelegate: NSObject,
 // MARK: Menu
 
 extension AppDelegate {
+    @IBAction func toggleClaudeCodeHistoryAutoScroll(_ menuItem: NSMenuItem) {
+        UserDefaults.zashiki.claudeCodeHistoryAutoScrollEnabled.toggle()
+        menuItem.state = UserDefaults.zashiki.claudeCodeHistoryAutoScrollEnabled ? .on : .off
+        NotificationCenter.default.post(name: .zashikiClaudeHistoryAutoScrollDidChange, object: nil)
+    }
+
     /// This is called for the dock right-click menu.
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         return dockMenu
@@ -1366,6 +1377,10 @@ extension AppDelegate {
 extension AppDelegate: NSMenuItemValidation {
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         switch item.action {
+        case #selector(toggleClaudeCodeHistoryAutoScroll(_:)):
+            item.state = UserDefaults.zashiki.claudeCodeHistoryAutoScrollEnabled ? .on : .off
+            return true
+
         case #selector(setAsDefaultTerminal(_:)):
             return NSWorkspace.shared.defaultTerminal != Bundle.main.bundleURL
 
