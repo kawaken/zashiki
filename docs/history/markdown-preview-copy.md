@@ -25,12 +25,29 @@ Markdownプレビューでテキストを選択した状態でも、ターミナ
 - terminal自身がfirst responderの場合は既存のkeybind処理を維持する。
 - それ以外のキーや、Copyを実装しないresponderには従来通りイベントを返す。
 
+## 実装結果
+
+- `SurfaceView.performKeyEquivalent`で標準の`Cmd+C`を検出する処理を追加した。
+- first responderがterminal surface以外で`NSText.copy:`を実装している場合、
+  `tryToPerform`でそのresponderへCopy actionを転送する。
+- terminal surface自身がfirst responderの場合は、既存のkeybind処理へそのまま進む。
+- Markdown preview専用の状態参照やTextual内部APIへの依存は追加していない。
+
 ## 検証
 
 - SwiftLintまたは関連するmacOS lintを実行する。
 - 可能ならDebug appをビルドし、Markdownプレビューの選択範囲で`Cmd+C`を確認する。
 - Terminalの通常の`Cmd+C`コピーと、既存のメニューshortcut処理が変わらないことを確認する。
 - Metal Toolchainなど環境不足でビルドできない場合は、未検証事項として記録する。
+
+### 実行結果
+
+- `swiftlint lint --strict`: 成功（0 violations）。
+- `xcrun swiftc -parse macos/Sources/Zashiki/Surface View/SurfaceView_AppKit.swift`:
+  成功。
+- `git diff --check`: 成功。
+- `just build` / `just test-fast`: XcodeにMetal Toolchainが無く、`metal`実行時に失敗。
+- GUIでの手動確認: Macがロックされており未実施。
 
 ## 完了後
 

@@ -1303,6 +1303,21 @@ extension Zashiki {
             // to receive any other event type here.
             guard event.type == .keyDown else { return false }
 
+            // Cmd+C is also registered as Zashiki's terminal copy shortcut. AppKit
+            // asks every view in the window about key equivalents, so a terminal
+            // surface can see this event even when a different responder (for
+            // example Textual's Markdown preview selection view) owns focus. In
+            // that case, route the standard Copy action to the focused responder
+            // before the terminal keybind path can consume it.
+            if event.modifierFlags.contains(.command),
+               event.modifierFlags.isDisjoint(with: [.shift, .control, .option]),
+               event.charactersIgnoringModifiers?.lowercased() == "c",
+               let firstResponder = window?.firstResponder,
+               !(firstResponder is Zashiki.SurfaceView),
+               firstResponder.responds(to: #selector(NSText.copy(_:))) {
+                return firstResponder.tryToPerform(#selector(NSText.copy(_:)), with: nil)
+            }
+
             // Only process events if we're focused. Some key events like C-/ macOS
             // appears to send to the first view in the hierarchy rather than the
             // the first responder (I don't know why). This prevents us from handling it.
