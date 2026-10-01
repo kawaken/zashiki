@@ -45,11 +45,13 @@ struct MarkdownPreviewModelTests {
     }
 
     @Test func testMarkdownPreviewSectionsSupportExplicitHeadingAnchors() {
-        let sections = MarkdownPreviewDocument.sections(for: "# Release Notes {#release-notes}\n")
+        for ending in ["", "\n"] {
+            let sections = MarkdownPreviewDocument.sections(for: "# Release Notes {#release-notes}" + ending)
 
-        #expect(sections.count == 1)
-        #expect(sections[0].anchor == "release-notes")
-        #expect(sections[0].markdown == "# Release Notes")
+            #expect(sections.count == 1)
+            #expect(sections[0].anchor == "release-notes")
+            #expect(sections[0].markdown == "# Release Notes" + ending)
+        }
     }
 
     @Test func testOpenSingleFileHasNoHistory() throws {
