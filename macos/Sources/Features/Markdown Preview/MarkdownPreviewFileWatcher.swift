@@ -57,6 +57,10 @@ final class MarkdownPreviewFileWatcher {
     private func arm() {
         let fd = Darwin.open(url.path, O_EVTONLY)
         guard fd >= 0 else {
+            // Report the initial state even when the file is temporarily
+            // unavailable, so the model can publish its existing error state
+            // without requiring a second explicit reload.
+            onChange()
             scheduleRearm()
             return
         }

@@ -105,7 +105,6 @@ class MarkdownPreviewModel: ObservableObject {
 
     private func show(url: URL) {
         fileURL = url
-        reload()
         isVisible = true
         watcher = MarkdownPreviewFileWatcher(url: url) { [weak self] in
             self?.reload()
