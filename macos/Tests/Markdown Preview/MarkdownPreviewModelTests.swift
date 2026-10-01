@@ -13,6 +13,45 @@ struct MarkdownPreviewModelTests {
         return url
     }
 
+    @Test func testMarkdownPreviewSectionsCreateGitHubStyleAnchors() {
+        let sections = MarkdownPreviewDocument.sections(for: """
+            Introduction
+
+            ## Getting Started
+
+            [Details](#getting-started)
+
+            ## Getting Started
+            """)
+
+        #expect(sections.map(\.anchor) == [nil, "getting-started", "getting-started-1"])
+        #expect(sections[1].id == "getting-started")
+        #expect(sections[2].id == "getting-started-1")
+    }
+
+    @Test func testMarkdownPreviewSectionsIgnoreHeadingsInsideCodeFences() {
+        let sections = MarkdownPreviewDocument.sections(for: """
+            # Actual Heading
+
+            ```markdown
+            # Not a Heading
+            ```
+
+            ## Another Heading
+            """)
+
+        #expect(sections.map(\.anchor) == ["actual-heading", "another-heading"])
+        #expect(sections[0].markdown.contains("# Not a Heading"))
+    }
+
+    @Test func testMarkdownPreviewSectionsSupportExplicitHeadingAnchors() {
+        let sections = MarkdownPreviewDocument.sections(for: "# Release Notes {#release-notes}\n")
+
+        #expect(sections.count == 1)
+        #expect(sections[0].anchor == "release-notes")
+        #expect(sections[0].markdown == "# Release Notes")
+    }
+
     @Test func testOpenSingleFileHasNoHistory() throws {
         let model = MarkdownPreviewModel()
         let url = try temporaryFile()
