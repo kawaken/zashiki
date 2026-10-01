@@ -29,6 +29,13 @@ Textualの`StructuredText`はリンククリックをSwiftUIの`openURL`環境�
 - `just lint`とCIの`just test-fast`を実行する。
 - 実機確認はリリース後に行う。
 
+## 正式リリース準備での検証結果
+
+- PRの`just test-fast`はSwiftコンパイルまでで、macOS XCTestは実行しない。
+- v0.6.0のRelease workflowのフルテストで、明示アンカーのテストだけが失敗した。
+- Markdown本文の末尾改行を分割処理が保持する一方、テストの期待値が末尾改行を含んでいなかった。アンカー生成の失敗ではない。
+- 実装は変更せず、テストで末尾改行あり・なしの両方を検証するようにし、それぞれの本文が保持されることを確認する。
+
 ## 対象外
 
 - Markdownファイル間のアプリ内遷移。
