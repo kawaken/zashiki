@@ -132,7 +132,7 @@ decisions.
   the associated PR is actually merged; implementation completion, marking a
   PR ready, CI completion, or hands-on verification completion are not reasons
   to remove it. When an Issue has multiple associated PRs, keep `wip` until
-  the last required PR is merged. Remove `wip` as the final cleanup step after
+  the last required PR is merged. Remove `wip` as a cleanup step after
   all required PRs merge, after recording the outcome in the Issue.
 - If work is intentionally cancelled, handed off to another agent, or closed
   without an implementation PR, record the reason and current status in the
@@ -140,13 +140,25 @@ decisions.
   session or implementation work has ended.
 - If the user asks to handle the Issue end-to-end, the draft-PR Plan review
   step may be folded into the same implementation flow.
-- Close an Issue only after the work is complete, all required PRs are merged,
-  and `wip` has been removed. Do not let a PR auto-close the Issue (for
-  example, do not use `Closes #123` in the PR body); close it explicitly as a
-  separate step and record the completion reason in a comment. An agent may
-  close the Issue automatically for documentation-only work with nothing to
-  verify, or when the user asked for end-to-end handling / explicitly asked
-  for the Issue to be closed. Otherwise, leave the final close to the human.
+- By default, when an associated PR is closed, the responsible agent also
+  closes the Issue explicitly as a separate step. No additional user request
+  or end-to-end designation is needed.
+  - When the PR is merged, confirm that all required PRs are merged and no
+    `needs-verification` requirement remains, record completion in an Issue
+    comment, remove `wip`, and close the Issue as completed. Do not leave it
+    open merely to wait for a release or post-release hands-on verification.
+  - When the PR is closed without merging and the work is cancelled, record
+    the cancellation reason, remove `wip`, and close the Issue as not planned.
+    Keep it open if a replacement PR, remaining implementation, or explicit
+    verification requirement is still pending; record that status instead.
+  - For Issues with multiple PRs, closing a partial or superseded PR does not
+    close the Issue while required work remains. Do not remove another
+    agent's claim.
+- Do not use GitHub's automatic Issue-closing keywords (for example,
+  `Closes #123`, `Fixes #123`, or `Resolves #123`) in PR titles, PR bodies, or
+  commit messages. Reference Issues with a plain Issue number or URL, then
+  close them explicitly through the Issue command or API after recording
+  the outcome and removing `wip`.
 - If a PR carries a large enough change that it needs hands-on verification
   (visual/behavioral, beyond what CI already checks), add the
   `needs-verification` label to the PR itself, not the issue. This label makes
