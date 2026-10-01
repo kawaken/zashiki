@@ -1,5 +1,143 @@
 import Foundation
 
+struct MarkdownPreviewDocumentSection: Identifiable, Equatable {
+    let id: String
+    let anchor: String?
+    let markdown: String
+}
+
+enum MarkdownPreviewDocument {
+    /// Splits a Markdown document at headings so page-internal links can use
+    /// `ScrollViewReader` without changing the rendered block styles.
+    static func sections(for body: String) -> [MarkdownPreviewDocumentSection] {
+        let lines = body.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        var sections: [(anchor: String?, lines: [String])] = []
+        var currentLines: [String] = []
+        var currentAnchor: String?
+        var usedAnchors = Set<String>()
+        var fence: Character?
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+            if let activeFence = fence {
+                currentLines.append(line)
+                if trimmed.first == activeFence,
+                   trimmed.prefix(while: { $0 == activeFence }).count >= 3 {
+                    fence = nil
+                }
+                continue
+            }
+
+            if let openingFence = openingFence(in: trimmed) {
+                fence = openingFence
+                currentLines.append(line)
+                continue
+            }
+
+            guard let heading = heading(in: line) else {
+                currentLines.append(line)
+                continue
+            }
+
+            if !currentLines.isEmpty || !sections.isEmpty {
+                sections.append((currentAnchor, currentLines))
+            }
+            currentLines = [heading.renderedLine]
+            currentAnchor = uniqueAnchor(
+                heading.explicitAnchor ?? slug(for: heading.text),
+                usedAnchors: &usedAnchors
+            )
+        }
+
+        if !currentLines.isEmpty || sections.isEmpty {
+            sections.append((currentAnchor, currentLines))
+        }
+
+        return sections.enumerated().map { index, section in
+            MarkdownPreviewDocumentSection(
+                id: section.anchor ?? "markdown-preview-section-\(index)",
+                anchor: section.anchor,
+                markdown: section.lines.joined(separator: "\n")
+            )
+        }
+    }
+
+    private static func openingFence(in line: String) -> Character? {
+        guard let first = line.first, first == "`" || first == "~" else { return nil }
+        guard line.prefix(while: { $0 == first }).count >= 3 else { return nil }
+        return first
+    }
+
+    private struct Heading {
+        let text: String
+        let renderedLine: String
+        let explicitAnchor: String?
+    }
+
+    private static func heading(in line: String) -> Heading? {
+        let indentation = line.prefix { $0 == " " }
+        guard indentation.count <= 3 else { return nil }
+
+        let content = line.dropFirst(indentation.count)
+        let hashes = content.prefix { $0 == "#" }
+        guard (1...6).contains(hashes.count) else { return nil }
+
+        let remainder = content.dropFirst(hashes.count)
+        guard remainder.isEmpty || remainder.first?.isWhitespace == true else { return nil }
+
+        var text = String(remainder).trimmingCharacters(in: .whitespaces)
+        while text.hasSuffix("#") {
+            text.removeLast()
+            text = text.trimmingCharacters(in: .whitespaces)
+        }
+
+        var explicitAnchor: String?
+        if let start = text.range(of: "{#", options: .backwards), text.hasSuffix("}") {
+            let candidate = text[text.index(start.lowerBound, offsetBy: 2)..<text.index(before: text.endIndex)]
+            if !candidate.isEmpty {
+                explicitAnchor = String(candidate)
+                text = String(text[..<start.lowerBound]).trimmingCharacters(in: .whitespaces)
+            }
+        }
+
+        let renderedLine = String(repeating: "#", count: hashes.count)
+            + (text.isEmpty ? "" : " \(text)")
+        return Heading(text: text, renderedLine: renderedLine, explicitAnchor: explicitAnchor)
+    }
+
+    private static func slug(for text: String) -> String {
+        let folded = text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        var slug = ""
+        var pendingSeparator = false
+
+        for scalar in folded.unicodeScalars {
+            if CharacterSet.alphanumerics.contains(scalar) || scalar == "_" || scalar == "-" {
+                if pendingSeparator, !slug.isEmpty { slug.append("-") }
+                slug.unicodeScalars.append(scalar)
+                pendingSeparator = false
+            } else if CharacterSet.whitespacesAndNewlines.contains(scalar) {
+                pendingSeparator = true
+            }
+        }
+
+        return slug
+    }
+
+    private static func uniqueAnchor(_ anchor: String, usedAnchors: inout Set<String>) -> String? {
+        guard !anchor.isEmpty else { return nil }
+
+        var candidate = anchor
+        var suffix = 1
+        while usedAnchors.contains(candidate) {
+            candidate = "\(anchor)-\(suffix)"
+            suffix += 1
+        }
+        usedAnchors.insert(candidate)
+        return candidate
+    }
+}
+
 struct MarkdownPreviewHistoryEntry: Identifiable, Equatable {
     let id: Int
     let url: URL

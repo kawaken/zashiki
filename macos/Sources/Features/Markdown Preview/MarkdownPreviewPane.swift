@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import Textual
 import UniformTypeIdentifiers
@@ -98,26 +99,67 @@ struct MarkdownPreviewPane: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             let parsed = MarkdownFrontMatter.parse(model.content)
-            ScrollView {
-                VStack(spacing: 0) {
-                    if !parsed.entries.isEmpty {
-                        FrontMatterTableView(entries: parsed.entries)
-                        Divider()
+            let sections = MarkdownPreviewDocument.sections(for: parsed.body)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 0) {
+                        if !parsed.entries.isEmpty {
+                            FrontMatterTableView(entries: parsed.entries)
+                            Divider()
+                        }
+
+                        ForEach(sections) { section in
+                            StructuredText(
+                                markdown: section.markdown,
+                                baseURL: model.fileURL?.deletingLastPathComponent()
+                            )
+                            .textual.structuredTextStyle(.gitHub)
+                            .textual.imageAttachmentLoader(
+                                MarkdownPreviewImageLoader(baseURL: model.fileURL?.deletingLastPathComponent())
+                            )
+                            .textual.textSelection(.enabled)
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .id(section.id)
+                        }
                     }
-                    StructuredText(
-                        markdown: parsed.body,
-                        baseURL: model.fileURL?.deletingLastPathComponent()
-                    )
-                    .textual.structuredTextStyle(.gitHub)
-                    .textual.imageAttachmentLoader(
-                        MarkdownPreviewImageLoader(baseURL: model.fileURL?.deletingLastPathComponent())
-                    )
-                    .textual.textSelection(.enabled)
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .environment(\.openURL, OpenURLAction { url in
+                    openLink(url, sections: sections, using: proxy)
+                })
             }
         }
+    }
+
+    private func openLink(
+        _ url: URL,
+        sections: [MarkdownPreviewDocumentSection],
+        using proxy: ScrollViewProxy
+    ) -> OpenURLAction.Result {
+        if let fragment = url.fragment, isLocalFragment(url) {
+            let anchor = fragment.removingPercentEncoding?.lowercased() ?? fragment.lowercased()
+            let target = sections.first {
+                $0.anchor?.lowercased() == anchor
+            }
+
+            guard let target else { return .discarded }
+            withAnimation {
+                proxy.scrollTo(target.id, anchor: .top)
+            }
+            return .handled
+        }
+
+        return NSWorkspace.shared.open(url) ? .handled : .discarded
+    }
+
+    private func isLocalFragment(_ url: URL) -> Bool {
+        guard let fileURL = model.fileURL else { return false }
+        guard let scheme = url.scheme else { return true }
+        guard scheme == "file" else { return false }
+
+        return url.path.isEmpty
+            || url.path == fileURL.path
+            || url.path == fileURL.deletingLastPathComponent().path
     }
 
     private func statusMessage(systemImage: String, message: String) -> some View {
