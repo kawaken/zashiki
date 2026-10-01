@@ -70,6 +70,7 @@ struct MarkdownPreviewPane: View {
                 .font(.headline)
                 .lineLimit(1)
                 .truncationMode(.middle)
+                .help(model.fileURL?.path ?? "")
 
             Spacer()
 
