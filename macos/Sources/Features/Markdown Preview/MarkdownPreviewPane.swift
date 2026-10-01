@@ -10,6 +10,14 @@ struct MarkdownPreviewPane: View {
     @ObservedObject var model: MarkdownPreviewModel
 
     @State private var isHistoryPresented = false
+    @FocusedValue(\.zashikiSurfaceCellSize) private var cellSize
+
+    private var markdownFontSize: CGFloat {
+        guard let cellHeight = cellSize?.height, cellHeight > 0 else {
+            return NSFont.systemFontSize
+        }
+        return max(NSFont.smallSystemFontSize, cellHeight * 0.8)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -104,7 +112,10 @@ struct MarkdownPreviewPane: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         if !parsed.entries.isEmpty {
-                            FrontMatterTableView(entries: parsed.entries)
+                            FrontMatterTableView(
+                                entries: parsed.entries,
+                                fontSize: markdownFontSize
+                            )
                             Divider()
                         }
 
@@ -118,6 +129,7 @@ struct MarkdownPreviewPane: View {
                                 MarkdownPreviewImageLoader(baseURL: model.fileURL?.deletingLastPathComponent())
                             )
                             .textual.textSelection(.enabled)
+                            .font(.system(size: markdownFontSize))
                             .padding()
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .id(section.id)

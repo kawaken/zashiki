@@ -4,13 +4,21 @@ import SwiftUI
 /// key/value table, shown above the rendered body in the preview pane.
 struct FrontMatterTableView: View {
     let entries: [MarkdownFrontMatter.Entry]
+    var fontSize: CGFloat?
+
+    private var keyFont: Font {
+        guard let fontSize else {
+            return .system(.body, design: .monospaced)
+        }
+        return .system(size: fontSize, design: .monospaced)
+    }
 
     var body: some View {
         Grid(alignment: .topLeading, horizontalSpacing: 12, verticalSpacing: 6) {
             ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
                 GridRow {
                     Text(entry.key)
-                        .font(.system(.body, design: .monospaced))
+                        .font(keyFont)
                         .foregroundStyle(.secondary)
                     Text(entry.value)
                         .textSelection(.enabled)
