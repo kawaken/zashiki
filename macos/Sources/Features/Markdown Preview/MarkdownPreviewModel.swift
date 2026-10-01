@@ -1,5 +1,10 @@
 import Foundation
 
+struct MarkdownPreviewHistoryEntry: Identifiable, Equatable {
+    let id: Int
+    let url: URL
+}
+
 /// Owns the state for a single terminal window's Markdown preview pane.
 /// One instance lives on each `BaseTerminalController` (see
 /// `markdownPreview` there) and is shared with the SwiftUI view tree via
@@ -35,6 +40,21 @@ class MarkdownPreviewModel: ObservableObject {
     /// Whether `goForward()` would move to a later entry.
     @Published private(set) var canGoForward: Bool = false
 
+    /// All files in the current in-memory navigation history, in open order.
+    /// The entry ID is its position in the history array, so repeated opens
+    /// of the same URL remain distinct entries.
+    var historyEntries: [MarkdownPreviewHistoryEntry] {
+        history.enumerated().map { index, url in
+            MarkdownPreviewHistoryEntry(id: index, url: url)
+        }
+    }
+
+    /// The index of the file currently shown in `historyEntries`.
+    var currentHistoryIndex: Int? {
+        guard history.indices.contains(historyIndex) else { return nil }
+        return historyIndex
+    }
+
     /// Files opened via `open(url:)`, in navigation order. `historyIndex`
     /// points at the entry currently shown in `fileURL`. `goBack()` /
     /// `goForward()` move within this list without altering it;
@@ -50,7 +70,9 @@ class MarkdownPreviewModel: ObservableObject {
     /// Replaces any previously-watched file. Any forward history is
     /// discarded, matching browser back/forward semantics.
     func open(url: URL) {
-        history.removeSubrange((historyIndex + 1)...)
+        if historyIndex + 1 < history.count {
+            history.removeSubrange((historyIndex + 1)...)
+        }
         history.append(url)
         historyIndex = history.count - 1
         updateNavigationState()
@@ -71,6 +93,14 @@ class MarkdownPreviewModel: ObservableObject {
         historyIndex += 1
         updateNavigationState()
         show(url: history[historyIndex])
+    }
+
+    /// Moves directly to an existing history entry without adding a new one.
+    func go(toHistoryEntryAt index: Int) {
+        guard history.indices.contains(index), index != historyIndex else { return }
+        historyIndex = index
+        updateNavigationState()
+        show(url: history[index])
     }
 
     private func show(url: URL) {

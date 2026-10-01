@@ -8,6 +8,8 @@ import UniformTypeIdentifiers
 struct MarkdownPreviewPane: View {
     @ObservedObject var model: MarkdownPreviewModel
 
+    @State private var isHistoryPresented = false
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -38,6 +40,22 @@ struct MarkdownPreviewPane: View {
             .foregroundStyle(model.canGoForward ? .primary : .tertiary)
             .disabled(!model.canGoForward)
             .help("Show Next File")
+
+            Button {
+                isHistoryPresented.toggle()
+            } label: {
+                Image(systemName: "clock.arrow.circlepath")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(model.historyEntries.isEmpty ? .tertiary : .primary)
+            .disabled(model.historyEntries.isEmpty)
+            .help("Show Markdown Preview History")
+            .popover(isPresented: $isHistoryPresented, arrowEdge: .top) {
+                MarkdownPreviewHistoryList(model: model) {
+                    model.go(toHistoryEntryAt: $0)
+                    isHistoryPresented = false
+                }
+            }
 
             Text(model.fileURL?.lastPathComponent ?? "Markdown Preview")
                 .font(.headline)
@@ -128,5 +146,64 @@ struct MarkdownPreviewPane: View {
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
         model.open(url: url)
+    }
+}
+
+private struct MarkdownPreviewHistoryList: View {
+    @ObservedObject var model: MarkdownPreviewModel
+    let select: (Int) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Markdown Preview History")
+                .font(.headline)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+
+            Divider()
+
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(model.historyEntries) { entry in
+                        Button {
+                            select(entry.id)
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: entry.id == model.currentHistoryIndex
+                                    ? "checkmark"
+                                    : "doc.text")
+                                    .frame(width: 14)
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(entry.url.lastPathComponent)
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+
+                                    Text(entry.url.path)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                }
+
+                                Spacer(minLength: 0)
+                            }
+                            .contentShape(Rectangle())
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(
+                                entry.id == model.currentHistoryIndex
+                                    ? Color.accentColor.opacity(0.12)
+                                    : Color.clear,
+                                in: RoundedRectangle(cornerRadius: 5)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(8)
+            }
+        }
+        .frame(width: 360, height: min(CGFloat(model.historyEntries.count * 58 + 54), 420))
     }
 }

@@ -46,6 +46,35 @@ struct MarkdownPreviewModelTests {
         #expect(!model.canGoForward)
     }
 
+    @Test func testHistoryEntriesExposeFilesInOpenOrder() throws {
+        let model = MarkdownPreviewModel()
+        let first = try temporaryFile()
+        let second = try temporaryFile()
+
+        model.open(url: first)
+        model.open(url: second)
+
+        #expect(model.historyEntries.map(\.url) == [first, second])
+        #expect(model.currentHistoryIndex == 1)
+    }
+
+    @Test func testSelectingHistoryEntryDoesNotAddEntry() throws {
+        let model = MarkdownPreviewModel()
+        let first = try temporaryFile()
+        let second = try temporaryFile()
+        let third = try temporaryFile()
+
+        model.open(url: first)
+        model.open(url: second)
+        model.open(url: third)
+        model.go(toHistoryEntryAt: 0)
+
+        #expect(model.fileURL == first)
+        #expect(model.historyEntries.map(\.url) == [first, second, third])
+        #expect(model.currentHistoryIndex == 0)
+        #expect(model.canGoForward)
+    }
+
     @Test func testGoBackBeyondStartIsNoOp() throws {
         let model = MarkdownPreviewModel()
         let url = try temporaryFile()
