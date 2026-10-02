@@ -87,3 +87,41 @@ Issue #239
   - 既定の設定で、ウィンドウ・タブバー・タイトルの見た目が変更前と同じ
   - フルスクリーンの出入り、タブの追加・切り替え、ウィンドウ復元
   - Quick Terminal の表示とフルスクリーン
+
+## 実装結果
+
+計画どおり4ステップで実装した。32ファイル、約2,100行の削除。
+
+- `macos-titlebar-style`: `tabs` 用2クラス、`hidden` 用1クラスと xib を削除し、nib は
+  `TerminalTransparentTitlebar` 固定にした。`hidden` スタイル専用だった macOS 26.0 向けの
+  スクロール回避処理（`SurfaceScrollView`）と、`tabs` スタイル専用だったタブ移動時の回避処理も
+  削除した。
+- `window-decoration`: 設定、タイトルバーなしの分岐、`toggle_window_decorations` アクションを
+  削除した。`native` 用の `Terminal.xib` は他から参照されていなかったので削除した。
+- フルスクリーン: `macos-non-native-fullscreen` を削除し、`fullscreen` を `false` / `true` に
+  絞った。コアから渡すフルスクリーンの種類も標準のみにした。
+
+### 計画から変えた点・追加の判断
+
+- ウィンドウ復元は、保存済みの独自フルスクリーンを復元しないようにした。通常のウィンドウが
+  独自フルスクリーンになる経路を残さないため。保存形式（`effectiveFullscreenMode`）は変えていない。
+- 独自フルスクリーン中の新規タブを止める警告と `supportsTabs` は、到達しなくなったので削除した。
+- `styleMask.contains(.titled)` の確認は残した。Quick Terminal 以外で不要になったかを個別に
+  確かめていないため。
+- CHANGELOG の Unreleased に廃止内容を記載した。
+
+### UI テスト
+
+`ZashikiUITests` は CI でも `just test` でも実行されない。今回は次のように変更したが、
+実行はしていない。
+
+- `ZashikiTitlebarTabsUITests` を削除。
+- ウィンドウ復元のテストはスタイル別4本を1本にまとめた。
+- 分割ペインをドラッグして新規ウィンドウにするテスト2本は、`hidden` の指定を外した。
+  この2本は縦位置と高さの検証がタイトルバーなしの配置を前提にしており、失敗する可能性がある。
+
+## 検証結果
+
+- `just lint`: 成功（違反なし）。
+- `just test`（macOS XCTest を含むフルスイート）: 成功。
+- 実機確認: 未実施（PR の `needs-verification` で確認する）。
