@@ -553,12 +553,6 @@ pub const GotoTab = enum(c_int) {
 pub const Fullscreen = enum(c_int) {
     native,
 
-    /// macOS has a non-native fullscreen mode that is more like a maximized
-    /// window. This is much faster to enter and exit than the native mode.
-    macos_non_native,
-    macos_non_native_visible_menu,
-    macos_non_native_padded_notch,
-
     test "ghostty.h Fullscreen" {
         try lib.checkGhosttyHEnum(Fullscreen, "GHOSTTY_FULLSCREEN_");
     }

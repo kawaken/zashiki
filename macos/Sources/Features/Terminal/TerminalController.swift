@@ -244,20 +244,10 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
             // fullscreen but this is how we've always done it. This matches iTerm2
             // behavior.
             c.toggleFullscreen(mode: .native)
-        } else if let fullscreenMode = ghostty.config.windowFullscreen {
-            switch fullscreenMode {
-            case .native:
-                // Native has to be done immediately so that our stylemask contains
-                // fullscreen for the logic later in this method.
-                c.toggleFullscreen(mode: .native)
-
-            case .nonNative, .nonNativeVisibleMenu, .nonNativePaddedNotch:
-                // If we're non-native then we have to do it on a later loop
-                // so that the content view is setup.
-                DispatchQueue.main.async {
-                    c.toggleFullscreen(mode: fullscreenMode)
-                }
-            }
+        } else if ghostty.config.windowFullscreen != nil {
+            // Native has to be done immediately so that our stylemask contains
+            // fullscreen for the logic later in this method.
+            c.toggleFullscreen(mode: .native)
         }
 
         // We're dispatching this async because otherwise the lastCascadePoint doesn't
@@ -391,19 +381,6 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         guard let parent,
               let parentController = parent.windowController as? TerminalController else {
             return newWindow(ghostty, withBaseConfig: baseConfig, withParent: parent)
-        }
-
-        // If our parent is in non-native fullscreen, then new tabs do not work.
-        // See: https://github.com/mitchellh/ghostty/issues/392
-        if let fullscreenStyle = parentController.fullscreenStyle,
-           fullscreenStyle.isFullscreen && !fullscreenStyle.supportsTabs {
-            let alert = NSAlert()
-            alert.messageText = "Cannot Create New Tab"
-            alert.informativeText = "New tabs are unsupported while in non-native fullscreen. Exit fullscreen and try again."
-            alert.addButton(withTitle: "OK")
-            alert.alertStyle = .warning
-            alert.beginSheetModal(for: parent)
-            return nil
         }
 
         // Create a new window and add it to the parent. New tabs share the

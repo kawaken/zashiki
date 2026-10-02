@@ -1400,18 +1400,6 @@ maximize: bool = false,
 ///
 ///   * `false` - Don't start in fullscreen (default)
 ///   * `true` - Start in native fullscreen
-///   * `non-native` - (macOS only) Start in non-native fullscreen, hiding the
-///     menu bar. This is faster than native fullscreen since it doesn't use
-///     animations. On non-macOS platforms, this behaves the same as `true`.
-///   * `non-native-visible-menu` - (macOS only) Start in non-native fullscreen,
-///     keeping the menu bar visible. On non-macOS platforms, behaves like `true`.
-///   * `non-native-padded-notch` - (macOS only) Start in non-native fullscreen,
-///     hiding the menu bar but padding for the notch on applicable devices.
-///     On non-macOS platforms, behaves like `true`.
-///
-/// Important: tabs DO NOT WORK with non-native fullscreen modes. Non-native
-/// fullscreen removes the titlebar and macOS native tabs require the titlebar.
-/// If you use tabs, use `true` (native) instead.
 fullscreen: Fullscreen = .false,
 
 /// The title Ghostty will use for the window. This will force the title of the
@@ -2625,37 +2613,6 @@ keybind: Keybinds = .{},
 ///
 /// Available since: 1.3.0.
 @"bell-audio-volume": f64 = 0.5,
-
-/// If anything other than false, fullscreen mode on macOS will not use the
-/// native fullscreen, but make the window fullscreen without animations and
-/// using a new space. It's faster than the native fullscreen mode since it
-/// doesn't use animations.
-///
-/// Important: tabs DO NOT WORK in this mode. Non-native fullscreen removes
-/// the titlebar and macOS native tabs require the titlebar. If you use tabs,
-/// you should not use this mode.
-///
-/// If you fullscreen a window with tabs, the currently focused tab will
-/// become fullscreen while the others will remain in a separate window in
-/// the background. You can switch to that window using normal window-switching
-/// keybindings such as command+tilde. When you exit fullscreen, the window
-/// will return to the tabbed state it was in before.
-///
-/// Allowable values are:
-///
-///   * `true` - Use non-native macOS fullscreen, hide the menu bar
-///   * `false` - Use native macOS fullscreen
-///   * `visible-menu` - Use non-native macOS fullscreen, keep the menu bar
-///     visible
-///   * `padded-notch` - Use non-native macOS fullscreen, hide the menu bar,
-///     but ensure the window is not obscured by the notch on applicable
-///     devices. The area around the notch will remain transparent currently,
-///     but in the future we may fill it with the window background color.
-///
-/// Changing this option at runtime works, but will only apply to the next
-/// time the window is made fullscreen. If a window is already fullscreen,
-/// it will retain the previous setting until fullscreen is exited.
-@"macos-non-native-fullscreen": NonNativeFullscreen = .false,
 
 /// Whether the window buttons in the macOS titlebar are visible. The window
 /// buttons are the colored buttons in the upper left corner of most macOS apps,
@@ -4362,25 +4319,12 @@ pub const ConfirmCloseSurface = enum(c_int) {
     always,
 };
 
-/// Valid values for macos-non-native-fullscreen
-/// c_int because it needs to be extern compatible
-/// If this is changed, you must also update ghostty.h
-pub const NonNativeFullscreen = enum(c_int) {
-    false,
-    true,
-    @"visible-menu",
-    @"padded-notch",
-};
-
 /// Valid values for fullscreen config option
 /// c_int because it needs to be extern compatible
 /// If this is changed, you must also update ghostty.h
 pub const Fullscreen = enum(c_int) {
     false,
     true,
-    @"non-native",
-    @"non-native-visible-menu",
-    @"non-native-padded-notch",
 };
 
 pub const WindowPaddingColor = enum {

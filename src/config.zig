@@ -30,7 +30,6 @@ pub const FontStyle = Config.FontStyle;
 pub const Keybinds = Config.Keybinds;
 pub const MouseShiftCapture = Config.MouseShiftCapture;
 pub const MouseScrollMultiplier = Config.MouseScrollMultiplier;
-pub const NonNativeFullscreen = Config.NonNativeFullscreen;
 pub const Fullscreen = Config.Fullscreen;
 pub const RepeatableCodepointMap = Config.RepeatableCodepointMap;
 pub const RepeatableFontVariation = Config.RepeatableFontVariation;

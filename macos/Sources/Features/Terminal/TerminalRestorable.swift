@@ -186,14 +186,9 @@ class TerminalWindowRestoration: NSObject, NSWindowRestoration {
             }
         }
 
+        // We let AppKit handle native fullscreen. Terminal windows no longer
+        // use non-native fullscreen, so a saved non-native mode is not restored.
         completionHandler(window, nil)
-        guard let mode = state.effectiveFullscreenMode, mode != .native else {
-            // We let AppKit handle native fullscreen
-            return
-        }
-        // Give the window to AppKit first, then adjust its frame and style
-        // to minimise any visible frame changes.
-        c.toggleFullscreen(mode: mode)
     }
 
     /// This restores the focus state of the surfaceview within the given window. When restoring,
