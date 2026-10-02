@@ -35,14 +35,28 @@ class BaseTerminalController: NSWindowController,
     /// The app instance that this terminal view will represent.
     let ghostty: Zashiki.App
 
+    /// The tab shown in this window. Per-tab state lives here; the properties
+    /// below forward to it so existing split/focus logic acts on this tab.
+    let selectedTab = TerminalTab()
+
     /// The currently focused surface.
     var focusedSurface: Zashiki.SurfaceView? {
-        didSet { syncFocusToSurfaceTree() }
+        get { selectedTab.focusedSurface }
+        set {
+            selectedTab.focusedSurface = newValue
+            syncFocusToSurfaceTree()
+        }
     }
 
-    /// The tree of splits within this terminal window.
-    @Published var surfaceTree: SplitTree<Zashiki.SurfaceView> = .init() {
-        didSet { surfaceTreeDidChange(from: oldValue, to: surfaceTree) }
+    /// The tree of splits within the selected tab.
+    var surfaceTree: SplitTree<Zashiki.SurfaceView> {
+        get { selectedTab.surfaceTree }
+        set {
+            let oldValue = selectedTab.surfaceTree
+            objectWillChange.send()
+            selectedTab.surfaceTree = newValue
+            surfaceTreeDidChange(from: oldValue, to: newValue)
+        }
     }
 
     /// This can be set to show/hide the command palette.
@@ -51,8 +65,8 @@ class BaseTerminalController: NSWindowController,
     /// Set if the terminal view should show the update overlay.
     @Published var updateOverlayIsVisible: Bool = false
 
-    /// The state for this window's Markdown preview pane.
-    let markdownPreview = MarkdownPreviewModel()
+    /// The state for the selected tab's Markdown preview pane.
+    var markdownPreview: MarkdownPreviewModel { selectedTab.markdownPreview }
 
     /// The state for this window's Worktree Status pane. Shared across every
     /// tab in the same tabGroup (see `init`) so switching tabs doesn't reset
@@ -124,7 +138,11 @@ class BaseTerminalController: NSWindowController,
     /// An override title for the tab/window set by the user via prompt_tab_title.
     /// When set, this takes precedence over the computed title from the terminal.
     var titleOverride: String? {
-        didSet { applyTitleToWindow() }
+        get { selectedTab.titleOverride }
+        set {
+            selectedTab.titleOverride = newValue
+            applyTitleToWindow()
+        }
     }
 
     /// The last computed title from the focused surface (without the override).
@@ -1657,7 +1675,7 @@ extension BaseTerminalController {
         // `surfaceTree` can be replaced entirely when splits are added/removed/closed.
         // For each tree snapshot we build a fresh publisher that watches all surfaces
         // in that snapshot.
-        $surfaceTree
+        selectedTab.$surfaceTree
             .map { tree in
                 tree.valuesPublisher(
                     valueKeyPath: valueKeyPath,
