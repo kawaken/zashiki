@@ -9,9 +9,6 @@ protocol TerminalViewDelegate: AnyObject {
     /// Called when the currently focused surface changed. This can be nil.
     func focusedSurfaceDidChange(to: Zashiki.SurfaceView?)
 
-    /// The URL of the pwd should change.
-    func pwdDidChange(to: URL?)
-
     /// The cell size changed.
     func cellSizeDidChange(to: NSSize)
 
@@ -120,8 +117,6 @@ struct TerminalView<ViewModel: TerminalViewModel>: View {
                                     }
                                 }
                                 .onChange(of: pwdURL) { newValue in
-                                    self.delegate?.pwdDidChange(to: newValue)
-
                                     worktreeStatusRefreshTask?.cancel()
                                     guard viewModel.worktreeStatus.isVisible, let newValue else { return }
                                     worktreeStatusRefreshTask = Task {

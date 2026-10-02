@@ -9,13 +9,13 @@ Issue #239
 
 ## 対象と固定する挙動
 
-| 設定 | 固定する挙動 | 既定値以外のための実装 |
-| --- | --- | --- |
-| `macos-titlebar-style` | `transparent` | `tabs` 用のウィンドウクラス2つ（約1,050行）、`hidden` 用1つ（約120行）、xib 3〜4つ |
-| `window-decoration` | タイトルバーあり | タイトルバーなしの分岐（nib 選択、`styleMask`、新規タブ時の警告ダイアログ） |
-| `macos-non-native-fullscreen` | macOS 標準のフルスクリーン | `toggle_fullscreen` で独自フルスクリーンを選ぶ分岐 |
-| `macos-window-buttons` | 表示 | 信号機ボタンを隠す処理 |
-| `macos-titlebar-proxy-icon` | 表示 | アイコンを隠す分岐 |
+| 設定                          | 固定する挙動                         | 既定値以外のための実装                                                             |
+| ----------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------- |
+| `macos-titlebar-style`        | `transparent`                        | `tabs` 用のウィンドウクラス2つ（約1,050行）、`hidden` 用1つ（約120行）、xib 3〜4つ |
+| `window-decoration`           | タイトルバーあり                     | タイトルバーなしの分岐（nib 選択、`styleMask`、新規タブ時の警告ダイアログ）        |
+| `macos-non-native-fullscreen` | macOS 標準のフルスクリーン           | `toggle_fullscreen` で独自フルスクリーンを選ぶ分岐                                 |
+| `macos-window-buttons`        | 表示                                 | 信号機ボタンを隠す処理                                                             |
+| `macos-titlebar-proxy-icon`   | 非表示（レビューで変更。当初は表示） | アイコンを表示する処理                                                             |
 
 いずれも設定ファイルでは使われていない（XDG と Application Support の両方を確認済み）。
 
@@ -109,6 +109,9 @@ Issue #239
 - `styleMask.contains(.titled)` の確認は残した。Quick Terminal 以外で不要になったかを個別に
   確かめていないため。
 - CHANGELOG の Unreleased に廃止内容を記載した。
+- タイトル横のフォルダアイコンは、レビューで「表示しなくてよい」となったため非表示に固定した。
+  `window.representedURL` を設定する処理と、そのためだけにあった `pwdDidChange` を削除した。
+  これは既定の見た目からの変更になる。
 
 ### UI テスト
 

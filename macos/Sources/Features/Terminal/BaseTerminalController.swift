@@ -909,13 +909,6 @@ class BaseTerminalController: NSWindowController,
         window.title = lastComputedTitle
     }
 
-    func pwdDidChange(to: URL?) {
-        guard let window else { return }
-
-        // Use the 'to' URL directly
-        window.representedURL = to
-    }
-
     func cellSizeDidChange(to: NSSize) {
         guard derivedConfig.windowStepResize else { return }
         // Stage manager can sometimes present windows in such a way that the
