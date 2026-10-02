@@ -1533,14 +1533,12 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
 
     struct DerivedConfig {
         let backgroundColor: Color
-        let macosWindowButtons: Zashiki.MacOSWindowButtons
         let maximize: Bool
         let windowPositionX: Int16?
         let windowPositionY: Int16?
 
         init() {
             self.backgroundColor = Color(NSColor.windowBackgroundColor)
-            self.macosWindowButtons = .visible
             self.maximize = false
             self.windowPositionX = nil
             self.windowPositionY = nil
@@ -1548,7 +1546,6 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
 
         init(_ config: Zashiki.Config) {
             self.backgroundColor = config.backgroundColor
-            self.macosWindowButtons = config.macosWindowButtons
             self.maximize = config.maximize
             self.windowPositionX = config.windowPositionX
             self.windowPositionY = config.windowPositionY

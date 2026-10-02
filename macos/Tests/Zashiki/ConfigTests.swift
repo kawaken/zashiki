@@ -110,11 +110,6 @@ struct ConfigTests {
         #expect(config.macosIconFrame == .aluminum)
     }
 
-    @Test func macosWindowButtonsDefaultsToVisible() throws {
-        let config = try TemporaryConfig("")
-        #expect(config.macosWindowButtons == .visible)
-    }
-
     @Test func scrollbarDefaultsToSystem() throws {
         let config = try TemporaryConfig("")
         #expect(config.scrollbar == .system)

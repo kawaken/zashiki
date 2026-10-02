@@ -308,18 +308,6 @@ extension Zashiki {
         }
     }
 
-    /// Enum for the macos-window-buttons config option
-    enum MacOSWindowButtons: String {
-        case visible
-        case hidden
-    }
-
-    /// Enum for the macos-titlebar-proxy-icon config option
-    enum MacOSTitlebarProxyIcon: String {
-        case visible
-        case hidden
-    }
-
     /// Enum for auto-update-channel config option
     enum AutoUpdateChannel: String {
         case tip

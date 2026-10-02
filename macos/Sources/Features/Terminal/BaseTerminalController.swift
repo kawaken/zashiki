@@ -912,12 +912,8 @@ class BaseTerminalController: NSWindowController,
     func pwdDidChange(to: URL?) {
         guard let window else { return }
 
-        if derivedConfig.macosTitlebarProxyIcon == .visible {
-            // Use the 'to' URL directly
-            window.representedURL = to
-        } else {
-            window.representedURL = nil
-        }
+        // Use the 'to' URL directly
+        window.representedURL = to
     }
 
     func cellSizeDidChange(to: NSSize) {
@@ -1557,20 +1553,17 @@ class BaseTerminalController: NSWindowController,
     }
 
     private struct DerivedConfig {
-        let macosTitlebarProxyIcon: Zashiki.MacOSTitlebarProxyIcon
         let windowStepResize: Bool
         let focusFollowsMouse: Bool
         let splitPreserveZoom: Zashiki.Config.SplitPreserveZoom
 
         init() {
-            self.macosTitlebarProxyIcon = .visible
             self.windowStepResize = false
             self.focusFollowsMouse = false
             self.splitPreserveZoom = .init()
         }
 
         init(_ config: Zashiki.Config) {
-            self.macosTitlebarProxyIcon = config.macosTitlebarProxyIcon
             self.windowStepResize = config.windowStepResize
             self.focusFollowsMouse = config.focusFollowsMouse
             self.splitPreserveZoom = config.splitPreserveZoom

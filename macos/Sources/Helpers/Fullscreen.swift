@@ -33,7 +33,6 @@ protocol FullscreenStyle {
     var delegate: FullscreenDelegate? { get set }
     var fullscreenMode: FullscreenMode { get }
     var isFullscreen: Bool { get }
-    var supportsTabs: Bool { get }
     init?(_ window: NSWindow)
     func enter()
     func exit()
@@ -90,7 +89,6 @@ class FullscreenBase {
 class NativeFullscreen: FullscreenBase, FullscreenStyle {
     var fullscreenMode: FullscreenMode { .native }
     var isFullscreen: Bool { window.styleMask.contains(.fullScreen) }
-    var supportsTabs: Bool { true }
 
     required init?(_ window: NSWindow) {
         // TODO: There are many requirements for native fullscreen we should
@@ -130,10 +128,6 @@ class NativeFullscreen: FullscreenBase, FullscreenStyle {
 
 class NonNativeFullscreen: FullscreenBase, FullscreenStyle {
     var fullscreenMode: FullscreenMode { .nonNative }
-
-    // Non-native fullscreen never supports tabs because tabs require
-    // the "titled" style and we don't have it for non-native fullscreen.
-    var supportsTabs: Bool { false }
 
     // isFullscreen is dependent on if we have saved state currently. We
     // could one day try to do fancier stuff like inspecting the window

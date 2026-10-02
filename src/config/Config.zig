@@ -2614,48 +2614,6 @@ keybind: Keybinds = .{},
 /// Available since: 1.3.0.
 @"bell-audio-volume": f64 = 0.5,
 
-/// Whether the window buttons in the macOS titlebar are visible. The window
-/// buttons are the colored buttons in the upper left corner of most macOS apps,
-/// also known as the traffic lights, that allow you to close, miniaturize, and
-/// zoom the window.
-///
-/// This setting has no effect when `window-decoration = none` or
-/// `macos-titlebar-style = hidden`, as the window buttons are always hidden in
-/// these modes.
-///
-/// Valid values are:
-///
-///   * `visible` - Show the window buttons.
-///   * `hidden` - Hide the window buttons.
-///
-/// The default value is `visible`.
-///
-/// Changing this option at runtime only applies to new windows.
-///
-/// Available since: 1.2.0
-@"macos-window-buttons": MacWindowButtons = .visible,
-
-/// Whether the proxy icon in the macOS titlebar is visible. The proxy icon
-/// is the icon that represents the folder of the current working directory.
-/// You can see this very clearly in the macOS built-in Terminal.app
-/// titlebar.
-///
-/// The proxy icon is only visible with the native macOS titlebar style.
-///
-/// Valid values are:
-///
-///   * `visible` - Show the proxy icon.
-///   * `hidden` - Hide the proxy icon.
-///
-/// The default value is `visible`.
-///
-/// This setting can be changed at runtime and will affect all currently
-/// open windows but only after their working directory changes again.
-/// Therefore, to make this work after changing the setting, you must
-/// usually `cd` to a different directory, open a different file in an
-/// editor, etc.
-@"macos-titlebar-proxy-icon": MacTitlebarProxyIcon = .visible,
-
 /// Controls the windowing behavior when dropping a file or folder
 /// onto the Zashiki icon in the macOS dock.
 ///
@@ -7977,18 +7935,6 @@ pub const WindowTheme = enum {
 pub const WindowColorspace = enum {
     srgb,
     @"display-p3",
-};
-
-/// See macos-window-buttons
-pub const MacWindowButtons = enum {
-    visible,
-    hidden,
-};
-
-/// See macos-titlebar-proxy-icon
-pub const MacTitlebarProxyIcon = enum {
-    visible,
-    hidden,
 };
 
 /// See macos-hidden

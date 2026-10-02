@@ -302,28 +302,6 @@ extension Zashiki {
             return String(cString: ptr)
         }
 
-        var macosWindowButtons: MacOSWindowButtons {
-            let defaultValue = MacOSWindowButtons.visible
-            guard let config = self.config else { return defaultValue }
-            var v: UnsafePointer<Int8>?
-            let key = "macos-window-buttons"
-            guard ghostty_config_get(config, &v, key, UInt(key.lengthOfBytes(using: .utf8))) else { return defaultValue }
-            guard let ptr = v else { return defaultValue }
-            let str = String(cString: ptr)
-            return MacOSWindowButtons(rawValue: str) ?? defaultValue
-        }
-
-        var macosTitlebarProxyIcon: MacOSTitlebarProxyIcon {
-            let defaultValue = MacOSTitlebarProxyIcon.visible
-            guard let config = self.config else { return defaultValue }
-            var v: UnsafePointer<Int8>?
-            let key = "macos-titlebar-proxy-icon"
-            guard ghostty_config_get(config, &v, key, UInt(key.lengthOfBytes(using: .utf8))) else { return defaultValue }
-            guard let ptr = v else { return defaultValue }
-            let str = String(cString: ptr)
-            return MacOSTitlebarProxyIcon(rawValue: str) ?? defaultValue
-        }
-
         var macosDockDropBehavior: MacDockDropBehavior {
             let defaultValue = MacDockDropBehavior.new_tab
             guard let config = self.config else { return defaultValue }
