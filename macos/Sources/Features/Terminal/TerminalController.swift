@@ -18,23 +18,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
             return defaultValue
         }
 
-        let nib = switch config.macosTitlebarStyle {
-        case .native: "Terminal"
-        case .hidden: "TerminalHiddenTitlebar"
-        case .transparent: "TerminalTransparentTitlebar"
-        case .tabs:
-#if compiler(>=6.2)
-            if #available(macOS 26.0, *) {
-                "TerminalTabsTitlebarTahoe"
-            } else {
-                "TerminalTabsTitlebarVentura"
-            }
-#else
-            "TerminalTabsTitlebarVentura"
-#endif
-        }
-
-        return nib
+        return "TerminalTransparentTitlebar"
     }
 
     /// This is set to true when we care about frame changes. This is a small optimization since
@@ -1468,23 +1452,6 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         // Get our target window
         let targetWindow = tabbedWindows[finalIndex]
 
-        // Moving tabs on macOS 26 RC causes very nasty visual glitches in the titlebar tabs.
-        // I believe this is due to messed up constraints for our hacky tab bar. I'd like to
-        // find a better workaround. For now, this improves things dramatically.
-        //
-        // Reproduction: titlebar tabs, create two tabs, "move tab left"
-        if #available(macOS 26, *) {
-            if window is TitlebarTabsTahoeTerminalWindow {
-                tabGroup.removeWindow(selectedWindow)
-                targetWindow.addTabbedWindowSafely(selectedWindow, ordered: action.amount < 0 ? .below : .above)
-                DispatchQueue.main.async {
-                    selectedWindow.makeKey()
-                }
-
-                return
-            }
-        }
-
         // Begin a group of window operations to minimize visual updates
         NSAnimationContext.beginGrouping()
         NSAnimationContext.current.duration = 0
@@ -1601,7 +1568,6 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
     struct DerivedConfig {
         let backgroundColor: Color
         let macosWindowButtons: Zashiki.MacOSWindowButtons
-        let macosTitlebarStyle: Zashiki.Config.MacOSTitlebarStyle
         let maximize: Bool
         let windowPositionX: Int16?
         let windowPositionY: Int16?
@@ -1609,7 +1575,6 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         init() {
             self.backgroundColor = Color(NSColor.windowBackgroundColor)
             self.macosWindowButtons = .visible
-            self.macosTitlebarStyle = .default
             self.maximize = false
             self.windowPositionX = nil
             self.windowPositionY = nil
@@ -1618,7 +1583,6 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         init(_ config: Zashiki.Config) {
             self.backgroundColor = config.backgroundColor
             self.macosWindowButtons = config.macosWindowButtons
-            self.macosTitlebarStyle = config.macosTitlebarStyle
             self.maximize = config.maximize
             self.windowPositionX = config.windowPositionX
             self.windowPositionY = config.windowPositionY

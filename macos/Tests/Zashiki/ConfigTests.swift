@@ -90,22 +90,6 @@ struct ConfigTests {
 
     // MARK: - Enum Properties
 
-    @Test func macosTitlebarStyleDefaultsToTransparent() throws {
-        let config = try TemporaryConfig("")
-        #expect(config.macosTitlebarStyle == .transparent)
-    }
-
-    @Test(arguments: [
-        ("native", Zashiki.Config.MacOSTitlebarStyle.native),
-        ("transparent", Zashiki.Config.MacOSTitlebarStyle.transparent),
-        ("tabs", Zashiki.Config.MacOSTitlebarStyle.tabs),
-        ("hidden", Zashiki.Config.MacOSTitlebarStyle.hidden),
-    ])
-    func macosTitlebarStyleValues(raw: String, expected: Zashiki.Config.MacOSTitlebarStyle) throws {
-        let config = try TemporaryConfig("macos-titlebar-style = \(raw)")
-        #expect(config.macosTitlebarStyle == expected)
-    }
-
     @Test func resizeOverlayDefaultsToAfterFirst() throws {
         let config = try TemporaryConfig("")
         #expect(config.resizeOverlay == .after_first)
