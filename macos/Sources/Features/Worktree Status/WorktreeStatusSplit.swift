@@ -18,26 +18,22 @@ struct WorktreeStatusSplit<Content: View>: View {
 
     @ObservedObject var agentStatus: AgentStatusModel
 
+    /// Divider positions, shared across the window's tabs.
+    @ObservedObject var layout: PanelLayoutModel
+
     @ViewBuilder let content: () -> Content
-
-    /// The fractional width of the pane vs. the terminal content.
-    @State private var split: CGFloat = 0.3
-
-    /// The fractional height of Worktree Status vs. Agents when both are
-    /// visible in the side panel.
-    @State private var panelSplit: CGFloat = 0.5
 
     var body: some View {
         Group {
             if !model.isVisible && !agentStatus.isVisible {
                 content()
             } else {
-                SplitView(.horizontal, $split, dividerColor: ghostty.config.splitDividerColor, left: {
+                SplitView(.horizontal, $layout.leftSplit, dividerColor: ghostty.config.splitDividerColor, left: {
                     sidePanel
                 }, right: {
                     content()
                 }, onEqualize: {
-                    split = 0.5
+                    layout.leftSplit = 0.5
                 })
             }
         }
@@ -47,12 +43,12 @@ struct WorktreeStatusSplit<Content: View>: View {
     @ViewBuilder
     private var sidePanel: some View {
         if model.isVisible && agentStatus.isVisible {
-            SplitView(.vertical, $panelSplit, dividerColor: ghostty.config.splitDividerColor, left: {
+            SplitView(.vertical, $layout.leftPanelSplit, dividerColor: ghostty.config.splitDividerColor, left: {
                 WorktreeStatusPane(model: model, directory: directory)
             }, right: {
                 AgentStatusPane(model: agentStatus, surfaces: surfaces)
             }, onEqualize: {
-                panelSplit = 0.5
+                layout.leftPanelSplit = 0.5
             })
         } else if model.isVisible {
             WorktreeStatusPane(model: model, directory: directory)

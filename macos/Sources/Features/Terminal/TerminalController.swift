@@ -66,7 +66,8 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
          withSurfaceTree tree: SplitTree<Zashiki.SurfaceView>? = nil,
          parent: NSWindow? = nil,
          worktreeStatus: WorktreeStatusModel? = nil,
-         agentStatus: AgentStatusModel? = nil
+         agentStatus: AgentStatusModel? = nil,
+         panelLayout: PanelLayoutModel? = nil
     ) {
         // The window we manage is not restorable if we've specified a command
         // to execute. We do this because the restored window is meaningless at the
@@ -80,7 +81,8 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
 
         super.init(
             ghostty, baseConfig: base, surfaceTree: tree,
-            worktreeStatus: worktreeStatus, agentStatus: agentStatus)
+            worktreeStatus: worktreeStatus, agentStatus: agentStatus,
+            panelLayout: panelLayout)
 
         // Setup our notifications for behaviors
         let center = NotificationCenter.default
@@ -440,7 +442,8 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         let controller = TerminalController.init(
             ghostty, withBaseConfig: baseConfig,
             worktreeStatus: parentController.worktreeStatus,
-            agentStatus: parentController.agentStatus)
+            agentStatus: parentController.agentStatus,
+            panelLayout: parentController.panelLayout)
         controller.isBackgroundOpaque = parentController.isBackgroundOpaque
         guard let window = controller.window else { return controller }
 

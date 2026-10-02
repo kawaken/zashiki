@@ -39,6 +39,9 @@ protocol TerminalViewModel: ObservableObject {
     /// The state for this window's Markdown preview pane.
     var markdownPreview: MarkdownPreviewModel { get }
 
+    /// The side pane divider positions, shared across this window's tabs.
+    var panelLayout: PanelLayoutModel { get }
+
     /// The state for this window's Worktree Status pane.
     var worktreeStatus: WorktreeStatusModel { get }
 
@@ -94,8 +97,9 @@ struct TerminalView<ViewModel: TerminalViewModel>: View {
                 model: viewModel.worktreeStatus,
                 directory: pwdURL,
                 surfaces: viewModel.tabGroupSurfaces,
-                agentStatus: viewModel.agentStatus) {
-                MarkdownPreviewSplit(ghostty: ghostty, model: viewModel.markdownPreview) {
+                agentStatus: viewModel.agentStatus,
+                layout: viewModel.panelLayout) {
+                MarkdownPreviewSplit(ghostty: ghostty, model: viewModel.markdownPreview, layout: viewModel.panelLayout) {
                     ZStack {
                         VStack(spacing: 0) {
                             // If we're running in debug mode we show a warning so that users

@@ -54,6 +54,10 @@ class BaseTerminalController: NSWindowController,
     /// The state for this window's Markdown preview pane.
     let markdownPreview = MarkdownPreviewModel()
 
+    /// The side pane divider positions. Shared across every tab in the
+    /// same tabGroup, like `worktreeStatus`.
+    let panelLayout: PanelLayoutModel
+
     /// The state for this window's Worktree Status pane. Shared across every
     /// tab in the same tabGroup (see `init`) so switching tabs doesn't reset
     /// the pane, matching a typical IDE's window-scoped sidebar.
@@ -164,7 +168,8 @@ class BaseTerminalController: NSWindowController,
          baseConfig base: Zashiki.SurfaceConfiguration? = nil,
          surfaceTree tree: SplitTree<Zashiki.SurfaceView>? = nil,
          worktreeStatus: WorktreeStatusModel? = nil,
-         agentStatus: AgentStatusModel? = nil
+         agentStatus: AgentStatusModel? = nil,
+         panelLayout: PanelLayoutModel? = nil
     ) {
         self.ghostty = ghostty
         self.derivedConfig = DerivedConfig(ghostty.config)
@@ -173,6 +178,7 @@ class BaseTerminalController: NSWindowController,
         // A fresh window (no parent tab) gets its own new instance.
         self.worktreeStatus = worktreeStatus ?? WorktreeStatusModel()
         self.agentStatus = agentStatus ?? AgentStatusModel()
+        self.panelLayout = panelLayout ?? PanelLayoutModel()
 
         super.init(window: nil)
 

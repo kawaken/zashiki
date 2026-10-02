@@ -9,22 +9,22 @@ struct MarkdownPreviewSplit<Content: View>: View {
 
     @ObservedObject var model: MarkdownPreviewModel
 
-    @ViewBuilder let content: () -> Content
+    /// Divider position, shared across the window's tabs.
+    @ObservedObject var layout: PanelLayoutModel
 
-    /// The fractional width of the terminal vs. the preview pane.
-    @State private var split: CGFloat = 0.7
+    @ViewBuilder let content: () -> Content
 
     var body: some View {
         Group {
             if !model.isVisible {
                 content()
             } else {
-                SplitView(.horizontal, $split, dividerColor: ghostty.config.splitDividerColor, left: {
+                SplitView(.horizontal, $layout.rightSplit, dividerColor: ghostty.config.splitDividerColor, left: {
                     content()
                 }, right: {
                     MarkdownPreviewPane(model: model)
                 }, onEqualize: {
-                    split = 0.5
+                    layout.rightSplit = 0.5
                 })
             }
         }
