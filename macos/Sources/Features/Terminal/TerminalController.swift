@@ -7,34 +7,7 @@ import GhosttyKit
 /// A classic, tabbed terminal experience.
 class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Controller {
     override var windowNibName: NSNib.Name? {
-        let defaultValue = "Terminal"
-
-        guard let appDelegate = NSApp.delegate as? AppDelegate else { return defaultValue }
-        let config = appDelegate.ghostty.config
-
-        // If we have no window decorations, there's no reason to do anything but
-        // the default titlebar (because there will be no titlebar).
-        if !config.windowDecorations {
-            return defaultValue
-        }
-
-        let nib = switch config.macosTitlebarStyle {
-        case .native: "Terminal"
-        case .hidden: "TerminalHiddenTitlebar"
-        case .transparent: "TerminalTransparentTitlebar"
-        case .tabs:
-#if compiler(>=6.2)
-            if #available(macOS 26.0, *) {
-                "TerminalTabsTitlebarTahoe"
-            } else {
-                "TerminalTabsTitlebarVentura"
-            }
-#else
-            "TerminalTabsTitlebarVentura"
-#endif
-        }
-
-        return nib
+        return "TerminalTransparentTitlebar"
     }
 
     /// This is set to true when we care about frame changes. This is a small optimization since
@@ -271,20 +244,10 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
             // fullscreen but this is how we've always done it. This matches iTerm2
             // behavior.
             c.toggleFullscreen(mode: .native)
-        } else if let fullscreenMode = ghostty.config.windowFullscreen {
-            switch fullscreenMode {
-            case .native:
-                // Native has to be done immediately so that our stylemask contains
-                // fullscreen for the logic later in this method.
-                c.toggleFullscreen(mode: .native)
-
-            case .nonNative, .nonNativeVisibleMenu, .nonNativePaddedNotch:
-                // If we're non-native then we have to do it on a later loop
-                // so that the content view is setup.
-                DispatchQueue.main.async {
-                    c.toggleFullscreen(mode: fullscreenMode)
-                }
-            }
+        } else if ghostty.config.windowFullscreen != nil {
+            // Native has to be done immediately so that our stylemask contains
+            // fullscreen for the logic later in this method.
+            c.toggleFullscreen(mode: .native)
         }
 
         // We're dispatching this async because otherwise the lastCascadePoint doesn't
@@ -418,19 +381,6 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         guard let parent,
               let parentController = parent.windowController as? TerminalController else {
             return newWindow(ghostty, withBaseConfig: baseConfig, withParent: parent)
-        }
-
-        // If our parent is in non-native fullscreen, then new tabs do not work.
-        // See: https://github.com/mitchellh/ghostty/issues/392
-        if let fullscreenStyle = parentController.fullscreenStyle,
-           fullscreenStyle.isFullscreen && !fullscreenStyle.supportsTabs {
-            let alert = NSAlert()
-            alert.messageText = "Cannot Create New Tab"
-            alert.informativeText = "New tabs are unsupported while in non-native fullscreen. Exit fullscreen and try again."
-            alert.addButton(withTitle: "OK")
-            alert.alertStyle = .warning
-            alert.beginSheetModal(for: parent)
-            return nil
         }
 
         // Create a new window and add it to the parent. New tabs share the
@@ -1468,23 +1418,6 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         // Get our target window
         let targetWindow = tabbedWindows[finalIndex]
 
-        // Moving tabs on macOS 26 RC causes very nasty visual glitches in the titlebar tabs.
-        // I believe this is due to messed up constraints for our hacky tab bar. I'd like to
-        // find a better workaround. For now, this improves things dramatically.
-        //
-        // Reproduction: titlebar tabs, create two tabs, "move tab left"
-        if #available(macOS 26, *) {
-            if window is TitlebarTabsTahoeTerminalWindow {
-                tabGroup.removeWindow(selectedWindow)
-                targetWindow.addTabbedWindowSafely(selectedWindow, ordered: action.amount < 0 ? .below : .above)
-                DispatchQueue.main.async {
-                    selectedWindow.makeKey()
-                }
-
-                return
-            }
-        }
-
         // Begin a group of window operations to minimize visual updates
         NSAnimationContext.beginGrouping()
         NSAnimationContext.current.duration = 0
@@ -1600,16 +1533,12 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
 
     struct DerivedConfig {
         let backgroundColor: Color
-        let macosWindowButtons: Zashiki.MacOSWindowButtons
-        let macosTitlebarStyle: Zashiki.Config.MacOSTitlebarStyle
         let maximize: Bool
         let windowPositionX: Int16?
         let windowPositionY: Int16?
 
         init() {
             self.backgroundColor = Color(NSColor.windowBackgroundColor)
-            self.macosWindowButtons = .visible
-            self.macosTitlebarStyle = .default
             self.maximize = false
             self.windowPositionX = nil
             self.windowPositionY = nil
@@ -1617,8 +1546,6 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
 
         init(_ config: Zashiki.Config) {
             self.backgroundColor = config.backgroundColor
-            self.macosWindowButtons = config.macosWindowButtons
-            self.macosTitlebarStyle = config.macosTitlebarStyle
             self.maximize = config.maximize
             self.windowPositionX = config.windowPositionX
             self.windowPositionY = config.windowPositionY

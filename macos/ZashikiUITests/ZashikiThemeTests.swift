@@ -68,14 +68,6 @@ final class ZashikiThemeTests: ZashikiCustomConfigCase {
     }
 
     @MainActor
-    func testLightNativeWindowThemeWithDarkTerminal() async throws {
-        try updateConfig("title=\(windowTitle) \n window-theme = light \n macos-titlebar-style = native")
-        let app = try zashikiApplication()
-        app.launch()
-        try assertTitlebarAppearance(.light, for: app)
-    }
-
-    @MainActor
     func testReloadingLightTransparentWindowTheme() async throws {
         try updateConfig("title=\(windowTitle) \n ")
         let app = try zashikiApplication()

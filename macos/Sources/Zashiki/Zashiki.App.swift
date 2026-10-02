@@ -651,8 +651,6 @@ extension Zashiki {
 
             case GHOSTTY_ACTION_TOGGLE_TAB_OVERVIEW:
                 fallthrough
-            case GHOSTTY_ACTION_TOGGLE_WINDOW_DECORATIONS:
-                fallthrough
             case GHOSTTY_ACTION_SIZE_LIMIT:
                 fallthrough
             case GHOSTTY_ACTION_QUIT_TIMER:
@@ -814,16 +812,6 @@ extension Zashiki {
             case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
-                guard let appState = self.appState(fromView: surfaceView) else { return }
-                guard appState.config.windowDecorations else {
-                    let alert = NSAlert()
-                    alert.messageText = "Tabs are disabled"
-                    alert.informativeText = "Enable window decorations to use tabs"
-                    alert.addButton(withTitle: "OK")
-                    alert.alertStyle = .warning
-                    _ = alert.runModal()
-                    return
-                }
 
                 NotificationCenter.default.post(
                     name: Notification.zashikiNewTab,

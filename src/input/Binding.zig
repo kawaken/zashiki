@@ -738,11 +738,6 @@ pub const Action = union(enum) {
     /// Fullscreen or unfullscreen the current window.
     toggle_fullscreen,
 
-    /// Toggle window decorations (titlebar, buttons, etc.) for the current window.
-    ///
-    /// Only implemented on Linux.
-    toggle_window_decorations,
-
     /// Toggle whether the terminal window should always float on top of other
     /// windows even when unfocused.
     ///
@@ -1365,7 +1360,6 @@ pub const Action = union(enum) {
             .close_window,
             .toggle_maximize,
             .toggle_fullscreen,
-            .toggle_window_decorations,
             .toggle_window_float_on_top,
             .toggle_secure_input,
             .toggle_mouse_reporting,

@@ -109,9 +109,6 @@ pub const Action = union(Key) {
     /// Toggle tab overview.
     toggle_tab_overview,
 
-    /// Toggle whether window directions are shown.
-    toggle_window_decorations,
-
     /// Toggle the quick terminal in or out.
     toggle_quick_terminal,
 
@@ -349,7 +346,6 @@ pub const Action = union(Key) {
         toggle_maximize,
         toggle_fullscreen,
         toggle_tab_overview,
-        toggle_window_decorations,
         toggle_quick_terminal,
         toggle_command_palette,
         toggle_visibility,
@@ -556,12 +552,6 @@ pub const GotoTab = enum(c_int) {
 /// The fullscreen mode to toggle to if we're moving to fullscreen.
 pub const Fullscreen = enum(c_int) {
     native,
-
-    /// macOS has a non-native fullscreen mode that is more like a maximized
-    /// window. This is much faster to enter and exit than the native mode.
-    macos_non_native,
-    macos_non_native_visible_menu,
-    macos_non_native_padded_notch,
 
     test "ghostty.h Fullscreen" {
         try lib.checkGhosttyHEnum(Fullscreen, "GHOSTTY_FULLSCREEN_");

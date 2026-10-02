@@ -117,18 +117,10 @@ class TerminalWindow: NSWindow {
             self.title = title
         }
 
-        // If window decorations are disabled, remove our title
-        if !config.windowDecorations { styleMask.remove(.titled) }
-
         // NOTE: setInitialWindowPosition is NOT called here because subclass
         // awakeFromNib may add decorations (e.g. toolbar for tabs style) that
         // change the frame. It is called from TerminalController.windowDidLoad
         // after the window is fully set up.
-
-        // If our traffic buttons should be hidden, then hide them
-        if config.macosWindowButtons == .hidden {
-            hideWindowButtons()
-        }
 
         // Create our reset zoom titlebar accessory. We have to have a title
         // to do this or AppKit triggers an assertion.
@@ -567,12 +559,6 @@ class TerminalWindow: NSWindow {
         return true
     }
 
-    private func hideWindowButtons() {
-        standardWindowButton(.closeButton)?.isHidden = true
-        standardWindowButton(.miniaturizeButton)?.isHidden = true
-        standardWindowButton(.zoomButton)?.isHidden = true
-    }
-
     deinit {
         if let observer = tabMenuObserver {
             NotificationCenter.default.removeObserver(observer)
@@ -586,17 +572,13 @@ class TerminalWindow: NSWindow {
         let backgroundBlur: Zashiki.Config.BackgroundBlur
         let backgroundColor: NSColor
         let backgroundOpacity: Double
-        let macosWindowButtons: Zashiki.MacOSWindowButtons
-        let macosTitlebarStyle: Zashiki.Config.MacOSTitlebarStyle
         let windowCornerRadius: CGFloat
 
         init() {
             self.title = nil
             self.backgroundColor = NSColor.windowBackgroundColor
             self.backgroundOpacity = 1
-            self.macosWindowButtons = .visible
             self.backgroundBlur = .disabled
-            self.macosTitlebarStyle = .default
             self.windowCornerRadius = 16
         }
 
@@ -604,19 +586,8 @@ class TerminalWindow: NSWindow {
             self.title = config.title
             self.backgroundColor = NSColor(config.backgroundColor)
             self.backgroundOpacity = config.backgroundOpacity
-            self.macosWindowButtons = config.macosWindowButtons
             self.backgroundBlur = config.backgroundBlur
-            self.macosTitlebarStyle = config.macosTitlebarStyle
-
-            // Set corner radius based on macos-titlebar-style
-            // Native, transparent, and hidden styles use 16pt radius
-            // Tabs style uses 20pt radius
-            switch config.macosTitlebarStyle {
-            case .tabs:
-                self.windowCornerRadius = 20
-            default:
-                self.windowCornerRadius = 16
-            }
+            self.windowCornerRadius = 16
         }
     }
 }

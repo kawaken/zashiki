@@ -246,17 +246,6 @@ extension Zashiki {
             return String(cString: ptr)
         }
 
-        var windowDecorations: Bool {
-            let defaultValue = true
-            guard let config = self.config else { return defaultValue }
-            var v: UnsafePointer<Int8>?
-            let key = "window-decoration"
-            guard ghostty_config_get(config, &v, key, UInt(key.lengthOfBytes(using: .utf8))) else { return defaultValue }
-            guard let ptr = v else { return defaultValue }
-            let str = String(cString: ptr)
-            return WindowDecoration(rawValue: str)?.enabled() ?? defaultValue
-        }
-
         var windowTheme: String? {
             guard let config = self.config else { return nil }
             var v: UnsafePointer<Int8>?
@@ -275,8 +264,6 @@ extension Zashiki {
         }
 
         /// Returns the fullscreen mode if fullscreen is enabled, or nil if disabled.
-        /// This parses the `fullscreen` enum config which supports both
-        /// native and non-native fullscreen modes.
         #if canImport(AppKit)
         var windowFullscreen: FullscreenMode? {
             guard let config = self.config else { return nil }
@@ -290,12 +277,6 @@ extension Zashiki {
                 nil
             case "true":
                 .native
-            case "non-native":
-                .nonNative
-            case "non-native-visible-menu":
-                .nonNativeVisibleMenu
-            case "non-native-padded-notch":
-                .nonNativePaddedNotch
             default:
                 nil
             }
@@ -312,32 +293,6 @@ extension Zashiki {
         }
         #endif
 
-        /// Returns the fullscreen mode for toggle actions (keybindings).
-        /// This is controlled by `macos-non-native-fullscreen` config.
-        #if canImport(AppKit)
-        var windowFullscreenMode: FullscreenMode {
-            let defaultValue: FullscreenMode = .native
-            guard let config = self.config else { return defaultValue }
-            var v: UnsafePointer<Int8>?
-            let key = "macos-non-native-fullscreen"
-            guard ghostty_config_get(config, &v, key, UInt(key.lengthOfBytes(using: .utf8))) else { return defaultValue }
-            guard let ptr = v else { return defaultValue }
-            let str = String(cString: ptr)
-            return switch str {
-            case "false":
-                    .native
-            case "true":
-                    .nonNative
-            case "visible-menu":
-                    .nonNativeVisibleMenu
-            case "padded-notch":
-                    .nonNativePaddedNotch
-            default:
-                defaultValue
-            }
-        }
-        #endif
-
         var windowTitleFontFamily: String? {
             guard let config = self.config else { return nil }
             var v: UnsafePointer<Int8>?
@@ -345,38 +300,6 @@ extension Zashiki {
             guard ghostty_config_get(config, &v, key, UInt(key.lengthOfBytes(using: .utf8))) else { return nil }
             guard let ptr = v else { return nil }
             return String(cString: ptr)
-        }
-
-        var macosWindowButtons: MacOSWindowButtons {
-            let defaultValue = MacOSWindowButtons.visible
-            guard let config = self.config else { return defaultValue }
-            var v: UnsafePointer<Int8>?
-            let key = "macos-window-buttons"
-            guard ghostty_config_get(config, &v, key, UInt(key.lengthOfBytes(using: .utf8))) else { return defaultValue }
-            guard let ptr = v else { return defaultValue }
-            let str = String(cString: ptr)
-            return MacOSWindowButtons(rawValue: str) ?? defaultValue
-        }
-
-        var macosTitlebarStyle: MacOSTitlebarStyle {
-            let defaultValue = MacOSTitlebarStyle.transparent
-            guard let config = self.config else { return defaultValue }
-            var v: UnsafePointer<Int8>?
-            let key = "macos-titlebar-style"
-            guard ghostty_config_get(config, &v, key, UInt(key.lengthOfBytes(using: .utf8))) else { return defaultValue }
-            guard let ptr = v else { return defaultValue }
-            return MacOSTitlebarStyle(rawValue: String(cString: ptr)) ?? defaultValue
-        }
-
-        var macosTitlebarProxyIcon: MacOSTitlebarProxyIcon {
-            let defaultValue = MacOSTitlebarProxyIcon.visible
-            guard let config = self.config else { return defaultValue }
-            var v: UnsafePointer<Int8>?
-            let key = "macos-titlebar-proxy-icon"
-            guard ghostty_config_get(config, &v, key, UInt(key.lengthOfBytes(using: .utf8))) else { return defaultValue }
-            guard let ptr = v else { return defaultValue }
-            let str = String(cString: ptr)
-            return MacOSTitlebarProxyIcon(rawValue: str) ?? defaultValue
         }
 
         var macosDockDropBehavior: MacDockDropBehavior {
@@ -886,19 +809,6 @@ extension Zashiki.Config {
         }
     }
 
-    enum WindowDecoration: String {
-        case none
-        case client
-        case auto
-
-        func enabled() -> Bool {
-            switch self {
-            case .client, .auto: return true
-            case .none: return false
-            }
-        }
-    }
-
     enum NotifyOnCommandFinish: String {
         case never
         case unfocused
@@ -910,10 +820,5 @@ extension Zashiki.Config {
 
         static let bell = NotifyOnCommandFinishAction(rawValue: 1 << 0)
         static let notify = NotifyOnCommandFinishAction(rawValue: 1 << 1)
-    }
-
-    enum MacOSTitlebarStyle: String {
-        static let `default` = MacOSTitlebarStyle.transparent
-        case native, transparent, tabs, hidden
     }
 }
