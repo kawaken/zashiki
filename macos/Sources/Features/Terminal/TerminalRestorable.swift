@@ -58,7 +58,7 @@ extension TerminalRestorable {
 
 /// The state stored for terminal window restoration.
 final class TerminalRestorableState: TerminalRestorable {
-    static var version: Int { 7 }
+    static var version: Int { 8 }
     static var minimumVersion: Int { 5 }
 
     var focusedSurface: String? {
@@ -75,6 +75,12 @@ final class TerminalRestorableState: TerminalRestorable {
     }
     var titleOverride: String? {
         internalState.titleOverride
+    }
+    var tabs: [InternalState<Zashiki.SurfaceView>.TabState] {
+        internalState.restorableTabs
+    }
+    var selectedTabIndex: Int {
+        internalState.selectedTabIndex ?? 0
     }
 
     /// Internal State we use to perform unit tests
@@ -155,35 +161,28 @@ class TerminalWindowRestoration: NSObject, NSWindowRestoration {
         // can be found for events from libghostty. This uses the low-level
         // createWindow so that AppKit can place the window wherever it should
         // be.
+        let tabs = state.tabs.map { tabState -> TerminalTab in
+            let tab = TerminalTab(surfaceTree: tabState.surfaceTree)
+            tab.color = tabState.tabColor ?? .none
+            tab.titleOverride = tabState.titleOverride
+            if let focusedStr = tabState.focusedSurface {
+                tab.focusedSurface = tab.surfaceTree.first(where: { $0.id.uuidString == focusedStr })
+            }
+            return tab
+        }
+
         let c = TerminalController.init(
             appDelegate.ghostty,
-            withSurfaceTree: state.surfaceTree)
+            withTabs: tabs,
+            selectedTabIndex: state.selectedTabIndex)
         guard let window = c.window else {
             completionHandler(nil, TerminalRestoreError.windowDidNotLoad)
             return
         }
 
-        // Restore our tab color and avoid unnecessary `invalidateRestorableState` calls
-        if let tabColor = state.tabColor {
-            (window as? TerminalWindow)?.tabColor = tabColor
-        }
-
-        // Restore the tab title override
-        c.titleOverride = state.titleOverride
-
-        // Setup our restored state on the controller
-        // Find the focused surface in surfaceTree
-        if let focusedStr = state.focusedSurface {
-            var foundView: Zashiki.SurfaceView?
-            for view in c.surfaceTree where view.id.uuidString == focusedStr {
-                foundView = view
-                break
-            }
-
-            if let view = foundView {
-                c.focusedSurface = view
-                restoreFocus(to: view, inWindow: window)
-            }
+        // Restore focus to the selected tab's focused surface.
+        if let view = c.focusedSurface {
+            restoreFocus(to: view, inWindow: window)
         }
 
         // We let AppKit handle native fullscreen. Terminal windows no longer

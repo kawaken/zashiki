@@ -11,7 +11,7 @@ extension AppDelegate: Zashiki.Delegate {
                 continue
             }
 
-            for surface in controller.surfaceTree where surface.id == id {
+            for surface in controller.allSurfaces where surface.id == id {
                 return surface
             }
         }
@@ -30,13 +30,21 @@ extension AppDelegate: Zashiki.Delegate {
     /// drop). This one round-trips through libghostty's `Surface.id`,
     /// which is what's visible to shell processes.
     func terminalController(forZashikiSurfaceID id: UInt64) -> BaseTerminalController? {
+        terminalTab(forZashikiSurfaceID: id)?.controller
+    }
+
+    /// Like `terminalController(forZashikiSurfaceID:)`, but also returns the
+    /// tab within that window that owns the surface.
+    func terminalTab(
+        forZashikiSurfaceID id: UInt64
+    ) -> (controller: BaseTerminalController, tab: TerminalTab)? {
         for window in NSApp.windows {
             guard let controller = window.windowController as? BaseTerminalController else {
                 continue
             }
 
-            for surface in controller.surfaceTree where surface.zashikiSurfaceID == id {
-                return controller
+            for tab in controller.tabs where tab.surfaceTree.contains(where: { $0.zashikiSurfaceID == id }) {
+                return (controller, tab)
             }
         }
 
