@@ -912,8 +912,14 @@ class BaseTerminalController: NSWindowController,
     func pwdDidChange(to: URL?) {
         guard let window else { return }
 
-        // Use the 'to' URL directly
+        // Use the 'to' URL directly. This keeps the titlebar's path menu
+        // (right-click or command-click on the title) working.
         window.representedURL = to
+
+        // We never show the proxy icon next to the title. AppKit recreates
+        // the button when the URL goes from nil to a value, so hide it on
+        // every change.
+        window.standardWindowButton(.documentIconButton)?.isHidden = true
     }
 
     func cellSizeDidChange(to: NSSize) {
