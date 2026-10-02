@@ -34,6 +34,8 @@ struct WorktreeStatusSplit<Content: View>: View {
             } else {
                 SplitView(.horizontal, $split, dividerColor: ghostty.config.splitDividerColor, left: {
                     sidePanel
+                        .padding(.top, Spike208.isInset ? Spike208.titleRowHeight : 0)
+                        .ignoresSafeArea(.container, edges: Spike208.isInset ? .top : [])
                 }, right: {
                     content()
                 }, onEqualize: {

@@ -1081,6 +1081,8 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         // apply this based on the root config but change it later based on surface
         // config (see focused surface change callback).
         syncAppearance(.init(config))
+
+        Spike208.start(self, ghostty: ghostty)
     }
 
     /// Setup correct window frame before showing the window

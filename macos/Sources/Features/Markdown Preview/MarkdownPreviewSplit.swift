@@ -23,6 +23,8 @@ struct MarkdownPreviewSplit<Content: View>: View {
                     content()
                 }, right: {
                     MarkdownPreviewPane(model: model)
+                        .padding(.top, Spike208.isInset ? Spike208.titleRowHeight : 0)
+                        .ignoresSafeArea(.container, edges: Spike208.isInset ? .top : [])
                 }, onEqualize: {
                     split = 0.5
                 })
