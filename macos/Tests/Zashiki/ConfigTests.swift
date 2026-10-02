@@ -41,16 +41,6 @@ struct ConfigTests {
         #expect(config.focusFollowsMouse == true)
     }
 
-    @Test func windowDecorationsDefaultsToTrue() throws {
-        let config = try TemporaryConfig("")
-        #expect(config.windowDecorations == true)
-    }
-
-    @Test func windowDecorationsNone() throws {
-        let config = try TemporaryConfig("window-decoration = none")
-        #expect(config.windowDecorations == false)
-    }
-
     @Test func macosWindowShadowDefaultsToTrue() throws {
         let config = try TemporaryConfig("")
         #expect(config.macosWindowShadow == true)

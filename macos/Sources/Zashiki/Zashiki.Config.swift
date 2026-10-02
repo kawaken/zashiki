@@ -246,17 +246,6 @@ extension Zashiki {
             return String(cString: ptr)
         }
 
-        var windowDecorations: Bool {
-            let defaultValue = true
-            guard let config = self.config else { return defaultValue }
-            var v: UnsafePointer<Int8>?
-            let key = "window-decoration"
-            guard ghostty_config_get(config, &v, key, UInt(key.lengthOfBytes(using: .utf8))) else { return defaultValue }
-            guard let ptr = v else { return defaultValue }
-            let str = String(cString: ptr)
-            return WindowDecoration(rawValue: str)?.enabled() ?? defaultValue
-        }
-
         var windowTheme: String? {
             guard let config = self.config else { return nil }
             var v: UnsafePointer<Int8>?
@@ -872,19 +861,6 @@ extension Zashiki.Config {
             switch self {
             case .top_right, .bottom_right: return true
             default: return false
-            }
-        }
-    }
-
-    enum WindowDecoration: String {
-        case none
-        case client
-        case auto
-
-        func enabled() -> Bool {
-            switch self {
-            case .client, .auto: return true
-            case .none: return false
             }
         }
     }

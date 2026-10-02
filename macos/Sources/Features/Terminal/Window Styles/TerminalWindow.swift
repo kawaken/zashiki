@@ -117,9 +117,6 @@ class TerminalWindow: NSWindow {
             self.title = title
         }
 
-        // If window decorations are disabled, remove our title
-        if !config.windowDecorations { styleMask.remove(.titled) }
-
         // NOTE: setInitialWindowPosition is NOT called here because subclass
         // awakeFromNib may add decorations (e.g. toolbar for tabs style) that
         // change the frame. It is called from TerminalController.windowDidLoad

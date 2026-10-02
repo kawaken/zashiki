@@ -1412,10 +1412,6 @@ maximize: bool = false,
 /// Important: tabs DO NOT WORK with non-native fullscreen modes. Non-native
 /// fullscreen removes the titlebar and macOS native tabs require the titlebar.
 /// If you use tabs, use `true` (native) instead.
-///
-/// On macOS, `true` (native fullscreen) does not work if `window-decoration`
-/// is set to `false`, because native fullscreen on macOS requires window
-/// decorations.
 fullscreen: Fullscreen = .false,
 
 /// The title Ghostty will use for the window. This will force the title of the
@@ -1931,45 +1927,6 @@ keybind: Keybinds = .{},
 /// will be used. If this is false, the default font size specified in the
 /// configuration `font-size` will be used.
 @"window-inherit-font-size": bool = true,
-
-/// Configure a preference for window decorations. This setting specifies
-/// a _preference_; the actual OS, desktop environment, window manager, etc.
-/// may override this preference. Ghostty will do its best to respect this
-/// preference but it may not always be possible.
-///
-/// Valid values:
-///
-///  * `none`
-///
-///    All window decorations will be disabled. Titlebar, borders, etc. will
-///    not be shown. On macOS, this will also disable tabs (enforced by the
-///    system).
-///
-///  * `auto`
-///
-///    Automatically decide to use either client-side or server-side
-///    decorations based on the detected preferences of the current OS and
-///    desktop environment. This option usually makes Ghostty look the most
-///    "native" for your desktop.
-///
-///  * `client`
-///
-///    Prefer client-side decorations.
-///
-///    Available since: 1.1.0
-///
-/// The default value is `auto`.
-///
-/// For the sake of backwards compatibility and convenience, this setting also
-/// accepts boolean true and false values. If set to `true`, this is equivalent
-/// to `auto`. If set to `false`, this is equivalent to `none`.
-///
-/// The "toggle_window_decorations" keybind action can be used to create
-/// a keybinding to toggle this setting at runtime.
-///
-/// macOS: To hide the titlebar without removing the native window borders
-///        or rounded corners, use `macos-titlebar-style = hidden` instead.
-@"window-decoration": WindowDecoration = .auto,
 
 /// The font that will be used for the application's window and tab titles.
 ///
@@ -8759,57 +8716,6 @@ pub const BackgroundBlur = union(enum) {
         try testing.expectError(error.InvalidValue, v.parseCLI(""));
         try testing.expectError(error.InvalidValue, v.parseCLI("aaaa"));
         try testing.expectError(error.InvalidValue, v.parseCLI("420"));
-    }
-};
-
-/// See window-decoration
-pub const WindowDecoration = enum(c_int) {
-    auto,
-    client,
-    none,
-
-    pub fn parseCLI(input_: ?[]const u8) !WindowDecoration {
-        const input = input_ orelse return .auto;
-
-        return if (cli.args.parseBool(input)) |b|
-            if (b) .auto else .none
-        else |_| if (std.meta.stringToEnum(WindowDecoration, input)) |v|
-            v
-        else
-            error.InvalidValue;
-    }
-
-    test "parse WindowDecoration" {
-        const testing = std.testing;
-
-        {
-            const v = try WindowDecoration.parseCLI(null);
-            try testing.expectEqual(WindowDecoration.auto, v);
-        }
-        {
-            const v = try WindowDecoration.parseCLI("true");
-            try testing.expectEqual(WindowDecoration.auto, v);
-        }
-        {
-            const v = try WindowDecoration.parseCLI("false");
-            try testing.expectEqual(WindowDecoration.none, v);
-        }
-        {
-            const v = try WindowDecoration.parseCLI("client");
-            try testing.expectEqual(WindowDecoration.client, v);
-        }
-        {
-            const v = try WindowDecoration.parseCLI("auto");
-            try testing.expectEqual(WindowDecoration.auto, v);
-        }
-        {
-            const v = try WindowDecoration.parseCLI("none");
-            try testing.expectEqual(WindowDecoration.none, v);
-        }
-        {
-            try testing.expectError(error.InvalidValue, WindowDecoration.parseCLI(""));
-            try testing.expectError(error.InvalidValue, WindowDecoration.parseCLI("aaaa"));
-        }
     }
 };
 

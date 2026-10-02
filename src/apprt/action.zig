@@ -109,9 +109,6 @@ pub const Action = union(Key) {
     /// Toggle tab overview.
     toggle_tab_overview,
 
-    /// Toggle whether window directions are shown.
-    toggle_window_decorations,
-
     /// Toggle the quick terminal in or out.
     toggle_quick_terminal,
 
@@ -349,7 +346,6 @@ pub const Action = union(Key) {
         toggle_maximize,
         toggle_fullscreen,
         toggle_tab_overview,
-        toggle_window_decorations,
         toggle_quick_terminal,
         toggle_command_palette,
         toggle_visibility,

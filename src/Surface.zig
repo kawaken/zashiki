@@ -5300,12 +5300,6 @@ pub fn performBindingAction(self: *Surface, action: input.Binding.Action) !bool 
             },
         ),
 
-        .toggle_window_decorations => return try self.rt_app.performAction(
-            .{ .surface = self },
-            .toggle_window_decorations,
-            {},
-        ),
-
         .toggle_tab_overview => return try self.rt_app.performAction(
             .{ .surface = self },
             .toggle_tab_overview,

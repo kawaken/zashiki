@@ -7,17 +7,6 @@ import GhosttyKit
 /// A classic, tabbed terminal experience.
 class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Controller {
     override var windowNibName: NSNib.Name? {
-        let defaultValue = "Terminal"
-
-        guard let appDelegate = NSApp.delegate as? AppDelegate else { return defaultValue }
-        let config = appDelegate.ghostty.config
-
-        // If we have no window decorations, there's no reason to do anything but
-        // the default titlebar (because there will be no titlebar).
-        if !config.windowDecorations {
-            return defaultValue
-        }
-
         return "TerminalTransparentTitlebar"
     }
 
