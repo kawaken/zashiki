@@ -76,10 +76,9 @@ Issue #239
 4. `macos-window-buttons`、`macos-titlebar-proxy-icon`
    - キーと型、隠す処理を削除。
 
-## レビューで決めたいこと
+## 決定事項
 
-- `fullscreen` の値を `false` / `true` に絞ってよいか。Issue に挙げた5つの設定には
-  含まれていないが、絞らないと通常のウィンドウが独自フルスクリーンになる経路が残る。
+- `fullscreen` の値は `false` / `true` に絞る（レビューで確認済み）。
 
 ## 検証
 
