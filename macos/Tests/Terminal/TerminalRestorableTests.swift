@@ -6,7 +6,7 @@ import AppKit
 struct TerminalRestorableTests {
     @Test
     func areYouForgettingToAddMigrationTests() {
-        #expect(TerminalRestorableState.version == 7)
+        #expect(TerminalRestorableState.version == 8)
         #expect(TerminalRestorableState.minimumVersion == 5)
 
         #expect(QuickTerminalRestorableState.version == 1)
@@ -108,6 +108,49 @@ struct TerminalRestorableTests {
         #expect(v7Generic.titleOverride == "tip")
         #expect(v7Generic.surfaceTree.contains(where: { $0.id.uuidString == "953CE952-D91D-4D36-AC72-9D0F1F6BCE73" }))
         #expect(v7Generic.surfaceTree.contains(where: { $0.id.uuidString == "D3223569-2E01-4BC5-9DB2-DBFC3AFF46D1" }))
+
+        // Data from before tabs lived inside the window restores as one tab.
+        #expect(v7.tabs == nil)
+        #expect(v7.selectedTabIndex == nil)
+        #expect(v7.restorableTabs.count == 1)
+        #expect(v7.restorableTabs[0].focusedSurface == "v7")
+        #expect(v7.restorableTabs[0].tabColor == .green)
+        #expect(v7.restorableTabs[0].titleOverride == "1.3.0")
+    }
+
+    @MainActor
+    @Test func restoreTerminalTabs() throws {
+        let first = try SplitTreeTests.makeHorizontalSplit()
+        let second = try SplitTreeTests.makeHorizontalSplit()
+        let state = DummyTerminalRestorableState(
+            .init(
+                focusedSurface: "second",
+                surfaceTree: second.0,
+                effectiveFullscreenMode: nil,
+                tabColor: .green,
+                titleOverride: "two",
+                tabs: [
+                    .init(focusedSurface: "first", surfaceTree: first.0, tabColor: nil, titleOverride: nil),
+                    .init(focusedSurface: "second", surfaceTree: second.0, tabColor: .green, titleOverride: "two"),
+                ],
+                selectedTabIndex: 1
+            )
+        )
+        let data = try archive(CodableBridge(state), className: "CodableBridge<Terminal>")
+
+        let decoded = try unarchive(data, className: "CodableBridge<Terminal>", as: CodableBridge<DummyTerminalRestorableState>.self)
+            .value.internalState
+        #expect(decoded.selectedTabIndex == 1)
+        #expect(decoded.restorableTabs.count == 2)
+        #expect(decoded.restorableTabs[0].focusedSurface == "first")
+        #expect(decoded.restorableTabs[0].surfaceTree.contains(where: { $0.id == first.1.id }))
+        #expect(decoded.restorableTabs[1].tabColor == .green)
+        #expect(decoded.restorableTabs[1].titleOverride == "two")
+        #expect(decoded.restorableTabs[1].surfaceTree.contains(where: { $0.id == second.2.id }))
+
+        // The top-level fields keep describing the selected tab.
+        #expect(decoded.focusedSurface == "second")
+        #expect(decoded.titleOverride == "two")
     }
 }
 

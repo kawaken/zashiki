@@ -176,6 +176,10 @@ class AppDelegate: NSObject,
     // MARK: - NSApplicationDelegate
 
     func applicationWillFinishLaunching(_ notification: Notification) {
+        // Tabs live inside our windows (see `TerminalTab`), so we don't use
+        // native window tabs. This also removes their Window menu items.
+        NSWindow.allowsAutomaticWindowTabbing = false
+
         #if DEBUG
         if
             let suite = UserDefaults.zashikiSuite,
@@ -556,11 +560,11 @@ class AppDelegate: NSObject,
             return
         }
 
-        let sourceController = resolveSourceController(components)
+        let source = resolveSource(components)
 
         switch components.host {
         case "markdown-preview":
-            handleMarkdownPreviewURL(components, sourceController: sourceController)
+            handleMarkdownPreviewURL(components, source: source)
 
         default:
             Self.logger.warning("zashiki URL: unknown host \(components.host ?? "(nil)", privacy: .public)")
@@ -568,12 +572,14 @@ class AppDelegate: NSObject,
     }
 
     /// Parses the `surface` query item (if present) and resolves it to
-    /// the terminal window controller that currently owns that surface.
-    /// Returns nil if `surface` is absent, malformed, or no longer
+    /// the terminal window controller and tab that currently own that
+    /// surface. Returns nil if `surface` is absent, malformed, or no longer
     /// resolves to a live surface (e.g. the window was closed) --
     /// callers should fall back to their own default target in that
     /// case.
-    private func resolveSourceController(_ components: URLComponents) -> BaseTerminalController? {
+    private func resolveSource(
+        _ components: URLComponents
+    ) -> (controller: BaseTerminalController, tab: TerminalTab)? {
         guard let raw = components.queryItems?.first(where: { $0.name == "surface" })?.value else {
             return nil
         }
@@ -582,16 +588,16 @@ class AppDelegate: NSObject,
             Self.logger.warning("zashiki URL: malformed 'surface' query item \(raw, privacy: .public)")
             return nil
         }
-        guard let controller = terminalController(forZashikiSurfaceID: id) else {
+        guard let source = terminalTab(forZashikiSurfaceID: id) else {
             Self.logger.warning("zashiki URL: no live surface for id \(raw, privacy: .public)")
             return nil
         }
-        return controller
+        return source
     }
 
     private func handleMarkdownPreviewURL(
         _ components: URLComponents,
-        sourceController: BaseTerminalController?
+        source: (controller: BaseTerminalController, tab: TerminalTab)?
     ) {
         guard components.path == "/open" else {
             Self.logger.warning("zashiki URL: unknown markdown-preview path \(components.path, privacy: .public)")
@@ -613,18 +619,24 @@ class AppDelegate: NSObject,
             return
         }
 
-        // Prefer the surface that made the request. Mirrors
+        // Prefer the tab of the surface that made the request, even if it
+        // isn't the selected tab: the preview's content is per tab. Mirrors
         // application(_:openFile:) below: if there's no window to
         // attach to (no resolved source, no preferred parent, e.g. all
         // windows were closed or we're still early in launch), open a
         // new one rather than silently dropping the request.
-        let controller: BaseTerminalController = sourceController
-            ?? TerminalController.preferredParent
-            ?? TerminalController.newWindow(ghostty)
+        let preview: MarkdownPreviewModel
+        if let source {
+            preview = source.tab.markdownPreview
+        } else {
+            let controller: BaseTerminalController = TerminalController.preferredParent
+                ?? TerminalController.newWindow(ghostty)
+            preview = controller.markdownPreview
+        }
         let previewURL = URL(fileURLWithPath: path).standardizedFileURL
-        controller.markdownPreview.open(url: previewURL)
-        guard controller.markdownPreview.isVisible,
-              controller.markdownPreview.fileURL?.standardizedFileURL == previewURL else {
+        preview.open(url: previewURL)
+        guard preview.isVisible,
+              preview.fileURL?.standardizedFileURL == previewURL else {
             acknowledgeMarkdownPreviewURL(components, result: "error:preview-not-opened")
             return
         }
@@ -909,7 +921,6 @@ class AppDelegate: NSObject,
         DispatchQueue.main.async {
             self.syncMenuShortcuts(config)
         }
-        TerminalController.all.forEach { $0.relabelTabs() }
 
         // Update our badge since config can change what we show.
         syncDockBadge()
@@ -1029,7 +1040,7 @@ class AppDelegate: NSObject,
 
     func findSurface(forUUID uuid: UUID) -> Zashiki.SurfaceView? {
         for c in TerminalController.all {
-            for view in c.surfaceTree where view.id == uuid {
+            for view in c.allSurfaces where view.id == uuid {
                 return view
             }
         }

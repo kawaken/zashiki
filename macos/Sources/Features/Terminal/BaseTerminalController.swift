@@ -35,9 +35,13 @@ class BaseTerminalController: NSWindowController,
     /// The app instance that this terminal view will represent.
     let ghostty: Zashiki.App
 
-    /// The tab shown in this window. Per-tab state lives here; the properties
-    /// below forward to it so existing split/focus logic acts on this tab.
-    let selectedTab = TerminalTab()
+    /// The tabs in this window, in display order. There is always at least one.
+    @Published private(set) var tabs: [TerminalTab]
+
+    /// The tab shown in this window. Per-tab state lives on the tab; the
+    /// properties below forward to it so existing split/focus logic acts on
+    /// the selected tab.
+    @Published private(set) var selectedTab: TerminalTab
 
     /// The currently focused surface.
     var focusedSurface: Zashiki.SurfaceView? {
@@ -65,36 +69,24 @@ class BaseTerminalController: NSWindowController,
     /// Set if the terminal view should show the update overlay.
     @Published var updateOverlayIsVisible: Bool = false
 
-    /// The state for the selected tab's Markdown preview pane.
+    /// The state for the selected tab's Markdown preview pane. The content is
+    /// per tab; whether the pane is shown is kept the same across every tab
+    /// in this window (see `observeMarkdownPreview(of:)`).
     var markdownPreview: MarkdownPreviewModel { selectedTab.markdownPreview }
 
-    /// The state for this window's Worktree Status pane. Shared across every
-    /// tab in the same tabGroup (see `init`) so switching tabs doesn't reset
-    /// the pane, matching a typical IDE's window-scoped sidebar.
-    let worktreeStatus: WorktreeStatusModel
+    /// The state for this window's Worktree Status pane.
+    let worktreeStatus = WorktreeStatusModel()
 
-    /// The state for this window's Agents pane. Shared the same way as
-    /// `worktreeStatus`; tracks every Surface across every tab in the
-    /// tabGroup, not just this controller's own tab (see `tabGroupSurfaces`).
-    let agentStatus: AgentStatusModel
+    /// The state for this window's Agents pane. Tracks every Surface across
+    /// every tab in this window (see `allSurfaces`).
+    let agentStatus = AgentStatusModel()
 
-    /// Every Surface across every tab in this window's tabGroup (not just
-    /// this controller's own tab), for the Agents list to track. Ghostty
-    /// tabs are backed by separate `NSWindow`s grouped into one `tabGroup`
-    /// (see `TerminalController.newTab`), so this walks every tabbed window's
-    /// controller and flattens their surface trees. Falls back to just this
-    /// controller's own tree when there's no tabGroup (a lone window) so the
-    /// Agents list still works before the window has a `tabGroup` assigned.
-    var tabGroupSurfaces: [Zashiki.SurfaceView] {
-        guard let windows = window?.tabGroup?.windows, !windows.isEmpty else {
-            return Array(surfaceTree)
-        }
-        return windows.flatMap { tabWindow -> [Zashiki.SurfaceView] in
-            guard let controller = tabWindow.windowController as? BaseTerminalController else {
-                return []
-            }
-            return Array(controller.surfaceTree)
-        }
+    /// True if the tab bar should be shown for this window.
+    var showsTabBar: Bool { false }
+
+    /// Every Surface across every tab in this window.
+    var allSurfaces: [Zashiki.SurfaceView] {
+        tabs.flatMap { Array($0.surfaceTree) }
     }
 
     /// True when any surface in this controller currently has an active bell.
@@ -129,8 +121,14 @@ class BaseTerminalController: NSWindowController,
     /// Track whether background is forced opaque (true) or using config transparency (false)
     var isBackgroundOpaque: Bool = false
 
-    /// The cancellables related to our focused surface.
-    private var focusedSurfaceCancellables: Set<AnyCancellable> = []
+    /// Keeps the window title in sync with the selected tab.
+    private var titleCancellable: AnyCancellable?
+
+    /// The last title computed for the selected tab.
+    private var lastComputedTitle: String = TerminalTab.placeholderTitle
+
+    /// Keeps the preview pane's visibility the same across tabs.
+    private var markdownPreviewCancellables: [TerminalTab.ID: AnyCancellable] = [:]
 
     /// Cancellable for aggregating bell state across all surfaces in this controller.
     private var bellStateCancellable: AnyCancellable?
@@ -139,14 +137,8 @@ class BaseTerminalController: NSWindowController,
     /// When set, this takes precedence over the computed title from the terminal.
     var titleOverride: String? {
         get { selectedTab.titleOverride }
-        set {
-            selectedTab.titleOverride = newValue
-            applyTitleToWindow()
-        }
+        set { selectedTab.titleOverride = newValue }
     }
-
-    /// The last computed title from the focused surface (without the override).
-    private var lastComputedTitle: String = "👻"
 
     /// The time that undo/redo operations that contain running ptys are valid for.
     var undoExpiration: Duration {
@@ -180,17 +172,13 @@ class BaseTerminalController: NSWindowController,
 
     init(_ ghostty: Zashiki.App,
          baseConfig base: Zashiki.SurfaceConfiguration? = nil,
-         surfaceTree tree: SplitTree<Zashiki.SurfaceView>? = nil,
-         worktreeStatus: WorktreeStatusModel? = nil,
-         agentStatus: AgentStatusModel? = nil
+         surfaceTree tree: SplitTree<Zashiki.SurfaceView>? = nil
     ) {
         self.ghostty = ghostty
         self.derivedConfig = DerivedConfig(ghostty.config)
-        // A caller passes an existing instance (see `TerminalController.newTab`)
-        // to share a window's Worktree Status/Agents state across its tabs.
-        // A fresh window (no parent tab) gets its own new instance.
-        self.worktreeStatus = worktreeStatus ?? WorktreeStatusModel()
-        self.agentStatus = agentStatus ?? AgentStatusModel()
+        let tab = TerminalTab()
+        self.tabs = [tab]
+        self.selectedTab = tab
 
         super.init(window: nil)
 
@@ -200,6 +188,10 @@ class BaseTerminalController: NSWindowController,
 
         // Setup our bell state for the window
         setupBellNotificationPublisher()
+
+        // Keep the window title and the preview pane following the tabs
+        setupTitlePublisher()
+        observeMarkdownPreview(of: tab)
 
         // Setup our notifications for behaviors
         let center = NotificationCenter.default
@@ -328,17 +320,132 @@ class BaseTerminalController: NSWindowController,
 
     /// Move focus to a surface view.
     func focusSurface(_ view: Zashiki.SurfaceView) {
-        // Check if target surface is in our tree
-        guard surfaceTree.contains(view) else { return }
+        // Check if target surface is in one of our tabs
+        guard let tab = tab(containing: view) else { return }
+        selectTab(tab)
 
         // Move focus to the target surface and activate the window/app
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak self] in
             Zashiki.moveFocus(to: view)
-            view.window?.makeKeyAndOrderFront(nil)
+            self?.window?.makeKeyAndOrderFront(nil)
             if !NSApp.isActive {
                 NSApp.activate(ignoringOtherApps: true)
             }
         }
+    }
+
+    // MARK: Tabs
+
+    /// The tab that contains the given surface, if any.
+    func tab(containing view: Zashiki.SurfaceView) -> TerminalTab? {
+        tabs.first { $0.surfaceTree.contains(view) }
+    }
+
+    /// Shows the given tab.
+    func selectTab(_ tab: TerminalTab) {
+        guard tab !== selectedTab, tabs.contains(where: { $0 === tab }) else { return }
+        let oldTab = selectedTab
+        selectedTab = tab
+
+        // The surfaces of the old tab are no longer on screen.
+        for surfaceView in oldTab.surfaceTree {
+            surfaceView.focusDidChange(false)
+        }
+        syncSurfaceTreeOcclusionState()
+
+        // Move focus into the new tab. The surface isn't in the view hierarchy
+        // until SwiftUI renders the new tree; moveFocus retries until it is.
+        if let target = tab.focusedSurface ?? tab.surfaceTree.first {
+            tab.focusedSurface = target
+            DispatchQueue.main.async {
+                Zashiki.moveFocus(to: target, from: oldTab.focusedSurface)
+            }
+        }
+
+        selectedTabDidChange(from: oldTab)
+    }
+
+    /// Adds a tab at the given index (clamped to the valid range).
+    func insertTab(_ tab: TerminalTab, at index: Int) {
+        tab.markdownPreview.isVisible = markdownPreview.isVisible
+        observeMarkdownPreview(of: tab)
+        tabs.insert(tab, at: max(0, min(index, tabs.count)))
+        syncSurfaceTreeOcclusionState()
+        tabsDidChange()
+    }
+
+    /// Removes a tab without confirmation. If it is the selected tab, a
+    /// neighbor becomes selected. The last tab can't be removed; close the
+    /// window instead.
+    func removeTab(_ tab: TerminalTab) {
+        guard tabs.count > 1, let index = tabs.firstIndex(where: { $0 === tab }) else { return }
+        if tab === selectedTab {
+            selectTab(index + 1 < tabs.count ? tabs[index + 1] : tabs[index - 1])
+        }
+        tabs.remove(at: index)
+        markdownPreviewCancellables[tab.id] = nil
+        tabsDidChange()
+    }
+
+    /// Moves a tab to the given index.
+    func moveTab(_ tab: TerminalTab, to index: Int) {
+        guard let current = tabs.firstIndex(where: { $0 === tab }) else { return }
+        let target = max(0, min(index, tabs.count - 1))
+        guard current != target else { return }
+        tabs.remove(at: current)
+        tabs.insert(tab, at: target)
+        tabsDidChange()
+    }
+
+    /// Replaces every tab. Used when restoring a window.
+    func replaceTabs(_ newTabs: [TerminalTab], selected: TerminalTab) {
+        guard !newTabs.isEmpty, newTabs.contains(where: { $0 === selected }) else { return }
+        markdownPreviewCancellables = [:]
+        tabs = newTabs
+        selectedTab = selected
+        newTabs.forEach { observeMarkdownPreview(of: $0) }
+        syncSurfaceTreeOcclusionState()
+        tabsDidChange()
+    }
+
+    /// Called after the selected tab changed. Subclasses should call super first.
+    func selectedTabDidChange(from oldTab: TerminalTab) {
+        refreshWorktreeStatusIfVisible()
+    }
+
+    /// Called after tabs were added, removed, or reordered.
+    func tabsDidChange() {}
+
+    /// Removes a surface from a tab that isn't selected. This happens without
+    /// confirmation, e.g. when the process of a background tab exits.
+    private func removeSurface(_ view: Zashiki.SurfaceView, fromBackgroundTab tab: TerminalTab) {
+        guard let node = tab.surfaceTree.root?.node(view: view) else { return }
+        let newTree = tab.surfaceTree.removing(node)
+        if newTree.isEmpty {
+            removeTab(tab)
+            return
+        }
+
+        tab.surfaceTree = newTree
+        if tab.focusedSurface == view {
+            tab.focusedSurface = newTree.first
+        }
+        tabsDidChange()
+    }
+
+    /// Keeps the preview pane's visibility the same across every tab in this
+    /// window: showing or hiding it in one tab applies to all of them.
+    private func observeMarkdownPreview(of tab: TerminalTab) {
+        markdownPreviewCancellables[tab.id] = tab.markdownPreview.$isVisible
+            .dropFirst()
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isVisible in
+                guard let self else { return }
+                for other in self.tabs where other.markdownPreview.isVisible != isVisible {
+                    other.markdownPreview.isVisible = isVisible
+                }
+            }
     }
 
     /// Called when the surfaceTree variable changed.
@@ -545,6 +652,7 @@ class BaseTerminalController: NSWindowController,
         undoAction: String? = nil
     ) {
         // Setup our new split tree
+        let tab = selectedTab
         let oldTree = surfaceTree
         surfaceTree = newTree
         if let newView {
@@ -563,6 +671,11 @@ class BaseTerminalController: NSWindowController,
             withTarget: self,
             expiresAfter: undoExpiration
         ) { target in
+            // The undo applies to the tab the change was made in, which may
+            // no longer be the selected one (or may be gone entirely).
+            guard target.tabs.contains(where: { $0 === tab }) else { return }
+            target.selectTab(tab)
+
             target.surfaceTree = oldTree
             if let oldView {
                 DispatchQueue.main.async {
@@ -574,6 +687,8 @@ class BaseTerminalController: NSWindowController,
                 withTarget: target,
                 expiresAfter: target.undoExpiration
             ) { target in
+                guard target.tabs.contains(where: { $0 === tab }) else { return }
+                target.selectTab(tab)
                 target.replaceSurfaceTree(
                     newTree,
                     moveFocusTo: newView,
@@ -658,10 +773,21 @@ class BaseTerminalController: NSWindowController,
 
     @objc private func zashikiDidCloseSurface(_ notification: Notification) {
         guard let target = notification.object as? Zashiki.SurfaceView else { return }
+        guard let tab = tab(containing: target) else { return }
+        let withConfirmation = (notification.userInfo?["process_alive"] as? Bool) ?? false
+
+        // A surface in a tab that isn't selected closes in place, unless we
+        // need to ask first. Then we show its tab so the alert has context.
+        if tab !== selectedTab {
+            guard withConfirmation else {
+                removeSurface(target, fromBackgroundTab: tab)
+                return
+            }
+            selectTab(tab)
+        }
+
         guard let node = surfaceTree.root?.node(view: target) else { return }
-        closeSurface(
-            node,
-            withConfirmation: (notification.userInfo?["process_alive"] as? Bool) ?? false)
+        closeSurface(node, withConfirmation: withConfirmation)
     }
 
     @objc private func zashikiDidNewSplit(_ notification: Notification) {
@@ -793,7 +919,8 @@ class BaseTerminalController: NSWindowController,
 
     @objc private func zashikiDidPresentTerminal(_ notification: Notification) {
         guard let target = notification.object as? Zashiki.SurfaceView else { return }
-        guard surfaceTree.contains(target) else { return }
+        guard let tab = tab(containing: target) else { return }
+        selectTab(tab)
 
         // Bring the window to front and focus the surface.
         window?.makeKeyAndOrderFront(nil)
@@ -876,29 +1003,25 @@ class BaseTerminalController: NSWindowController,
     // MARK: TerminalViewDelegate
 
     func focusedSurfaceDidChange(to: Zashiki.SurfaceView?) {
-        let lastFocusedSurface = focusedSurface
-        focusedSurface = to
-
-        // Important to cancel any prior subscriptions
-        focusedSurfaceCancellables = []
-
-        // Setup our title listener. If we have a focused surface we always use that.
-        // Otherwise, we try to use our last focused surface. In either case, we only
-        // want to care if the surface is in the tree so we don't listen to titles of
-        // closed surfaces.
-        if let titleSurface = focusedSurface ?? lastFocusedSurface,
-           surfaceTree.contains(titleSurface) {
-            // If we have a surface, we want to listen for title changes.
-            titleSurface.$title
-                .combineLatest(titleSurface.$bell)
-                .map { [weak self] in self?.computeTitle(title: $0, bell: $1) ?? "" }
-                .sink { [weak self] in self?.titleDidChange(to: $0) }
-                .store(in: &focusedSurfaceCancellables)
-        } else {
-            // There is no surface to listen to titles for.
-            titleDidChange(to: "👻")
+        // The view can report focus for a surface of a tab we just switched
+        // away from. Record it on its own tab instead of the selected one.
+        if let to, let owner = tab(containing: to), owner !== selectedTab {
+            owner.focusedSurface = to
+            return
         }
+
+        // The tab follows the title of its focused surface (see `TerminalTab`).
+        focusedSurface = to
     }
+
+    func tabBarDidSelect(_ tab: TerminalTab) {
+        selectTab(tab)
+    }
+
+    /// Subclasses that support multiple tabs override these.
+    func tabBarDidClose(_ tab: TerminalTab) {}
+
+    func tabBarDidRequestNewTab() {}
 
     private func computeTitle(title: String, bell: Bool) -> String {
         var result = title
@@ -909,22 +1032,29 @@ class BaseTerminalController: NSWindowController,
         return result
     }
 
-    private func titleDidChange(to: String) {
-        lastComputedTitle = to
-        applyTitleToWindow()
+    /// Keeps the window title following the selected tab: its override if set,
+    /// otherwise the title of its focused surface.
+    private func setupTitlePublisher() {
+        titleCancellable = $selectedTab
+            .map { tab in
+                tab.$surfaceTitle.combineLatest(tab.$titleOverride, tab.$focusedSurfaceBell)
+            }
+            .switchToLatest()
+            .sink { [weak self] surfaceTitle, titleOverride, bell in
+                guard let self else { return }
+                let title = self.computeTitle(title: titleOverride ?? surfaceTitle, bell: bell)
+                self.lastComputedTitle = title
+                self.applyTitleToWindow()
+            }
     }
 
+    /// Applies the selected tab's title to the window. The window doesn't
+    /// exist yet when the title is first computed, so this is also called
+    /// once it has loaded.
     private func applyTitleToWindow() {
-        guard let window else { return }
-
-        if let titleOverride {
-            window.title = computeTitle(
-                title: titleOverride,
-                bell: focusedSurface?.bell ?? false)
-            return
-        }
-
-        window.title = lastComputedTitle
+        // Accessing `window` would load it, so wait until it is.
+        guard isWindowLoaded else { return }
+        window?.title = lastComputedTitle
     }
 
     func pwdDidChange(to: URL?) {
@@ -1235,6 +1365,8 @@ class BaseTerminalController: NSWindowController,
 
         // Set our update overlay state
         updateOverlayIsVisible = defaultUpdateOverlayVisibility()
+
+        applyTitleToWindow()
     }
 
     func defaultUpdateOverlayVisibility() -> Bool {
@@ -1270,13 +1402,13 @@ class BaseTerminalController: NSWindowController,
         guard let window = self.window else { return true }
 
         // If we have no surfaces, close.
-        if surfaceTree.isEmpty { return true }
+        if allSurfaces.isEmpty { return true }
 
         // If we already have an alert, continue with it
         guard alert == nil else { return false }
 
         // If our surfaces don't require confirmation, close.
-        if !surfaceTree.contains(where: { $0.needsConfirmQuit }) { return true }
+        if !tabs.contains(where: { $0.needsConfirmQuit }) { return true }
 
         return false
     }
@@ -1350,11 +1482,15 @@ class BaseTerminalController: NSWindowController,
     }
 
     private func syncSurfaceTreeOcclusionState() {
-        let visible = self.window?.occlusionState.contains(.visible) ?? false
-        for view in surfaceTree {
-            if let surface = view.surface, view.isWindowVisible != visible {
-                ghostty_surface_set_occlusion(surface, visible)
-                view.isWindowVisible = visible
+        // Only the selected tab is on screen.
+        let windowVisible = self.window?.occlusionState.contains(.visible) ?? false
+        for tab in tabs {
+            let visible = windowVisible && tab === selectedTab
+            for view in tab.surfaceTree {
+                if let surface = view.surface, view.isWindowVisible != visible {
+                    ghostty_surface_set_occlusion(surface, visible)
+                    view.isWindowVisible = visible
+                }
             }
         }
     }
@@ -1634,7 +1770,7 @@ extension BaseTerminalController: NSMenuItemValidation {
         guard scheme != appliedColorScheme else {
             return
         }
-        for surfaceView in surfaceTree {
+        for surfaceView in allSurfaces {
             if let surface = surfaceView.surface {
                 ghostty_surface_set_color_scheme(surface, scheme)
             }
@@ -1649,10 +1785,16 @@ extension BaseTerminalController {
     /// Publishes an app-wide notification whenever this terminal window's aggregate
     /// bell state changes.
     private func setupBellNotificationPublisher() {
-        bellStateCancellable = surfaceValuesPublisher(valueKeyPath: \.bell, publisherKeyPath: \.$bell)
-            .map { $0.values.contains(true) }
+        bellStateCancellable = $tabs
+            .map { tabs in
+                // Re-evaluate whenever any tab's bell changes. The hop to the
+                // main queue lets the tab finish updating before we read it.
+                Publishers.MergeMany(tabs.map { $0.$bell })
+                    .receive(on: DispatchQueue.main)
+                    .map { _ in tabs.contains(where: { $0.bell }) }
+            }
+            .switchToLatest()
             .removeDuplicates()
-            .receive(on: DispatchQueue.main)
             .sink { [weak self] hasBell in
                 guard let self else { return }
                 bell = hasBell
@@ -1662,30 +1804,6 @@ extension BaseTerminalController {
                     userInfo: [Notification.Name.terminalWindowHasBellKey: hasBell]
                 )
             }
-    }
-
-    /// Creates a publisher for values on all surfaces in this controller's tree.
-    ///
-    /// The publisher emits a dictionary of surface IDs to values whenever the tree changes
-    /// or any surface publishes a new value for the key path.
-    func surfaceValuesPublisher<Value>(
-        valueKeyPath: KeyPath<Zashiki.SurfaceView, Value>,
-        publisherKeyPath: KeyPath<Zashiki.SurfaceView, Published<Value>.Publisher>
-    ) -> AnyPublisher<[Zashiki.SurfaceView.ID: Value], Never> {
-        // `surfaceTree` can be replaced entirely when splits are added/removed/closed.
-        // For each tree snapshot we build a fresh publisher that watches all surfaces
-        // in that snapshot.
-        selectedTab.$surfaceTree
-            .map { tree in
-                tree.valuesPublisher(
-                    valueKeyPath: valueKeyPath,
-                    publisherKeyPath: publisherKeyPath
-                )
-            }
-            // Keep only the latest tree publisher active. This automatically cancels
-            // subscriptions for old/removed surfaces when the tree changes.
-            .switchToLatest()
-            .eraseToAnyPublisher()
     }
 }
 

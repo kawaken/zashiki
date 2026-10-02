@@ -1108,7 +1108,8 @@ extension Zashiki {
                     guard let surfaceView = self.surfaceView(from: surface) else { return false }
 
                     // See gotoTab for notes on this check.
-                    guard (surfaceView.window?.tabGroup?.windows.count ?? 0) > 1 else { return false }
+                    guard let controller = surfaceView.window?.windowController as? BaseTerminalController,
+                          controller.tabs.count > 1 else { return false }
 
                     NotificationCenter.default.post(
                         name: .zashikiMoveTab,
@@ -1140,7 +1141,8 @@ extension Zashiki {
 
                     // Similar to goto_split (see comment there) about our performability,
                     // we should make this more accurate later.
-                    guard (surfaceView.window?.tabGroup?.windows.count ?? 0) > 1 else { return false }
+                    guard let controller = surfaceView.window?.windowController as? BaseTerminalController,
+                          controller.tabs.count > 1 else { return false }
 
                     NotificationCenter.default.post(
                         name: Notification.zashikiGotoTab,
@@ -1601,10 +1603,14 @@ extension Zashiki {
                 let titleOverride = title.isEmpty ? nil : title
                 guard let surface = target.target.surface else { return false }
                 guard let surfaceView = self.surfaceView(from: surface) else { return false }
-                guard let window = surfaceView.window,
-                      let controller = window.windowController as? BaseTerminalController
-                else { return false }
-                controller.titleOverride = titleOverride
+                // The surface may be in a tab that isn't selected, in which
+                // case it has no window. Find its tab among every window.
+                let tab = NSApp.windows.lazy
+                    .compactMap { $0.windowController as? BaseTerminalController }
+                    .compactMap { $0.tab(containing: surfaceView) }
+                    .first
+                guard let tab else { return false }
+                tab.titleOverride = titleOverride
                 return true
 
             default:
