@@ -912,8 +912,7 @@ class BaseTerminalController: NSWindowController,
     func pwdDidChange(to: URL?) {
         guard let window else { return }
 
-        // Use the 'to' URL directly. This keeps the titlebar's path menu
-        // (right-click or command-click on the title) working.
+        // Use the 'to' URL directly
         window.representedURL = to
 
         // We never show the proxy icon next to the title. AppKit recreates
@@ -1240,6 +1239,12 @@ class BaseTerminalController: NSWindowController,
     }
 
     // MARK: NSWindowDelegate
+
+    /// We bind the working directory to the window (see `pwdDidChange`) but
+    /// never show the titlebar's path menu for it.
+    func window(_ window: NSWindow, shouldPopUpDocumentPathMenu menu: NSMenu) -> Bool {
+        false
+    }
 
     /// Check whether window should be closed without showing an alert
     func windowCanBeClosedWithoutConfirmation() -> Bool {
