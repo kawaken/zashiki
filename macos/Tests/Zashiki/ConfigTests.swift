@@ -41,16 +41,6 @@ struct ConfigTests {
         #expect(config.focusFollowsMouse == true)
     }
 
-    @Test func windowDecorationsDefaultsToTrue() throws {
-        let config = try TemporaryConfig("")
-        #expect(config.windowDecorations == true)
-    }
-
-    @Test func windowDecorationsNone() throws {
-        let config = try TemporaryConfig("window-decoration = none")
-        #expect(config.windowDecorations == false)
-    }
-
     @Test func macosWindowShadowDefaultsToTrue() throws {
         let config = try TemporaryConfig("")
         #expect(config.macosWindowShadow == true)
@@ -90,22 +80,6 @@ struct ConfigTests {
 
     // MARK: - Enum Properties
 
-    @Test func macosTitlebarStyleDefaultsToTransparent() throws {
-        let config = try TemporaryConfig("")
-        #expect(config.macosTitlebarStyle == .transparent)
-    }
-
-    @Test(arguments: [
-        ("native", Zashiki.Config.MacOSTitlebarStyle.native),
-        ("transparent", Zashiki.Config.MacOSTitlebarStyle.transparent),
-        ("tabs", Zashiki.Config.MacOSTitlebarStyle.tabs),
-        ("hidden", Zashiki.Config.MacOSTitlebarStyle.hidden),
-    ])
-    func macosTitlebarStyleValues(raw: String, expected: Zashiki.Config.MacOSTitlebarStyle) throws {
-        let config = try TemporaryConfig("macos-titlebar-style = \(raw)")
-        #expect(config.macosTitlebarStyle == expected)
-    }
-
     @Test func resizeOverlayDefaultsToAfterFirst() throws {
         let config = try TemporaryConfig("")
         #expect(config.resizeOverlay == .after_first)
@@ -134,11 +108,6 @@ struct ConfigTests {
     @Test func macosIconFrameDefaultsToAluminum() throws {
         let config = try TemporaryConfig("")
         #expect(config.macosIconFrame == .aluminum)
-    }
-
-    @Test func macosWindowButtonsDefaultsToVisible() throws {
-        let config = try TemporaryConfig("")
-        #expect(config.macosWindowButtons == .visible)
     }
 
     @Test func scrollbarDefaultsToSystem() throws {

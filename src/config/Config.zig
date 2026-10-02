@@ -1400,22 +1400,6 @@ maximize: bool = false,
 ///
 ///   * `false` - Don't start in fullscreen (default)
 ///   * `true` - Start in native fullscreen
-///   * `non-native` - (macOS only) Start in non-native fullscreen, hiding the
-///     menu bar. This is faster than native fullscreen since it doesn't use
-///     animations. On non-macOS platforms, this behaves the same as `true`.
-///   * `non-native-visible-menu` - (macOS only) Start in non-native fullscreen,
-///     keeping the menu bar visible. On non-macOS platforms, behaves like `true`.
-///   * `non-native-padded-notch` - (macOS only) Start in non-native fullscreen,
-///     hiding the menu bar but padding for the notch on applicable devices.
-///     On non-macOS platforms, behaves like `true`.
-///
-/// Important: tabs DO NOT WORK with non-native fullscreen modes. Non-native
-/// fullscreen removes the titlebar and macOS native tabs require the titlebar.
-/// If you use tabs, use `true` (native) instead.
-///
-/// On macOS, `true` (native fullscreen) does not work if `window-decoration`
-/// is set to `false`, because native fullscreen on macOS requires window
-/// decorations.
 fullscreen: Fullscreen = .false,
 
 /// The title Ghostty will use for the window. This will force the title of the
@@ -1932,45 +1916,6 @@ keybind: Keybinds = .{},
 /// configuration `font-size` will be used.
 @"window-inherit-font-size": bool = true,
 
-/// Configure a preference for window decorations. This setting specifies
-/// a _preference_; the actual OS, desktop environment, window manager, etc.
-/// may override this preference. Ghostty will do its best to respect this
-/// preference but it may not always be possible.
-///
-/// Valid values:
-///
-///  * `none`
-///
-///    All window decorations will be disabled. Titlebar, borders, etc. will
-///    not be shown. On macOS, this will also disable tabs (enforced by the
-///    system).
-///
-///  * `auto`
-///
-///    Automatically decide to use either client-side or server-side
-///    decorations based on the detected preferences of the current OS and
-///    desktop environment. This option usually makes Ghostty look the most
-///    "native" for your desktop.
-///
-///  * `client`
-///
-///    Prefer client-side decorations.
-///
-///    Available since: 1.1.0
-///
-/// The default value is `auto`.
-///
-/// For the sake of backwards compatibility and convenience, this setting also
-/// accepts boolean true and false values. If set to `true`, this is equivalent
-/// to `auto`. If set to `false`, this is equivalent to `none`.
-///
-/// The "toggle_window_decorations" keybind action can be used to create
-/// a keybinding to toggle this setting at runtime.
-///
-/// macOS: To hide the titlebar without removing the native window borders
-///        or rounded corners, use `macos-titlebar-style = hidden` instead.
-@"window-decoration": WindowDecoration = .auto,
-
 /// The font that will be used for the application's window and tab titles.
 ///
 /// If this setting is left unset, the system default font will be used.
@@ -1991,10 +1936,9 @@ keybind: Keybinds = .{},
 ///   * `light` - Use the light theme regardless of system theme.
 ///   * `dark` - Use the dark theme regardless of system theme.
 ///
-/// If `macos-titlebar-style` is `tabs` or `transparent`, the window theme will be
-/// automatically set based on the luminosity of the terminal background color.
-/// This only applies to terminal windows. This setting will still apply to
-/// non-terminal windows within Ghostty.
+/// For terminal windows, the window theme is automatically set based on the
+/// luminosity of the terminal background color. This setting still applies
+/// to non-terminal windows within Ghostty.
 @"window-theme": WindowTheme = .auto,
 
 /// The color space to use when interpreting terminal colors. "Terminal colors"
@@ -2669,121 +2613,6 @@ keybind: Keybinds = .{},
 ///
 /// Available since: 1.3.0.
 @"bell-audio-volume": f64 = 0.5,
-
-/// If anything other than false, fullscreen mode on macOS will not use the
-/// native fullscreen, but make the window fullscreen without animations and
-/// using a new space. It's faster than the native fullscreen mode since it
-/// doesn't use animations.
-///
-/// Important: tabs DO NOT WORK in this mode. Non-native fullscreen removes
-/// the titlebar and macOS native tabs require the titlebar. If you use tabs,
-/// you should not use this mode.
-///
-/// If you fullscreen a window with tabs, the currently focused tab will
-/// become fullscreen while the others will remain in a separate window in
-/// the background. You can switch to that window using normal window-switching
-/// keybindings such as command+tilde. When you exit fullscreen, the window
-/// will return to the tabbed state it was in before.
-///
-/// Allowable values are:
-///
-///   * `true` - Use non-native macOS fullscreen, hide the menu bar
-///   * `false` - Use native macOS fullscreen
-///   * `visible-menu` - Use non-native macOS fullscreen, keep the menu bar
-///     visible
-///   * `padded-notch` - Use non-native macOS fullscreen, hide the menu bar,
-///     but ensure the window is not obscured by the notch on applicable
-///     devices. The area around the notch will remain transparent currently,
-///     but in the future we may fill it with the window background color.
-///
-/// Changing this option at runtime works, but will only apply to the next
-/// time the window is made fullscreen. If a window is already fullscreen,
-/// it will retain the previous setting until fullscreen is exited.
-@"macos-non-native-fullscreen": NonNativeFullscreen = .false,
-
-/// Whether the window buttons in the macOS titlebar are visible. The window
-/// buttons are the colored buttons in the upper left corner of most macOS apps,
-/// also known as the traffic lights, that allow you to close, miniaturize, and
-/// zoom the window.
-///
-/// This setting has no effect when `window-decoration = none` or
-/// `macos-titlebar-style = hidden`, as the window buttons are always hidden in
-/// these modes.
-///
-/// Valid values are:
-///
-///   * `visible` - Show the window buttons.
-///   * `hidden` - Hide the window buttons.
-///
-/// The default value is `visible`.
-///
-/// Changing this option at runtime only applies to new windows.
-///
-/// Available since: 1.2.0
-@"macos-window-buttons": MacWindowButtons = .visible,
-
-/// The style of the macOS titlebar. Available values are: "native",
-/// "transparent", "tabs", and "hidden".
-///
-/// The "native" style uses the native macOS titlebar with zero customization.
-/// The titlebar will match your window theme (see `window-theme`).
-///
-/// The "transparent" style is the same as "native" but the titlebar will
-/// be transparent and allow your window background color to come through.
-/// This makes a more seamless window appearance but looks a little less
-/// typical for a macOS application and may not work well with all themes.
-///
-/// The "transparent" style will also update in real-time to dynamic
-/// changes to the window background color, e.g. via OSC 11. To make this
-/// more aesthetically pleasing, this only happens if the terminal is
-/// a window, tab, or split that borders the top of the window. This
-/// avoids a disjointed appearance where the titlebar color changes
-/// but all the topmost terminals don't match.
-///
-/// The "tabs" style is a completely custom titlebar that integrates the
-/// tab bar into the titlebar. This titlebar always matches the background
-/// color of the terminal. There are some limitations to this style:
-/// On macOS 13 and below, saved window state will not restore tabs correctly.
-/// macOS 14 does not have this issue and any other macOS version has not
-/// been tested.
-///
-/// The "hidden" style hides the titlebar. Unlike `window-decoration = none`,
-/// however, it does not remove the frame from the window or cause it to have
-/// squared corners. Changing to or from this option at run-time may affect
-/// existing windows in buggy ways.
-///
-/// When "hidden", the top titlebar area can no longer be used for dragging
-/// the window. To drag the window, you can use option+click on the resizable
-/// areas of the frame to drag the window. This is a standard macOS behavior
-/// and not something Ghostty enables.
-///
-/// The default value is "transparent". This is an opinionated choice
-/// but its one I think is the most aesthetically pleasing and works in
-/// most cases.
-///
-/// Changing this option at runtime only applies to new windows.
-@"macos-titlebar-style": MacTitlebarStyle = .transparent,
-
-/// Whether the proxy icon in the macOS titlebar is visible. The proxy icon
-/// is the icon that represents the folder of the current working directory.
-/// You can see this very clearly in the macOS built-in Terminal.app
-/// titlebar.
-///
-/// The proxy icon is only visible with the native macOS titlebar style.
-///
-/// Valid values are:
-///
-///   * `visible` - Show the proxy icon.
-///   * `hidden` - Hide the proxy icon.
-///
-/// The default value is `visible`.
-///
-/// This setting can be changed at runtime and will affect all currently
-/// open windows but only after their working directory changes again.
-/// Therefore, to make this work after changing the setting, you must
-/// usually `cd` to a different directory, open a different file in an
-/// editor, etc.
-@"macos-titlebar-proxy-icon": MacTitlebarProxyIcon = .visible,
 
 /// Controls the windowing behavior when dropping a file or folder
 /// onto the Zashiki icon in the macOS dock.
@@ -4448,25 +4277,12 @@ pub const ConfirmCloseSurface = enum(c_int) {
     always,
 };
 
-/// Valid values for macos-non-native-fullscreen
-/// c_int because it needs to be extern compatible
-/// If this is changed, you must also update ghostty.h
-pub const NonNativeFullscreen = enum(c_int) {
-    false,
-    true,
-    @"visible-menu",
-    @"padded-notch",
-};
-
 /// Valid values for fullscreen config option
 /// c_int because it needs to be extern compatible
 /// If this is changed, you must also update ghostty.h
 pub const Fullscreen = enum(c_int) {
     false,
     true,
-    @"non-native",
-    @"non-native-visible-menu",
-    @"non-native-padded-notch",
 };
 
 pub const WindowPaddingColor = enum {
@@ -8121,26 +7937,6 @@ pub const WindowColorspace = enum {
     @"display-p3",
 };
 
-/// See macos-window-buttons
-pub const MacWindowButtons = enum {
-    visible,
-    hidden,
-};
-
-/// See macos-titlebar-style
-pub const MacTitlebarStyle = enum {
-    native,
-    transparent,
-    tabs,
-    hidden,
-};
-
-/// See macos-titlebar-proxy-icon
-pub const MacTitlebarProxyIcon = enum {
-    visible,
-    hidden,
-};
-
 /// See macos-hidden
 pub const MacHidden = enum {
     never,
@@ -8810,57 +8606,6 @@ pub const BackgroundBlur = union(enum) {
         try testing.expectError(error.InvalidValue, v.parseCLI(""));
         try testing.expectError(error.InvalidValue, v.parseCLI("aaaa"));
         try testing.expectError(error.InvalidValue, v.parseCLI("420"));
-    }
-};
-
-/// See window-decoration
-pub const WindowDecoration = enum(c_int) {
-    auto,
-    client,
-    none,
-
-    pub fn parseCLI(input_: ?[]const u8) !WindowDecoration {
-        const input = input_ orelse return .auto;
-
-        return if (cli.args.parseBool(input)) |b|
-            if (b) .auto else .none
-        else |_| if (std.meta.stringToEnum(WindowDecoration, input)) |v|
-            v
-        else
-            error.InvalidValue;
-    }
-
-    test "parse WindowDecoration" {
-        const testing = std.testing;
-
-        {
-            const v = try WindowDecoration.parseCLI(null);
-            try testing.expectEqual(WindowDecoration.auto, v);
-        }
-        {
-            const v = try WindowDecoration.parseCLI("true");
-            try testing.expectEqual(WindowDecoration.auto, v);
-        }
-        {
-            const v = try WindowDecoration.parseCLI("false");
-            try testing.expectEqual(WindowDecoration.none, v);
-        }
-        {
-            const v = try WindowDecoration.parseCLI("client");
-            try testing.expectEqual(WindowDecoration.client, v);
-        }
-        {
-            const v = try WindowDecoration.parseCLI("auto");
-            try testing.expectEqual(WindowDecoration.auto, v);
-        }
-        {
-            const v = try WindowDecoration.parseCLI("none");
-            try testing.expectEqual(WindowDecoration.none, v);
-        }
-        {
-            try testing.expectError(error.InvalidValue, WindowDecoration.parseCLI(""));
-            try testing.expectError(error.InvalidValue, WindowDecoration.parseCLI("aaaa"));
-        }
     }
 };
 

@@ -912,12 +912,13 @@ class BaseTerminalController: NSWindowController,
     func pwdDidChange(to: URL?) {
         guard let window else { return }
 
-        if derivedConfig.macosTitlebarProxyIcon == .visible {
-            // Use the 'to' URL directly
-            window.representedURL = to
-        } else {
-            window.representedURL = nil
-        }
+        // Use the 'to' URL directly
+        window.representedURL = to
+
+        // We never show the proxy icon next to the title. AppKit recreates
+        // the button when the URL goes from nil to a value, so hide it on
+        // every change.
+        window.standardWindowButton(.documentIconButton)?.isHidden = true
     }
 
     func cellSizeDidChange(to: NSSize) {
@@ -1239,6 +1240,12 @@ class BaseTerminalController: NSWindowController,
 
     // MARK: NSWindowDelegate
 
+    /// We bind the working directory to the window (see `pwdDidChange`) but
+    /// never show the titlebar's path menu for it.
+    func window(_ window: NSWindow, shouldPopUpDocumentPathMenu menu: NSMenu) -> Bool {
+        false
+    }
+
     /// Check whether window should be closed without showing an alert
     func windowCanBeClosedWithoutConfirmation() -> Bool {
         // We must have a window. Is it even possible not to?
@@ -1557,20 +1564,17 @@ class BaseTerminalController: NSWindowController,
     }
 
     private struct DerivedConfig {
-        let macosTitlebarProxyIcon: Zashiki.MacOSTitlebarProxyIcon
         let windowStepResize: Bool
         let focusFollowsMouse: Bool
         let splitPreserveZoom: Zashiki.Config.SplitPreserveZoom
 
         init() {
-            self.macosTitlebarProxyIcon = .visible
             self.windowStepResize = false
             self.focusFollowsMouse = false
             self.splitPreserveZoom = .init()
         }
 
         init(_ config: Zashiki.Config) {
-            self.macosTitlebarProxyIcon = config.macosTitlebarProxyIcon
             self.windowStepResize = config.windowStepResize
             self.focusFollowsMouse = config.focusFollowsMouse
             self.splitPreserveZoom = config.splitPreserveZoom

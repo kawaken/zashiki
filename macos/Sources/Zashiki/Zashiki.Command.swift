@@ -25,7 +25,6 @@ extension Zashiki {
         /// target platform or they just aren't implemented yet.
         static let unsupportedActionKeys: [String] = [
             "toggle_tab_overview",
-            "toggle_window_decorations",
         ]
 
         init(cValue: ghostty_command_s) {

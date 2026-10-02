@@ -609,12 +609,6 @@ fn actionCommands(action: Action.Key) []const Command {
             .description = "Toggle the fullscreen state of the current window.",
         }},
 
-        .toggle_window_decorations => comptime &.{.{
-            .action = .toggle_window_decorations,
-            .title = "Toggle Window Decorations",
-            .description = "Toggle the window decorations.",
-        }},
-
         .toggle_window_float_on_top => comptime &.{.{
             .action = .toggle_window_float_on_top,
             .title = "Toggle Float on Top",

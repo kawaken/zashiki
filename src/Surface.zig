@@ -309,7 +309,6 @@ const DerivedConfig = struct {
     mouse_scroll_multiplier: configpkg.MouseScrollMultiplier,
     mouse_shift_capture: configpkg.MouseShiftCapture,
     fullscreen: configpkg.Fullscreen,
-    macos_non_native_fullscreen: configpkg.NonNativeFullscreen,
     macos_option_as_alt: ?input.OptionAsAlt,
     selection_clear_on_copy: bool,
     selection_clear_on_typing: bool,
@@ -388,7 +387,6 @@ const DerivedConfig = struct {
             .mouse_scroll_multiplier = config.@"mouse-scroll-multiplier",
             .mouse_shift_capture = config.@"mouse-shift-capture",
             .fullscreen = config.fullscreen,
-            .macos_non_native_fullscreen = config.@"macos-non-native-fullscreen",
             .macos_option_as_alt = config.@"macos-option-as-alt",
             .selection_clear_on_copy = config.@"selection-clear-on-copy",
             .selection_clear_on_typing = config.@"selection-clear-on-typing",
@@ -5292,18 +5290,7 @@ pub fn performBindingAction(self: *Surface, action: input.Binding.Action) !bool 
         .toggle_fullscreen => return try self.rt_app.performAction(
             .{ .surface = self },
             .toggle_fullscreen,
-            switch (self.config.macos_non_native_fullscreen) {
-                .false => .native,
-                .true => .macos_non_native,
-                .@"visible-menu" => .macos_non_native_visible_menu,
-                .@"padded-notch" => .macos_non_native_padded_notch,
-            },
-        ),
-
-        .toggle_window_decorations => return try self.rt_app.performAction(
-            .{ .surface = self },
-            .toggle_window_decorations,
-            {},
+            .native,
         ),
 
         .toggle_tab_overview => return try self.rt_app.performAction(

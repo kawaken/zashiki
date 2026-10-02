@@ -77,7 +77,6 @@ final class ZashikiWindowPositionUITests: ZashikiCustomConfigCase {
             window-width = 40
             window-height = 20
             title = "ZashikiWindowPositionUITests"
-            macos-titlebar-style = hidden
             """
         )
 
@@ -96,7 +95,6 @@ final class ZashikiWindowPositionUITests: ZashikiCustomConfigCase {
         try updateConfig(
             """
             title = "ZashikiWindowPositionUITests"
-            macos-titlebar-style = hidden
             """
         )
         app.typeKey(",", modifierFlags: [.command, .shift])
@@ -132,7 +130,6 @@ final class ZashikiWindowPositionUITests: ZashikiCustomConfigCase {
             window-width = 40
             window-height = 20
             title = "ZashikiWindowPositionUITests"
-            macos-titlebar-style = hidden
             """
         )
 
@@ -176,10 +173,7 @@ final class ZashikiWindowPositionUITests: ZashikiCustomConfigCase {
 
     // MARK: - Restore round-trip per titlebar style
 
-    @MainActor func testRestoredNative() throws { try runRestoreTest(titlebarStyle: "native") }
-    @MainActor func testRestoredHidden() throws { try runRestoreTest(titlebarStyle: "hidden") }
-    @MainActor func testRestoredTransparent() throws { try runRestoreTest(titlebarStyle: "transparent") }
-    @MainActor func testRestoredTabs() throws { try runRestoreTest(titlebarStyle: "tabs") }
+    @MainActor func testRestored() throws { try runRestoreTest() }
 
     // MARK: - Config overrides cached position/size
 
@@ -283,10 +277,9 @@ final class ZashikiWindowPositionUITests: ZashikiCustomConfigCase {
 
     /// Opens a new window, records its frame, closes it, opens another,
     /// and verifies the frame is restored consistently.
-    private func runRestoreTest(titlebarStyle: String) throws {
+    private func runRestoreTest() throws {
         try updateConfig(
             """
-            macos-titlebar-style = \(titlebarStyle)
             title = "ZashikiWindowPositionUITests"
             """
         )
@@ -316,13 +309,13 @@ final class ZashikiWindowPositionUITests: ZashikiCustomConfigCase {
         let restoredFrame = window2.frame
 
         XCTAssertEqual(restoredFrame.origin.x, firstFrame.origin.x, accuracy: 2,
-                        "[\(titlebarStyle)] x position should be restored")
+                        "x position should be restored")
         XCTAssertEqual(restoredFrame.origin.y, firstFrame.origin.y, accuracy: 2,
-                        "[\(titlebarStyle)] y position should be restored")
+                        "y position should be restored")
         XCTAssertEqual(restoredFrame.size.width, firstFrame.size.width, accuracy: 2,
-                        "[\(titlebarStyle)] width should be restored")
+                        "width should be restored")
         XCTAssertEqual(restoredFrame.size.height, firstFrame.size.height, accuracy: 2,
-                        "[\(titlebarStyle)] height should be restored")
+                        "height should be restored")
 
         app.terminate()
     }
