@@ -9,6 +9,10 @@ struct AgentStatusPane: View {
     /// the focused one). The model is shared by all tabs in the window.
     let surfaces: [Zashiki.SurfaceView]
 
+    /// Space for the window buttons when this pane is in the window's
+    /// top-left corner.
+    @Environment(\.windowButtonsInset) private var windowButtonsInset
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -48,7 +52,9 @@ struct AgentStatusPane: View {
             .buttonStyle(.plain)
             .help("Close Agents")
         }
-        .padding(8)
+        .padding(.horizontal, 8)
+        .padding(.leading, windowButtonsInset)
+        .frame(height: WindowTopRow.height)
     }
 
     @ViewBuilder

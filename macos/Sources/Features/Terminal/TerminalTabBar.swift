@@ -12,10 +12,23 @@ struct TerminalTabBar: View {
     let onClose: (TerminalTab) -> Void
     let onNewTab: () -> Void
 
-    static let height: CGFloat = 28
+    /// True when a split in the selected tab is zoomed.
+    var isZoomed: Bool = false
+    var onResetZoom: () -> Void = {}
+
+    /// Space to leave for the window buttons when the bar is in the window's
+    /// top-left corner.
+    var windowButtonsInset: CGFloat = 0
+
+    static let height: CGFloat = WindowTopRow.height
 
     var body: some View {
         HStack(spacing: 0) {
+            if windowButtonsInset > 0 {
+                Color.clear.frame(width: windowButtonsInset)
+                Divider()
+            }
+
             ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
                 TerminalTabItem(
                     tab: tab,
@@ -36,6 +49,19 @@ struct TerminalTabBar: View {
             .buttonStyle(.plain)
             .help("New Tab")
             .accessibilityLabel("New Tab")
+
+            if isZoomed {
+                Divider()
+                Button(action: onResetZoom) {
+                    Image("ResetZoom")
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: Self.height, height: Self.height)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Reset Split Zoom")
+                .accessibilityLabel("Reset Split Zoom")
+            }
         }
         .frame(height: Self.height)
         .background(Color.primary.opacity(0.08))

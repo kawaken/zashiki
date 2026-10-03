@@ -18,12 +18,6 @@ class TerminalWindow: NSWindow {
     /// The view model for SwiftUI views
     private var viewModel = ViewModel()
 
-    /// Reset split zoom button in titlebar
-    private let resetZoomAccessory = NSTitlebarAccessoryViewController()
-
-    /// Update notification UI in titlebar
-    private let updateAccessory = NSTitlebarAccessoryViewController()
-
     /// Visual indicator that mirrors the selected tab color.
     private lazy var tabColorIndicator: NSHostingView<TabColorIndicatorView> = {
         let view = NSHostingView(rootView: TabColorIndicatorView(tabColor: tabColor))
@@ -46,8 +40,9 @@ class TerminalWindow: NSWindow {
     /// Whether this window supports the update accessory. If this is false, then views within this
     /// window should determine how to show update notifications.
     var supportsUpdateAccessory: Bool {
-        // Native window supports it.
-        true
+        // There is no title row to show it in, so the terminal view shows the
+        // update overlay instead.
+        false
     }
 
     /// Glass effect view for liquid glass background when transparency is enabled
@@ -122,29 +117,12 @@ class TerminalWindow: NSWindow {
         // change the frame. It is called from TerminalController.windowDidLoad
         // after the window is fully set up.
 
-        // Create our reset zoom titlebar accessory. We have to have a title
-        // to do this or AppKit triggers an assertion.
+        // There is no title row: our content extends to the top of the window
+        // and the tab bar and the side panels' headers take its place.
         if styleMask.contains(.titled) {
-            resetZoomAccessory.layoutAttribute = .right
-            resetZoomAccessory.view = NSHostingView(rootView: ResetZoomAccessoryView(
-                viewModel: viewModel,
-                action: { [weak self] in
-                    guard let self else { return }
-                    self.terminalController?.splitZoom(self)
-                }))
-            addTitlebarAccessoryViewController(resetZoomAccessory)
-            resetZoomAccessory.view.translatesAutoresizingMaskIntoConstraints = false
-
-            // Create update notification accessory
-            if supportsUpdateAccessory {
-                updateAccessory.layoutAttribute = .right
-                updateAccessory.view = NonDraggableHostingView(rootView: UpdateAccessoryView(
-                    viewModel: viewModel,
-                    model: appDelegate.updateViewModel
-                ))
-                addTitlebarAccessoryViewController(updateAccessory)
-                updateAccessory.view.translatesAutoresizingMaskIntoConstraints = false
-            }
+            styleMask.insert(.fullSizeContentView)
+            titlebarAppearsTransparent = true
+            titleVisibility = .hidden
         }
 
         // Setup the accessory view for tabs that shows our keyboard shortcuts,
@@ -202,14 +180,6 @@ class TerminalWindow: NSWindow {
 
     override func becomeMain() {
         super.becomeMain()
-
-        // Its possible we miss the accessory titlebar call so we check again
-        // whenever the window becomes main. Both of these are idempotent.
-        if tabBarView != nil {
-            tabBarDidAppear()
-        } else {
-            tabBarDidDisappear()
-        }
         viewModel.isMainWindow = true
     }
 
@@ -241,16 +211,7 @@ class TerminalWindow: NSWindow {
         // it. This has been verified to work on macOS 12 to 26
         if isTabBar(childViewController) {
             childViewController.identifier = Self.tabBarIdentifier
-            tabBarDidAppear()
         }
-    }
-
-    override func removeTitlebarAccessoryViewController(at index: Int) {
-        if let childViewController = titlebarAccessoryViewControllers[safe: index], isTabBar(childViewController) {
-            tabBarDidDisappear()
-        }
-
-        super.removeTitlebarAccessoryViewController(at: index)
     }
 
     // MARK: Tab Bar
@@ -287,26 +248,6 @@ class TerminalWindow: NSWindow {
         // View controllers should be tagged with this as soon as possible to
         // increase our accuracy. We do this manually.
         return childViewController.identifier == Self.tabBarIdentifier
-    }
-
-    private func tabBarDidAppear() {
-        // Remove our reset zoom accessory. For some reason having a SwiftUI
-        // titlebar accessory causes our content view scaling to be wrong.
-        // Removing it fixes it, we just need to remember to add it again later.
-        if let idx = titlebarAccessoryViewControllers.firstIndex(of: resetZoomAccessory) {
-            removeTitlebarAccessoryViewController(at: idx)
-        }
-
-        // We don't need to do this with the update accessory. I don't know why but
-        // everything works fine.
-    }
-
-    private func tabBarDidDisappear() {
-        if styleMask.contains(.titled) {
-            if titlebarAccessoryViewControllers.firstIndex(of: resetZoomAccessory) == nil {
-                addTitlebarAccessoryViewController(resetZoomAccessory)
-            }
-        }
     }
 
     // MARK: Tab Key Equivalents
