@@ -11,6 +11,10 @@ struct WorktreeStatusPane: View {
     /// isn't known.
     let directory: URL?
 
+    /// Space for the window buttons when this pane is in the window's
+    /// top-left corner.
+    @Environment(\.windowButtonsInset) private var windowButtonsInset
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -69,7 +73,9 @@ struct WorktreeStatusPane: View {
             .buttonStyle(.plain)
             .help("Close Worktree Status")
         }
-        .padding(8)
+        .padding(.horizontal, 8)
+        .padding(.leading, windowButtonsInset)
+        .frame(height: WindowTopRow.height)
     }
 
     @ViewBuilder

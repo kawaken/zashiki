@@ -107,7 +107,8 @@ struct MarkdownPreviewPane: View {
             .buttonStyle(.plain)
             .help("Close Markdown Preview")
         }
-        .padding(8)
+        .padding(.horizontal, 8)
+        .frame(height: WindowTopRow.height)
     }
 
     @State private var isFontSizePresented = false

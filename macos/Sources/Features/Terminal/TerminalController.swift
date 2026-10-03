@@ -159,7 +159,9 @@ class TerminalController: BaseTerminalController {
         }
     }
 
-    override var showsTabBar: Bool { tabs.count > 1 }
+    /// The tab bar is always shown: with no title row, it is where the title
+    /// is shown and where the window can be dragged.
+    override var showsTabBar: Bool { true }
 
     override func selectedTabDidChange(from oldTab: TerminalTab) {
         super.selectedTabDidChange(from: oldTab)

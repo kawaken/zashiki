@@ -89,12 +89,10 @@ class TransparentTitlebarTerminalWindow: TerminalWindow {
         if let titlebarView = titlebarContainer?.firstDescendant(withClassName: "NSTitlebarView") {
             titlebarView.wantsLayer = true
 
-            // For glass background styles, use a transparent titlebar to let the glass effect show through
-            let isGlassStyle = derivedConfig.backgroundBlur.isGlassStyle
-
-            titlebarView.layer?.backgroundColor = isGlassStyle
-                ? NSColor.clear.cgColor
-                : preferredBackgroundColor?.cgColor
+            // Our content extends under the titlebar and draws the top row
+            // itself (see `TerminalWindow.awakeFromNib`), so the titlebar must
+            // not paint over it.
+            titlebarView.layer?.backgroundColor = NSColor.clear.cgColor
         }
 
         // In all cases, we have to hide the background view since this has multiple subviews
@@ -106,9 +104,10 @@ class TransparentTitlebarTerminalWindow: TerminalWindow {
     private func syncAppearanceVentura(_ surfaceConfig: Zashiki.SurfaceView.DerivedConfig) {
         guard let titlebarContainer else { return }
 
-        // Setup the titlebar background color to match ours
+        // Our content extends under the titlebar and draws the top row
+        // itself, so the titlebar must not paint over it.
         titlebarContainer.wantsLayer = true
-        titlebarContainer.layer?.backgroundColor = preferredBackgroundColor?.cgColor
+        titlebarContainer.layer?.backgroundColor = NSColor.clear.cgColor
 
         // See the docs for the function that sets this to true on why
         effectViewIsHidden = false

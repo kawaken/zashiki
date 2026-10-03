@@ -84,6 +84,10 @@ class BaseTerminalController: NSWindowController,
     /// True if the tab bar should be shown for this window.
     var showsTabBar: Bool { false }
 
+    /// Space the top row leaves at its leading edge for the window buttons
+    /// (the traffic lights). Zero when they aren't drawn over our content.
+    @Published private(set) var windowButtonsInset: CGFloat = 0
+
     /// Every Surface across every tab in this window.
     var allSurfaces: [Zashiki.SurfaceView] {
         tabs.flatMap { Array($0.surfaceTree) }
@@ -1014,6 +1018,24 @@ class BaseTerminalController: NSWindowController,
         focusedSurface = to
     }
 
+    func tabBarDidRequestResetZoom() {
+        splitZoom(self)
+    }
+
+    /// Recomputes `windowButtonsInset`. The window buttons sit over our
+    /// content only when it extends under the titlebar, and not in fullscreen.
+    func updateWindowButtonsInset() {
+        guard let window,
+              window.styleMask.contains(.fullSizeContentView),
+              !window.styleMask.contains(.fullScreen),
+              let zoomButton = window.standardWindowButton(.zoomButton) else {
+            windowButtonsInset = 0
+            return
+        }
+
+        windowButtonsInset = zoomButton.frame.maxX + 8
+    }
+
     func tabBarDidSelect(_ tab: TerminalTab) {
         selectTab(tab)
     }
@@ -1267,6 +1289,7 @@ class BaseTerminalController: NSWindowController,
     }
 
     func fullscreenDidChange() {
+        updateWindowButtonsInset()
         guard let fullscreenStyle else { return }
 
         // When we enter fullscreen, we want to show the update overlay so that it
@@ -1365,6 +1388,8 @@ class BaseTerminalController: NSWindowController,
 
         // Set our update overlay state
         updateOverlayIsVisible = defaultUpdateOverlayVisibility()
+
+        updateWindowButtonsInset()
 
         applyTitleToWindow()
     }
