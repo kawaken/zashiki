@@ -5,6 +5,7 @@
 - タブをウィンドウの中で管理するように変更。左右のパネル（Worktree Status / Agents / Markdownプレビュー）はウィンドウに1つになり、タブバーはその間に表示される
 - Markdownプレビューの開閉をウィンドウ単位に変更。表示するファイルと履歴はタブごとで、タブを切り替えるとそのタブのファイルに切り替わる
 - macOS標準のタブ機能（タブのドラッグによるウィンドウ間の移動・切り離し、「すべてのウィンドウを統合」）は使えなくなった
+- タイトル行をなくし、ウィンドウの最上段にタブバーと左右パネルの見出しを並べるように。タブバーはタブが1枚でも表示する
 - ウィンドウ上部の見た目を切り替える設定（`macos-titlebar-style`、`window-decoration`、`macos-non-native-fullscreen`、`macos-window-buttons`、`macos-titlebar-proxy-icon`）と、キーバインド用アクション `toggle_window_decorations` を廃止。見た目は従来の既定値に固定
 - タイトル横のフォルダアイコン（プロキシアイコン）を表示しないように。タイトルを右クリックして表示するフォルダ階層のメニューも出さないように
 - `fullscreen` 設定の値を `true` / `false` のみに変更（`non-native` などの値は廃止）

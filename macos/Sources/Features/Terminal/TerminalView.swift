@@ -29,6 +29,9 @@ protocol TerminalViewDelegate: AnyObject {
 
     /// The new tab button was clicked in the tab bar.
     func tabBarDidRequestNewTab()
+
+    /// The reset zoom button was clicked in the tab bar.
+    func tabBarDidRequestResetZoom()
 }
 
 /// The view model is a required implementation for TerminalView callers. This contains
@@ -66,6 +69,9 @@ protocol TerminalViewModel: ObservableObject {
 
     /// True if the tab bar should be shown for this window.
     var showsTabBar: Bool { get }
+
+    /// Space the top row leaves at its leading edge for the window buttons.
+    var windowButtonsInset: CGFloat { get }
 }
 
 /// The main terminal view. This terminal view supports splits.
@@ -94,6 +100,10 @@ struct TerminalView<ViewModel: TerminalViewModel>: View {
     @FocusedValue(\.zashikiSurfacePwd) private var surfacePwd
     @FocusedValue(\.zashikiSurfaceCellSize) private var cellSize
 
+    private var leftPanelIsVisible: Bool {
+        viewModel.worktreeStatus.isVisible || viewModel.agentStatus.isVisible
+    }
+
     // The pwd of the focused surface as a URL
     private var pwdURL: URL? {
         guard let surfacePwd, surfacePwd != "" else { return nil }
@@ -112,7 +122,8 @@ struct TerminalView<ViewModel: TerminalViewModel>: View {
                 model: viewModel.worktreeStatus,
                 directory: pwdURL,
                 surfaces: viewModel.allSurfaces,
-                agentStatus: viewModel.agentStatus) {
+                agentStatus: viewModel.agentStatus,
+                windowButtonsInset: viewModel.windowButtonsInset) {
                 MarkdownPreviewSplit(ghostty: ghostty, model: viewModel.markdownPreview) {
                     VStack(spacing: 0) {
                         if viewModel.showsTabBar {
@@ -122,7 +133,11 @@ struct TerminalView<ViewModel: TerminalViewModel>: View {
                                 selectedTab: viewModel.selectedTab,
                                 onSelect: { delegate?.tabBarDidSelect($0) },
                                 onClose: { delegate?.tabBarDidClose($0) },
-                                onNewTab: { delegate?.tabBarDidRequestNewTab() })
+                                onNewTab: { delegate?.tabBarDidRequestNewTab() },
+                                isZoomed: viewModel.surfaceTree.zoomed != nil,
+                                onResetZoom: { delegate?.tabBarDidRequestResetZoom() },
+                                // The bar is in the top-left corner when the left panel is hidden.
+                                windowButtonsInset: leftPanelIsVisible ? 0 : viewModel.windowButtonsInset)
                         }
 
                         ZStack {
@@ -185,6 +200,9 @@ struct TerminalView<ViewModel: TerminalViewModel>: View {
                     }
                 }
             }
+            // There is no title row: the top row (tab bar and panel headers)
+            // starts at the top edge of the window, under the window buttons.
+            .ignoresSafeArea(.container, edges: .top)
         }
     }
 }
