@@ -87,6 +87,52 @@ struct MarkdownPreviewModelTests {
         #expect(!model.canGoForward)
     }
 
+    @Test func testGoBackKeepsLaterHistoryEntries() throws {
+        let model = MarkdownPreviewModel()
+        let files = try (0..<4).map { _ in try temporaryFile() }
+
+        for file in files {
+            model.open(url: file)
+        }
+        model.goBack()
+
+        #expect(model.fileURL == files[2])
+        #expect(model.historyEntries.map(\.url) == files)
+        #expect(model.currentHistoryIndex == 2)
+        #expect(model.canGoForward)
+    }
+
+    @Test func testMarkdownPreviewFontSizeFollowsTerminalByDefault() {
+        #expect(MarkdownPreviewFontSizePolicy.resolve(
+            override: 0,
+            terminalCellHeight: 20,
+            fallbackSize: 13
+        ) == 16)
+        #expect(MarkdownPreviewFontSizePolicy.resolve(
+            override: 0,
+            terminalCellHeight: nil,
+            fallbackSize: 13
+        ) == 13)
+    }
+
+    @Test func testMarkdownPreviewFontSizeOverrideIsIndependentAndClamped() {
+        #expect(MarkdownPreviewFontSizePolicy.resolve(
+            override: 18,
+            terminalCellHeight: 30,
+            fallbackSize: 13
+        ) == 18)
+        #expect(MarkdownPreviewFontSizePolicy.resolve(
+            override: 5,
+            terminalCellHeight: 30,
+            fallbackSize: 13
+        ) == MarkdownPreviewFontSizePolicy.minimumSize)
+        #expect(MarkdownPreviewFontSizePolicy.resolve(
+            override: 40,
+            terminalCellHeight: 30,
+            fallbackSize: 13
+        ) == MarkdownPreviewFontSizePolicy.maximumSize)
+    }
+
     @Test func testHistoryEntriesExposeFilesInOpenOrder() throws {
         let model = MarkdownPreviewModel()
         let first = try temporaryFile()
