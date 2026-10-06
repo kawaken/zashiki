@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 struct MarkdownPreviewDocumentSection: Identifiable, Equatable {
@@ -143,6 +144,24 @@ struct MarkdownPreviewHistoryEntry: Identifiable, Equatable {
     let url: URL
 }
 
+enum MarkdownPreviewFontSizePolicy {
+    static let minimumSize: CGFloat = 10
+    static let maximumSize: CGFloat = 32
+    static let terminalScale: CGFloat = 0.8
+
+    static func resolve(
+        override: CGFloat,
+        terminalCellHeight: CGFloat?,
+        fallbackSize: CGFloat
+    ) -> CGFloat {
+        guard override > 0 else {
+            guard let terminalCellHeight, terminalCellHeight > 0 else { return fallbackSize }
+            return max(NSFont.smallSystemFontSize, terminalCellHeight * terminalScale)
+        }
+        return min(maximumSize, max(minimumSize, override))
+    }
+}
+
 /// Owns the state for a single terminal window's Markdown preview pane.
 /// One instance lives on each `BaseTerminalController` (see
 /// `markdownPreview` there) and is shared with the SwiftUI view tree via
@@ -181,17 +200,10 @@ class MarkdownPreviewModel: ObservableObject {
     /// All files in the current in-memory navigation history, in open order.
     /// The entry ID is its position in the history array, so repeated opens
     /// of the same URL remain distinct entries.
-    var historyEntries: [MarkdownPreviewHistoryEntry] {
-        history.enumerated().map { index, url in
-            MarkdownPreviewHistoryEntry(id: index, url: url)
-        }
-    }
+    @Published private(set) var historyEntries: [MarkdownPreviewHistoryEntry] = []
 
     /// The index of the file currently shown in `historyEntries`.
-    var currentHistoryIndex: Int? {
-        guard history.indices.contains(historyIndex) else { return nil }
-        return historyIndex
-    }
+    @Published private(set) var currentHistoryIndex: Int?
 
     /// Files opened via `open(url:)`, in navigation order. `historyIndex`
     /// points at the entry currently shown in `fileURL`. `goBack()` /
@@ -250,6 +262,10 @@ class MarkdownPreviewModel: ObservableObject {
     }
 
     private func updateNavigationState() {
+        historyEntries = history.enumerated().map { index, url in
+            MarkdownPreviewHistoryEntry(id: index, url: url)
+        }
+        currentHistoryIndex = history.indices.contains(historyIndex) ? historyIndex : nil
         canGoBack = historyIndex > 0
         canGoForward = historyIndex < history.count - 1
     }

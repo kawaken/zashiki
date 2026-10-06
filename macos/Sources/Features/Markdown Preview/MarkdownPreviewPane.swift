@@ -11,12 +11,15 @@ struct MarkdownPreviewPane: View {
 
     @State private var isHistoryPresented = false
     @FocusedValue(\.zashikiSurfaceCellSize) private var cellSize
+    @AppStorage("MarkdownPreviewFontSizeOverride", store: .zashiki)
+    private var markdownFontSizeOverride: Double = 0
 
     private var markdownFontSize: CGFloat {
-        guard let cellHeight = cellSize?.height, cellHeight > 0 else {
-            return NSFont.systemFontSize
-        }
-        return max(NSFont.smallSystemFontSize, cellHeight * 0.8)
+        MarkdownPreviewFontSizePolicy.resolve(
+            override: CGFloat(markdownFontSizeOverride),
+            terminalCellHeight: cellSize?.height,
+            fallbackSize: NSFont.systemFontSize
+        )
     }
 
     var body: some View {
@@ -66,6 +69,17 @@ struct MarkdownPreviewPane: View {
                 }
             }
 
+            Button {
+                isFontSizePresented.toggle()
+            } label: {
+                Image(systemName: "textformat.size")
+            }
+            .buttonStyle(.plain)
+            .help("Markdown Preview Font Size")
+            .popover(isPresented: $isFontSizePresented, arrowEdge: .top) {
+                fontSizeControls
+            }
+
             Text(model.fileURL?.lastPathComponent ?? "Markdown Preview")
                 .font(.headline)
                 .lineLimit(1)
@@ -90,6 +104,37 @@ struct MarkdownPreviewPane: View {
             .help("Close Markdown Preview")
         }
         .padding(8)
+    }
+
+    @State private var isFontSizePresented = false
+
+    private var fontSizeControls: some View {
+        let fontSizeRange = Double(MarkdownPreviewFontSizePolicy.minimumSize)...Double(
+            MarkdownPreviewFontSizePolicy.maximumSize
+        )
+
+        return VStack(alignment: .leading, spacing: 12) {
+            Text("Markdown Preview Font Size")
+                .font(.headline)
+            HStack {
+                Text("\(Int(markdownFontSize)) pt")
+                    .monospacedDigit()
+                Slider(
+                    value: Binding(
+                        get: { Double(markdownFontSize) },
+                        set: { markdownFontSizeOverride = $0 }
+                    ),
+                    in: fontSizeRange,
+                    step: 1
+                )
+            }
+            Button("Match Terminal") {
+                markdownFontSizeOverride = 0
+            }
+            .disabled(markdownFontSizeOverride == 0)
+        }
+        .padding(14)
+        .frame(width: 260)
     }
 
     @ViewBuilder
