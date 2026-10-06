@@ -283,7 +283,7 @@ class MarkdownPreviewModel: ObservableObject {
     }
 
     /// Toggles pane visibility. If no file is open yet, this shows/hides
-    /// an empty state with an "Open File..." affordance.
+    /// an empty state.
     func toggle() {
         isVisible.toggle()
     }

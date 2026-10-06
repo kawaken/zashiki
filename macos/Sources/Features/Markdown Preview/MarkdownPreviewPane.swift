@@ -1,7 +1,6 @@
 import AppKit
 import SwiftUI
 import Textual
-import UniformTypeIdentifiers
 
 /// The right-hand pane shown when a terminal window's Markdown preview is
 /// visible. Shows a header (back/forward navigation, file name, close
@@ -88,11 +87,12 @@ struct MarkdownPreviewPane: View {
 
             Spacer()
 
-            Button(action: openFile) {
+            Button(action: revealFileInFinder) {
                 Image(systemName: "folder")
             }
             .buttonStyle(.plain)
-            .help("Open File...")
+            .disabled(model.fileURL == nil)
+            .help("Reveal File in Finder")
 
             Button {
                 model.close()
@@ -148,7 +148,6 @@ struct MarkdownPreviewPane: View {
                     .foregroundStyle(.secondary)
                 Text("No file open")
                     .foregroundStyle(.secondary)
-                Button("Open File...", action: openFile)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
@@ -156,7 +155,7 @@ struct MarkdownPreviewPane: View {
             let sections = MarkdownPreviewDocument.sections(for: parsed.body)
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(spacing: 0) {
+                    LazyVStack(spacing: 0) {
                         if !parsed.entries.isEmpty {
                             FrontMatterTableView(
                                 entries: parsed.entries,
@@ -233,19 +232,9 @@ struct MarkdownPreviewPane: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func openFile() {
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.canChooseFiles = true
-        if let markdownType = UTType(filenameExtension: "md") {
-            panel.allowedContentTypes = [markdownType, .plainText]
-        } else {
-            panel.allowedContentTypes = [.plainText]
-        }
-
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        model.open(url: url)
+    private func revealFileInFinder() {
+        guard let fileURL = model.fileURL else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([fileURL])
     }
 }
 
