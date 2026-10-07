@@ -10,13 +10,17 @@ struct MarkdownPreviewPane: View {
 
     @State private var isHistoryPresented = false
     @FocusedValue(\.zashikiSurfaceCellSize) private var cellSize
+    @Environment(\.zashikiLastFocusedSurface) private var lastFocusedSurface
     @AppStorage("MarkdownPreviewFontSizeOverride", store: .zashiki)
     private var markdownFontSizeOverride: Double = 0
 
     private var markdownFontSize: CGFloat {
         MarkdownPreviewFontSizePolicy.resolve(
             override: CGFloat(markdownFontSizeOverride),
-            terminalCellHeight: cellSize?.height,
+            terminalCellHeight: MarkdownPreviewFontSizePolicy.terminalCellHeight(
+                focused: cellSize?.height,
+                lastFocused: lastFocusedSurface?.value?.cellSize.height
+            ),
             fallbackSize: NSFont.systemFontSize
         )
     }
