@@ -5,6 +5,11 @@
 - ウィンドウ上部の見た目を切り替える設定（`macos-titlebar-style`、`window-decoration`、`macos-non-native-fullscreen`、`macos-window-buttons`、`macos-titlebar-proxy-icon`）と、キーバインド用アクション `toggle_window_decorations` を廃止。見た目は従来の既定値に固定
 - タイトル横のフォルダアイコン（プロキシアイコン）を表示しないように。タイトルを右クリックして表示するフォルダ階層のメニューも出さないように
 - `fullscreen` 設定の値を `true` / `false` のみに変更（`non-native` などの値は廃止）
+- Markdownプレビューの文字サイズを、ターミナルとは別に調整・リセットできるように
+- 履歴を戻っても、その後に開いたファイルの履歴が消えないように修正
+- 長いMarkdown文書のスクロールを改善
+- プレビュー中のファイルをFinderで表示できるようにし、ファイル選択機能を廃止
+- Markdownプレビューの履歴一覧を新しい順に表示
 
 ## v0.6.0 (2026-10-01)
 
