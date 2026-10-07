@@ -53,10 +53,14 @@ class ExpiringUndoManager: UndoManager {
     /// Removes all undo and redo operations from the undo manager.
     ///
     /// This override ensures that all expiring targets are also cleared when
-    /// the undo manager is reset.
+    /// the undo manager is reset. Keep them alive until after replacing the set:
+    /// deinit calls back into this manager and would otherwise mutate the set
+    /// while its storage is being replaced.
     override func removeAllActions() {
+        let targets = expiringTargets
         super.removeAllActions()
         expiringTargets = []
+        withExtendedLifetime(targets) {}
     }
 
     /// Removes all undo and redo operations involving the specified target.
@@ -73,15 +77,14 @@ class ExpiringUndoManager: UndoManager {
         if let expiring = target as? ExpiringTarget {
             expiringTargets.remove(expiring)
         } else {
-            // Find and remove any ExpiringTarget instances that wrap this target.
-            expiringTargets
-                .filter { $0.target == nil || $0.target === (target as AnyObject) }
-                .forEach {
-                    // Technically they'll always expire when they get deinitialized
-                    // but we want to make sure it happens right now.
-                    $0.expire()
-                    expiringTargets.remove($0)
-                }
+            // Remove matches before expiring them. expire() re-enters this
+            // method with the ExpiringTarget, so it must not mutate the set
+            // while we are iterating over its contents.
+            let matchingTargets = expiringTargets.filter {
+                $0.target == nil || $0.target === (target as AnyObject)
+            }
+            expiringTargets.subtract(matchingTargets)
+            matchingTargets.forEach { $0.expire() }
         }
     }
 }
