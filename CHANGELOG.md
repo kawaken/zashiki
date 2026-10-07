@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.7.0 (2026-10-07)
+
 - ウィンドウ上部の見た目を切り替える設定（`macos-titlebar-style`、`window-decoration`、`macos-non-native-fullscreen`、`macos-window-buttons`、`macos-titlebar-proxy-icon`）と、キーバインド用アクション `toggle_window_decorations` を廃止。見た目は従来の既定値に固定
 - タイトル横のフォルダアイコン（プロキシアイコン）を表示しないように。タイトルを右クリックして表示するフォルダ階層のメニューも出さないように
 - `fullscreen` 設定の値を `true` / `false` のみに変更（`non-native` などの値は廃止）
