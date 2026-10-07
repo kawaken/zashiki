@@ -145,6 +145,21 @@ struct MarkdownPreviewModelTests {
         #expect(model.currentHistoryIndex == 1)
     }
 
+    @Test func testHistoryEntriesCanBeDisplayedNewestFirst() throws {
+        let model = MarkdownPreviewModel()
+        let first = try temporaryFile()
+        let second = try temporaryFile()
+        let third = try temporaryFile()
+
+        model.open(url: first)
+        model.open(url: second)
+        model.open(url: third)
+
+        #expect(model.historyEntriesNewestFirst.map(\.url) == [third, second, first])
+        #expect(model.historyEntriesNewestFirst.map(\.id) == [2, 1, 0])
+        #expect(model.currentHistoryIndex == 2)
+    }
+
     @Test func testSelectingHistoryEntryDoesNotAddEntry() throws {
         let model = MarkdownPreviewModel()
         let first = try temporaryFile()

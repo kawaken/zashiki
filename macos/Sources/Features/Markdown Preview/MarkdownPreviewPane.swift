@@ -253,7 +253,7 @@ private struct MarkdownPreviewHistoryList: View {
 
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
-                    ForEach(model.historyEntries) { entry in
+                    ForEach(model.historyEntriesNewestFirst) { entry in
                         Button {
                             select(entry.id)
                         } label: {

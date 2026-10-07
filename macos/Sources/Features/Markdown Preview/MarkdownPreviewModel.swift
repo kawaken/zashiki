@@ -202,6 +202,11 @@ class MarkdownPreviewModel: ObservableObject {
     /// of the same URL remain distinct entries.
     @Published private(set) var historyEntries: [MarkdownPreviewHistoryEntry] = []
 
+    /// History entries ordered from most recently opened to oldest.
+    var historyEntriesNewestFirst: [MarkdownPreviewHistoryEntry] {
+        Array(historyEntries.reversed())
+    }
+
     /// The index of the file currently shown in `historyEntries`.
     @Published private(set) var currentHistoryIndex: Int?
 
