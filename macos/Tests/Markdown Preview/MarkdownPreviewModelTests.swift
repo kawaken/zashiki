@@ -115,6 +115,35 @@ struct MarkdownPreviewModelTests {
         ) == 13)
     }
 
+    @Test func testMarkdownPreviewFontSizeUsesLastFocusedTerminalWhenPreviewIsFocused() {
+        let terminalCellHeight = MarkdownPreviewFontSizePolicy.terminalCellHeight(
+            focused: nil,
+            lastFocused: 20
+        )
+
+        #expect(terminalCellHeight == 20)
+        #expect(MarkdownPreviewFontSizePolicy.resolve(
+            override: 0,
+            terminalCellHeight: terminalCellHeight,
+            fallbackSize: 13
+        ) == 16)
+    }
+
+    @Test func testMarkdownPreviewFontSizePrefersFocusedTerminalAndRejectsInvalidSizes() {
+        #expect(MarkdownPreviewFontSizePolicy.terminalCellHeight(
+            focused: 24,
+            lastFocused: 20
+        ) == 24)
+        #expect(MarkdownPreviewFontSizePolicy.terminalCellHeight(
+            focused: 0,
+            lastFocused: 20
+        ) == 20)
+        #expect(MarkdownPreviewFontSizePolicy.terminalCellHeight(
+            focused: nil,
+            lastFocused: 0
+        ) == nil)
+    }
+
     @Test func testMarkdownPreviewFontSizeOverrideIsIndependentAndClamped() {
         #expect(MarkdownPreviewFontSizePolicy.resolve(
             override: 18,

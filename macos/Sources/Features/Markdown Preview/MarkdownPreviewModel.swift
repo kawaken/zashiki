@@ -149,6 +149,12 @@ enum MarkdownPreviewFontSizePolicy {
     static let maximumSize: CGFloat = 32
     static let terminalScale: CGFloat = 0.8
 
+    static func terminalCellHeight(focused: CGFloat?, lastFocused: CGFloat?) -> CGFloat? {
+        if let focused, focused > 0 { return focused }
+        if let lastFocused, lastFocused > 0 { return lastFocused }
+        return nil
+    }
+
     static func resolve(
         override: CGFloat,
         terminalCellHeight: CGFloat?,

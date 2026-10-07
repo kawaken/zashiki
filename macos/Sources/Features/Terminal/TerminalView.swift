@@ -154,6 +154,7 @@ struct TerminalView<ViewModel: TerminalViewModel>: View {
                         }
                     }
                 }
+                .zashikiLastFocusedSurface(lastFocusedSurface)
             }
         }
     }
