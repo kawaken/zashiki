@@ -5,8 +5,6 @@ struct AboutView: View {
 
     private let githubURL = URL(string: "https://github.com/kawaken/zashiki")
 
-    /// Read the commit from the bundle.
-    private var build: String? { Bundle.main.infoDictionary?["CFBundleVersion"] as? String }
     private var commit: String? { Bundle.main.infoDictionary?["ZashikiCommit"] as? String }
     private var version: String? { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String }
 
@@ -104,9 +102,6 @@ struct AboutView: View {
                         PropertyRow(label: "Version", text: v)
                     case .none:
                         EmptyView()
-                    }
-                    if let build {
-                        PropertyRow(label: "Build", text: build)
                     }
                     if let commit, commit != "",
                        let url = githubURL?.appendingPathComponent("/commits/\(commit)") {
