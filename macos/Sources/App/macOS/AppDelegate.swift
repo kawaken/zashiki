@@ -540,7 +540,9 @@ class AppDelegate: NSObject,
     /// nil) source controller instead of re-parsing it individually.
     ///
     /// Recognized: `zashiki://markdown-preview/open?path=<percent-encoded
-    /// absolute path>&surface=<0x...>`.
+    /// absolute path>&surface=<0x...>&response=<temporary response path>`.
+    /// `surface` and `response` are optional for callers that do not need
+    /// window targeting or an open result.
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
             handleZashikiURL(url)
@@ -593,11 +595,13 @@ class AppDelegate: NSObject,
     ) {
         guard components.path == "/open" else {
             Self.logger.warning("zashiki URL: unknown markdown-preview path \(components.path, privacy: .public)")
+            acknowledgeMarkdownPreviewURL(components, result: "error:unknown-action")
             return
         }
         guard let path = components.queryItems?.first(where: { $0.name == "path" })?.value,
               path.hasPrefix("/") else {
             Self.logger.warning("zashiki URL: markdown-preview/open requires an absolute 'path' query item")
+            acknowledgeMarkdownPreviewURL(components, result: "error:invalid-path")
             return
         }
 
@@ -605,6 +609,7 @@ class AppDelegate: NSObject,
         guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
               !isDirectory.boolValue else {
             Self.logger.warning("zashiki URL: markdown-preview file not found: \(path, privacy: .public)")
+            acknowledgeMarkdownPreviewURL(components, result: "error:file-not-found")
             return
         }
 
@@ -616,7 +621,27 @@ class AppDelegate: NSObject,
         let controller: BaseTerminalController = sourceController
             ?? TerminalController.preferredParent
             ?? TerminalController.newWindow(ghostty)
-        controller.markdownPreview.open(url: URL(fileURLWithPath: path))
+        let previewURL = URL(fileURLWithPath: path).standardizedFileURL
+        controller.markdownPreview.open(url: previewURL)
+        guard controller.markdownPreview.isVisible,
+              controller.markdownPreview.fileURL?.standardizedFileURL == previewURL else {
+            acknowledgeMarkdownPreviewURL(components, result: "error:preview-not-opened")
+            return
+        }
+        acknowledgeMarkdownPreviewURL(components, result: "opened")
+    }
+
+    private func acknowledgeMarkdownPreviewURL(_ components: URLComponents, result: String) {
+        guard let responsePath = components.queryItems?
+            .first(where: { $0.name == MarkdownPreviewOpenAcknowledgement.queryItemName })?.value else {
+            return
+        }
+
+        do {
+            try MarkdownPreviewOpenAcknowledgement.write(result, to: responsePath)
+        } catch {
+            Self.logger.warning("zashiki URL: failed to write Markdown preview response: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     /// Setup signal handlers

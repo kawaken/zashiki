@@ -13,6 +13,20 @@ struct MarkdownPreviewModelTests {
         return url
     }
 
+    @Test func markdownPreviewAcknowledgementOnlyUsesDedicatedTemporaryFiles() {
+        let validPath = "/tmp/zashiki-preview-response-abcdefghijklmnopqrstuv"
+        #expect(MarkdownPreviewOpenAcknowledgement.responseURL(for: validPath)?.path == validPath)
+        #expect(MarkdownPreviewOpenAcknowledgement.responseURL(
+            for: "/tmp/other-response-abcdefghijklmnopqrstuv"
+        ) == nil)
+        #expect(MarkdownPreviewOpenAcknowledgement.responseURL(
+            for: "/tmp/zashiki-preview-response-../../outside"
+        ) == nil)
+        #expect(MarkdownPreviewOpenAcknowledgement.responseURL(
+            for: "relative/zashiki-preview-response-abcdefghijklmnopqrstuv"
+        ) == nil)
+    }
+
     @Test func testMarkdownPreviewSectionsCreateGitHubStyleAnchors() {
         let sections = MarkdownPreviewDocument.sections(for: """
             Introduction
