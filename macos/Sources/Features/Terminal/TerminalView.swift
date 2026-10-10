@@ -20,6 +20,15 @@ protocol TerminalViewDelegate: AnyObject {
 
     /// A split tree operation
     func performSplitAction(_ action: TerminalSplitOperation)
+
+    /// A tab was clicked in the tab bar.
+    func tabBarDidSelect(_ tab: TerminalTab)
+
+    /// A tab's close button was clicked in the tab bar.
+    func tabBarDidClose(_ tab: TerminalTab)
+
+    /// The new tab button was clicked in the tab bar.
+    func tabBarDidRequestNewTab()
 }
 
 /// The view model is a required implementation for TerminalView callers. This contains
@@ -45,9 +54,18 @@ protocol TerminalViewModel: ObservableObject {
     /// The state for this window's Agents list.
     var agentStatus: AgentStatusModel { get }
 
-    /// Every Surface across every tab in this window's tabGroup, for the
-    /// Agents list to track.
-    var tabGroupSurfaces: [Zashiki.SurfaceView] { get }
+    /// Every Surface across every tab in this window, for the Agents list
+    /// to track.
+    var allSurfaces: [Zashiki.SurfaceView] { get }
+
+    /// The tabs in this window, in display order.
+    var tabs: [TerminalTab] { get }
+
+    /// The tab currently shown.
+    var selectedTab: TerminalTab { get }
+
+    /// True if the tab bar should be shown for this window.
+    var showsTabBar: Bool { get }
 }
 
 /// The main terminal view. This terminal view supports splits.
@@ -93,64 +111,76 @@ struct TerminalView<ViewModel: TerminalViewModel>: View {
                 ghostty: ghostty,
                 model: viewModel.worktreeStatus,
                 directory: pwdURL,
-                surfaces: viewModel.tabGroupSurfaces,
+                surfaces: viewModel.allSurfaces,
                 agentStatus: viewModel.agentStatus) {
                 MarkdownPreviewSplit(ghostty: ghostty, model: viewModel.markdownPreview) {
-                    ZStack {
-                        VStack(spacing: 0) {
-                            // If we're running in debug mode we show a warning so that users
-                            // know that performance will be degraded.
-                            if Zashiki.info.mode == GHOSTTY_BUILD_MODE_DEBUG || Zashiki.info.mode == GHOSTTY_BUILD_MODE_RELEASE_SAFE {
-                                DebugBuildWarningView()
-                            }
-
-                            TerminalSplitTreeView(
-                                tree: viewModel.surfaceTree,
-                                action: { delegate?.performSplitAction($0) })
-                                .environmentObject(ghostty)
-                                .zashikiLastFocusedSurface(lastFocusedSurface)
-                                .focused($focused)
-                                .onAppear { self.focused = true }
-                                .onChange(of: focusedSurface) { newValue in
-                                    // We want to keep track of our last focused surface so even if
-                                    // we lose focus we keep this set to the last non-nil value.
-                                    if newValue != nil {
-                                        lastFocusedSurface = .init(newValue)
-                                        self.delegate?.focusedSurfaceDidChange(to: newValue)
-                                    }
-                                }
-                                .onChange(of: pwdURL) { newValue in
-                                    self.delegate?.pwdDidChange(to: newValue)
-
-                                    worktreeStatusRefreshTask?.cancel()
-                                    guard viewModel.worktreeStatus.isVisible, let newValue else { return }
-                                    worktreeStatusRefreshTask = Task {
-                                        try? await Task.sleep(nanoseconds: 400_000_000)
-                                        guard !Task.isCancelled else { return }
-                                        viewModel.worktreeStatus.refresh(directory: newValue)
-                                    }
-                                }
-                                .onChange(of: cellSize) { newValue in
-                                    guard let size = newValue else { return }
-                                    self.delegate?.cellSizeDidChange(to: size)
-                                }
-                                .frame(idealWidth: lastFocusedSurface?.value?.initialSize?.width,
-                                       idealHeight: lastFocusedSurface?.value?.initialSize?.height)
+                    VStack(spacing: 0) {
+                        if viewModel.showsTabBar {
+                            TerminalTabBar(
+                                ghostty: ghostty,
+                                tabs: viewModel.tabs,
+                                selectedTab: viewModel.selectedTab,
+                                onSelect: { delegate?.tabBarDidSelect($0) },
+                                onClose: { delegate?.tabBarDidClose($0) },
+                                onNewTab: { delegate?.tabBarDidRequestNewTab() })
                         }
 
-                        if let surfaceView = lastFocusedSurface?.value {
-                            TerminalCommandPaletteView(
-                                surfaceView: surfaceView,
-                                isPresented: $viewModel.commandPaletteIsShowing,
-                                zashikiConfig: ghostty.config,
-                                updateViewModel: (NSApp.delegate as? AppDelegate)?.updateViewModel) { action in
-                                self.delegate?.performAction(action, on: surfaceView)
-                            }
-                        }
+                        ZStack {
+                            VStack(spacing: 0) {
+                                // If we're running in debug mode we show a warning so that users
+                                // know that performance will be degraded.
+                                if Zashiki.info.mode == GHOSTTY_BUILD_MODE_DEBUG || Zashiki.info.mode == GHOSTTY_BUILD_MODE_RELEASE_SAFE {
+                                    DebugBuildWarningView()
+                                }
 
-                        // Show update information above all else.
-                        if viewModel.updateOverlayIsVisible {
-                            UpdateOverlay()
+                                TerminalSplitTreeView(
+                                    tree: viewModel.surfaceTree,
+                                    action: { delegate?.performSplitAction($0) })
+                                    .environmentObject(ghostty)
+                                    .zashikiLastFocusedSurface(lastFocusedSurface)
+                                    .focused($focused)
+                                    .onAppear { self.focused = true }
+                                    .onChange(of: focusedSurface) { newValue in
+                                        // We want to keep track of our last focused surface so even if
+                                        // we lose focus we keep this set to the last non-nil value.
+                                        if newValue != nil {
+                                            lastFocusedSurface = .init(newValue)
+                                            self.delegate?.focusedSurfaceDidChange(to: newValue)
+                                        }
+                                    }
+                                    .onChange(of: pwdURL) { newValue in
+                                        self.delegate?.pwdDidChange(to: newValue)
+
+                                        worktreeStatusRefreshTask?.cancel()
+                                        guard viewModel.worktreeStatus.isVisible, let newValue else { return }
+                                        worktreeStatusRefreshTask = Task {
+                                            try? await Task.sleep(nanoseconds: 400_000_000)
+                                            guard !Task.isCancelled else { return }
+                                            viewModel.worktreeStatus.refresh(directory: newValue)
+                                        }
+                                    }
+                                    .onChange(of: cellSize) { newValue in
+                                        guard let size = newValue else { return }
+                                        self.delegate?.cellSizeDidChange(to: size)
+                                    }
+                                    .frame(idealWidth: lastFocusedSurface?.value?.initialSize?.width,
+                                           idealHeight: lastFocusedSurface?.value?.initialSize?.height)
+                            }
+
+                            if let surfaceView = lastFocusedSurface?.value {
+                                TerminalCommandPaletteView(
+                                    surfaceView: surfaceView,
+                                    isPresented: $viewModel.commandPaletteIsShowing,
+                                    zashikiConfig: ghostty.config,
+                                    updateViewModel: (NSApp.delegate as? AppDelegate)?.updateViewModel) { action in
+                                    self.delegate?.performAction(action, on: surfaceView)
+                                }
+                            }
+
+                            // Show update information above all else.
+                            if viewModel.updateOverlayIsVisible {
+                                UpdateOverlay()
+                            }
                         }
                     }
                 }
