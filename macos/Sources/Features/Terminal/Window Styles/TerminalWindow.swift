@@ -41,6 +41,12 @@ class TerminalWindow: NSWindow {
 
         tabbingMode = .disallowed
 
+        // Our tab bar occupies the native titlebar. Disable Window Server's
+        // automatic titlebar dragging: it can move the window before AppKit's
+        // tab drag source receives the mouse events. WindowDragHandle requests
+        // window movement explicitly with performDrag(with:).
+        isMovable = false
+
         // All new windows are based on the app config at the time of creation.
         guard let appDelegate = NSApp.delegate as? AppDelegate else { return }
         let config = appDelegate.ghostty.config

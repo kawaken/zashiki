@@ -6,6 +6,10 @@ import SwiftUI
 class TerminalViewContainer: NSView {
     private let terminalView: NSView
 
+    // The content extends under the titlebar. Neither this container nor its
+    // hosting view may advertise that interactive tabs are window drag regions.
+    override var mouseDownCanMoveWindow: Bool { false }
+
     /// Combined glass effect and inactive tint overlay view
     private(set) var glassEffectView: NSView?
     private var derivedConfig: DerivedConfig?
@@ -23,7 +27,7 @@ class TerminalViewContainer: NSView {
     }
 
     init<Root: View>(@ViewBuilder rootView: () -> Root) {
-        self.terminalView = NSHostingView(rootView: rootView())
+        self.terminalView = NonDraggableHostingView(rootView: rootView())
         super.init(frame: .zero)
         setup()
     }

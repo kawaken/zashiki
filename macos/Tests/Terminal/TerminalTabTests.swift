@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import Testing
 @testable import Zashiki
 
@@ -14,6 +15,43 @@ struct TerminalTabTests {
     private func controller() throws -> Controller {
         let app = try #require((NSApp.delegate as? AppDelegate)?.ghostty)
         return Controller(app, withSurfaceTree: .init())
+    }
+
+    @Test func titlebarTabHitTestingDoesNotAdvertiseWindowDragging() throws {
+        let tab = TerminalTab()
+        let container = TerminalViewContainer {
+            TerminalTabItem(
+                tab: tab, isSelected: true, shortcut: "⌘1", showsBellInTitle: false,
+                canCloseOthers: false, canCloseRight: false,
+                onSelect: {}, onClose: {}, onAction: { _ in }, onMove: { _, _ in })
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        let window = TerminalWindow(contentRect: NSRect(x: 0, y: 0, width: 300, height: 36),
+                                    styleMask: [.titled], backing: .buffered, defer: false)
+        window.awakeFromNib()
+        window.contentView = container
+        container.layoutSubtreeIfNeeded()
+        #expect(!window.isMovable)
+        let hosting = try #require(container.subviews.first)
+        #expect(!container.mouseDownCanMoveWindow)
+        #expect(!hosting.mouseDownCanMoveWindow)
+
+        func findTab(in view: NSView) -> TerminalTabItemView? {
+            if let tab = view as? TerminalTabItemView { return tab }
+            return view.subviews.lazy.compactMap { findTab(in: $0) }.first
+        }
+        let tabView = try #require(findTab(in: hosting))
+        #expect(tabView.bounds.width > 0)
+        #expect(tabView.bounds.height > 0)
+        // Title, shortcut, and empty padding must all reach the drag source,
+        // including the top of the tab that overlaps the native titlebar.
+        let bounds = tabView.bounds
+        for point in [NSPoint(x: bounds.midX, y: 1), NSPoint(x: bounds.midX, y: bounds.midY),
+                      NSPoint(x: bounds.maxX - 20, y: bounds.midY)] {
+            let hit = tabView.hitTest(tabView.convert(point, to: tabView.superview))
+            #expect(hit === tabView)
+            #expect(hit?.mouseDownCanMoveWindow == false)
+        }
     }
 
     @Test func dragBoundariesPreserveSelectionAndTabIdentity() throws {
