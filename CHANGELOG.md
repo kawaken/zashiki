@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- `zashiki +markdown-preview`がプレビューを開けたか確認して結果を返すように
+- プレビューにフォーカスしても、ターミナルの文字サイズを使って表示を維持するように
+- AboutダイアログからBuild番号を削除
+- Undo操作をすべて削除するとクラッシュする問題を修正
+
 ## v0.7.0 (2026-10-07)
 
 - ウィンドウ上部の見た目を切り替える設定（`macos-titlebar-style`、`window-decoration`、`macos-non-native-fullscreen`、`macos-window-buttons`、`macos-titlebar-proxy-icon`）と、キーバインド用アクション `toggle_window_decorations` を廃止。見た目は従来の既定値に固定

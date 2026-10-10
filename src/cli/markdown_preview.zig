@@ -3,7 +3,9 @@ const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 const Action = @import("ghostty.zig").Action;
 const args = @import("args.zig");
+const compat_file = @import("../lib/compat/file.zig");
 const global = @import("../global.zig");
+const os_file = @import("../os/file.zig");
 
 pub const Options = struct {
     pub fn deinit(self: Options) void {
@@ -24,8 +26,9 @@ pub const Options = struct {
 ///   zashiki +markdown-preview path/to/file.md
 ///
 /// The path is resolved to an absolute path and sent to the running Zashiki
-/// instance through its `zashiki://` URL handler. When the command runs from
-/// a Zashiki shell, `ZASHIKI_SURFACE_ID` is also forwarded so the preview can
+/// instance through its `zashiki://` URL handler. The command waits for the
+/// app to confirm that the preview pane opened. When the command runs from a
+/// Zashiki shell, `ZASHIKI_SURFACE_ID` is also forwarded so the preview can
 /// be associated with the originating terminal window.
 pub fn run(alloc: Allocator) !u8 {
     if (comptime builtin.target.os.tag != .macos) {
@@ -82,7 +85,17 @@ pub fn run(alloc: Allocator) !u8 {
         null;
     defer if (surface_id) |value| alloc.free(value);
 
-    const url = try buildURL(alloc, absolute_path, surface_id);
+    var response_name_buf: [os_file.random_basename_len]u8 = undefined;
+    const response_name = os_file.randomBasename(&response_name_buf) catch unreachable;
+    const response_path = try std.fmt.allocPrint(
+        alloc,
+        "/tmp/zashiki-preview-response-{s}",
+        .{response_name},
+    );
+    defer alloc.free(response_path);
+    defer std.Io.Dir.deleteFileAbsolute(global.io(), response_path) catch {};
+
+    const url = try buildURL(alloc, absolute_path, surface_id, response_path);
     defer alloc.free(url);
 
     const app_path = try applicationPath(alloc);
@@ -112,11 +125,49 @@ pub fn run(alloc: Allocator) !u8 {
         return 1;
     };
 
-    return switch (term) {
-        .exited => |code| code,
-        .signal => 1,
-        .stopped, .unknown => 1,
+    switch (term) {
+        .exited => |code| if (code != 0) return code,
+        .signal, .stopped, .unknown => return 1,
+    }
+
+    const response = waitForResponse(alloc, response_path) catch |err| {
+        try stderr.print(
+            "zashiki +markdown-preview: Zashiki did not confirm opening the preview: {}\n",
+            .{err},
+        );
+        return 1;
     };
+    defer alloc.free(response);
+
+    if (std.mem.eql(u8, response, "opened")) {
+        var stdout_buffer: [4096]u8 = undefined;
+        var stdout_writer = std.Io.File.stdout().writer(global.io(), &stdout_buffer);
+        try stdout_writer.interface.print("Markdown preview opened: {s}\n", .{absolute_path});
+        try stdout_writer.end();
+        return 0;
+    }
+
+    const reason = if (std.mem.startsWith(u8, response, "error:"))
+        response["error:".len..]
+    else
+        "invalid-response";
+    try stderr.print("zashiki +markdown-preview: Zashiki rejected the preview request ({s})\n", .{reason});
+    return 1;
+}
+
+fn waitForResponse(alloc: Allocator, path: []const u8) ![]u8 {
+    for (0..200) |_| {
+        const file = std.Io.Dir.openFileAbsolute(global.io(), path, .{ .mode = .read_only }) catch |err| switch (err) {
+            error.FileNotFound => {
+                try std.Io.sleep(global.io(), .fromMilliseconds(50), .awake);
+                continue;
+            },
+            else => return err,
+        };
+        defer file.close(global.io());
+        return try compat_file.readToEndAlloc(file, alloc, 1024);
+    }
+    return error.ResponseTimeout;
 }
 
 fn parsePath(alloc: Allocator) ![]const u8 {
@@ -141,7 +192,7 @@ fn parsePath(alloc: Allocator) ![]const u8 {
     return path orelse error.MissingPath;
 }
 
-fn buildURL(alloc: Allocator, path: []const u8, surface_id: ?[]const u8) ![]u8 {
+fn buildURL(alloc: Allocator, path: []const u8, surface_id: ?[]const u8, response_path: []const u8) ![]u8 {
     var buffer: std.Io.Writer.Allocating = .init(alloc);
     defer buffer.deinit();
 
@@ -153,6 +204,8 @@ fn buildURL(alloc: Allocator, path: []const u8, surface_id: ?[]const u8) ![]u8 {
             try appendQueryComponent(&buffer.writer, surface);
         }
     }
+    try buffer.writer.writeAll("&response=");
+    try appendQueryComponent(&buffer.writer, response_path);
     return buffer.toOwnedSlice();
 }
 
@@ -203,21 +256,27 @@ test "build markdown preview URL" {
         std.testing.allocator,
         "/tmp/日本語 notes.md?draft=true#section",
         "0x0123456789abcdef",
+        "/tmp/zashiki-preview-response-abcdefghijklmnopqrstuv",
     );
     defer std.testing.allocator.free(url);
 
     try std.testing.expectEqualStrings(
-        "zashiki://markdown-preview/open?path=%2Ftmp%2F%E6%97%A5%E6%9C%AC%E8%AA%9E%20notes.md%3Fdraft%3Dtrue%23section&surface=0x0123456789abcdef",
+        "zashiki://markdown-preview/open?path=%2Ftmp%2F%E6%97%A5%E6%9C%AC%E8%AA%9E%20notes.md%3Fdraft%3Dtrue%23section&surface=0x0123456789abcdef&response=%2Ftmp%2Fzashiki-preview-response-abcdefghijklmnopqrstuv",
         url,
     );
 }
 
 test "invalid surface IDs are omitted" {
-    const url = try buildURL(std.testing.allocator, "/tmp/readme.md", "not-a-surface");
+    const url = try buildURL(
+        std.testing.allocator,
+        "/tmp/readme.md",
+        "not-a-surface",
+        "/tmp/zashiki-preview-response-abcdefghijklmnopqrstuv",
+    );
     defer std.testing.allocator.free(url);
 
     try std.testing.expectEqualStrings(
-        "zashiki://markdown-preview/open?path=%2Ftmp%2Freadme.md",
+        "zashiki://markdown-preview/open?path=%2Ftmp%2Freadme.md&response=%2Ftmp%2Fzashiki-preview-response-abcdefghijklmnopqrstuv",
         url,
     );
 }
