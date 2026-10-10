@@ -107,7 +107,8 @@ struct MarkdownPreviewPane: View {
             .buttonStyle(.plain)
             .help("Close Markdown Preview")
         }
-        .padding(8)
+        .padding(.horizontal, 8)
+        .frame(height: WindowTopRow.height)
     }
 
     @State private var isFontSizePresented = false
@@ -184,7 +185,13 @@ struct MarkdownPreviewPane: View {
                             .id(section.id)
                         }
                     }
+                    .background {
+                        if let position = model.scrollPosition {
+                            MarkdownPreviewScrollTracker(position: position)
+                        }
+                    }
                 }
+                .id(model.scrollPosition?.id)
                 .environment(\.openURL, OpenURLAction { url in
                     openLink(url, sections: sections, using: proxy)
                 })

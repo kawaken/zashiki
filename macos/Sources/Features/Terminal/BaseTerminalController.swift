@@ -84,6 +84,10 @@ class BaseTerminalController: NSWindowController,
     /// True if the tab bar should be shown for this window.
     var showsTabBar: Bool { false }
 
+    /// Space the top row leaves at its leading edge for the window buttons
+    /// (the traffic lights). Zero when they aren't drawn over our content.
+    @Published private(set) var windowButtonsInset: CGFloat = 0
+
     /// Every Surface across every tab in this window.
     var allSurfaces: [Zashiki.SurfaceView] {
         tabs.flatMap { Array($0.surfaceTree) }
@@ -345,6 +349,12 @@ class BaseTerminalController: NSWindowController,
     func selectTab(_ tab: TerminalTab) {
         guard tab !== selectedTab, tabs.contains(where: { $0 === tab }) else { return }
         let oldTab = selectedTab
+        if oldTab.isEditingTitle {
+            // Selecting a tab is a focus change even before its surface exists.
+            // End the field editor now so it commits to the tab being left.
+            window?.makeFirstResponder(window)
+            oldTab.isEditingTitle = false
+        }
         selectedTab = tab
 
         // The surfaces of the old tab are no longer on screen.
@@ -358,7 +368,10 @@ class BaseTerminalController: NSWindowController,
         if let target = tab.focusedSurface ?? tab.surfaceTree.first {
             tab.focusedSurface = target
             DispatchQueue.main.async {
-                Zashiki.moveFocus(to: target, from: oldTab.focusedSurface)
+                Zashiki.moveFocus(to: target, from: oldTab.focusedSurface) { [weak self, weak tab] in
+                    guard let self, self.selectedTab === tab else { return false }
+                    return !self.tabs.contains(where: { $0.isEditingTitle })
+                }
             }
         }
 
@@ -533,6 +546,10 @@ class BaseTerminalController: NSWindowController,
 
     /// Prompt the user to change the tab/window title.
     func promptTabTitle() {
+        if showsTabBar {
+            selectedTab.isEditingTitle = true
+            return
+        }
         guard let window else { return }
 
         let alert = NSAlert()
@@ -1014,8 +1031,52 @@ class BaseTerminalController: NSWindowController,
         focusedSurface = to
     }
 
+    func tabBarDidRequestResetZoom() {
+        splitZoom(self)
+    }
+
+    /// Recomputes `windowButtonsInset`. The window buttons sit over our
+    /// content only when it extends under the titlebar, and not in fullscreen.
+    func updateWindowButtonsInset() {
+        guard let window,
+              window.styleMask.contains(.fullSizeContentView),
+              !window.styleMask.contains(.fullScreen),
+              let zoomButton = window.standardWindowButton(.zoomButton) else {
+            windowButtonsInset = 0
+            return
+        }
+
+        windowButtonsInset = zoomButton.frame.maxX + 8
+    }
+
     func tabBarDidSelect(_ tab: TerminalTab) {
         selectTab(tab)
+    }
+
+    func tabBarDidPerform(_ action: TerminalTabAction, on tab: TerminalTab) {
+        guard tabs.contains(where: { $0 === tab }) else { return }
+        switch action {
+        case .rename:
+            tab.isEditingTitle = true
+            selectTab(tab)
+        case .setTitle(let title):
+            tab.titleOverride = title.isEmpty ? nil : title
+            window?.invalidateRestorableState()
+        case .setColor(let color):
+            tab.color = color
+            window?.invalidateRestorableState()
+        case .finishEditing:
+            if let focusedSurface { window?.makeFirstResponder(focusedSurface) }
+        case .closeOthers, .closeRight:
+            break
+        }
+    }
+
+    func tabBarDidMove(_ source: UUID, relativeTo target: TerminalTab, after: Bool) {
+        guard let from = tabs.firstIndex(where: { $0.id == source }),
+              let targetIndex = tabs.firstIndex(where: { $0 === target }) else { return }
+        let boundary = targetIndex + (after ? 1 : 0)
+        moveTab(tabs[from], to: boundary - (from < boundary ? 1 : 0))
     }
 
     /// Subclasses that support multiple tabs override these.
@@ -1267,6 +1328,7 @@ class BaseTerminalController: NSWindowController,
     }
 
     func fullscreenDidChange() {
+        updateWindowButtonsInset()
         guard let fullscreenStyle else { return }
 
         // When we enter fullscreen, we want to show the update overlay so that it
@@ -1365,6 +1427,8 @@ class BaseTerminalController: NSWindowController,
 
         // Set our update overlay state
         updateOverlayIsVisible = defaultUpdateOverlayVisibility()
+
+        updateWindowButtonsInset()
 
         applyTitleToWindow()
     }
@@ -1521,17 +1585,6 @@ class BaseTerminalController: NSWindowController,
     }
 
     @IBAction func changeTabTitle(_ sender: Any) {
-        if let targetWindow = window {
-            let inlineHostWindow =
-                targetWindow.tabbedWindows?
-                    .first(where: { $0.tabBarView != nil }) as? TerminalWindow
-                ?? (targetWindow as? TerminalWindow)
-
-            if let inlineHostWindow, inlineHostWindow.beginInlineTabTitleEdit(for: targetWindow) {
-                return
-            }
-        }
-
         promptTabTitle()
     }
 
@@ -1678,7 +1731,7 @@ class BaseTerminalController: NSWindowController,
     }
 
     /// Re-runs `gw list` for this tab's directory if the (possibly
-    /// tabGroup-shared, see `worktreeStatus`) pane is visible. Called when
+    /// window-scoped, see `worktreeStatus`) pane is visible. Called when
     /// this tab's pane is first shown, and again whenever this tab becomes
     /// the active one in a shared pane, since another tab may have left it
     /// showing a different directory's listing.

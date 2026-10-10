@@ -143,11 +143,6 @@ class TerminalController: BaseTerminalController {
         // we want to invalidate our state.
         invalidateRestorableState()
 
-        // Update our zoom state
-        if let window = window as? TerminalWindow {
-            window.surfaceIsZoomed = to.zoomed != nil
-        }
-
         // If the selected tab has no surfaces left then the tab goes away. If
         // it was the only tab we close our window.
         if to.isEmpty {
@@ -159,16 +154,14 @@ class TerminalController: BaseTerminalController {
         }
     }
 
-    override var showsTabBar: Bool { tabs.count > 1 }
+    /// The tab bar is always shown: with no title row, it is where the title
+    /// is shown and where the window can be dragged.
+    override var showsTabBar: Bool { true }
 
     override func selectedTabDidChange(from oldTab: TerminalTab) {
         super.selectedTabDidChange(from: oldTab)
         invalidateRestorableState()
 
-        // The zoom indicator and titlebar colors follow the selected tab.
-        if let window = window as? TerminalWindow {
-            window.surfaceIsZoomed = surfaceTree.zoomed != nil
-        }
         syncAppearance()
     }
 
@@ -179,6 +172,18 @@ class TerminalController: BaseTerminalController {
 
     override func tabBarDidClose(_ tab: TerminalTab) {
         closeTab(tab)
+    }
+
+    override func tabBarDidPerform(_ action: TerminalTabAction, on tab: TerminalTab) {
+        guard tabs.contains(where: { $0 === tab }) else { return }
+        switch action {
+        case .closeOthers:
+            performCloseOtherTabs(keeping: tab)
+        case .closeRight:
+            performCloseTabsOnTheRight(of: tab)
+        default:
+            super.tabBarDidPerform(action, on: tab)
+        }
     }
 
     override func tabBarDidRequestNewTab() {
@@ -489,10 +494,7 @@ class TerminalController: BaseTerminalController {
         /// ``TerminalController/focusedSurfaceDidChange(to:)``
     }
 
-    /// Update the accessory view of each tab according to the keyboard
-    /// shortcut that activates it (if any). This is called when the key window
-    /// changes, when a window is closed, and when tabs are reordered
-    /// with the mouse.
+    /// Update window appearance from the selected tab.
     override func syncAppearance() {
         // When our focus changes, we update our window appearance based on the
         // currently focused surface.
@@ -504,17 +506,6 @@ class TerminalController: BaseTerminalController {
         // Let our window handle its own appearance
         guard let window = window as? TerminalWindow else { return }
 
-        // Sync our zoom state for splits
-        window.surfaceIsZoomed = surfaceTree.zoomed != nil
-
-        // Set the font for the window and tab titles.
-        if let titleFontName = surfaceConfig.windowTitleFontFamily {
-            window.titlebarFont = NSFont(name: titleFontName, size: NSFont.systemFontSize)
-        } else {
-            window.titlebarFont = nil
-        }
-
-        // Call this last in case it uses any of the properties above.
         window.syncAppearance(surfaceConfig)
         terminalViewContainer?.zashikiConfigDidChange(ghostty.config, preferredBackgroundColor: window.preferredBackgroundColor)
     }
@@ -981,7 +972,11 @@ class TerminalController: BaseTerminalController {
     }
 
     @IBAction func closeOtherTabs(_ sender: Any?) {
-        let tabsToClose = otherTabs
+        performCloseOtherTabs(keeping: selectedTab)
+    }
+
+    private func performCloseOtherTabs(keeping tab: TerminalTab) {
+        let tabsToClose = tabs.filter { $0 !== tab }
 
         // If we only have one tab then we have no other tabs to close
         guard !tabsToClose.isEmpty else { return }
@@ -1001,7 +996,12 @@ class TerminalController: BaseTerminalController {
     }
 
     @IBAction func closeTabsOnTheRight(_ sender: Any?) {
-        let tabsToClose = tabsOnTheRight
+        performCloseTabsOnTheRight(of: selectedTab)
+    }
+
+    private func performCloseTabsOnTheRight(of tab: TerminalTab) {
+        guard let index = tabs.firstIndex(where: { $0 === tab }) else { return }
+        let tabsToClose = Array(tabs.dropFirst(index + 1))
         guard !tabsToClose.isEmpty else { return }
 
         guard tabsToClose.contains(where: { $0.needsConfirmQuit }) else {

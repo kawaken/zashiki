@@ -168,10 +168,14 @@ enum MarkdownPreviewFontSizePolicy {
     }
 }
 
-/// Owns the state for a single terminal window's Markdown preview pane.
-/// One instance lives on each `BaseTerminalController` (see
-/// `markdownPreview` there) and is shared with the SwiftUI view tree via
-/// `TerminalViewModel`.
+/// A reference per history entry also prevents a disappearing view from
+/// writing its final offset into a newly opened document.
+final class MarkdownPreviewScrollPosition {
+    let id = UUID()
+    var offset: CGFloat = 0
+}
+
+/// Owns one terminal tab's Markdown preview, history, and scroll positions.
 ///
 /// Live-reload is driven by `MarkdownPreviewFileWatcher`: `open(url:)`
 /// starts watching the file, and further writes (including atomic-save
@@ -189,8 +193,7 @@ class MarkdownPreviewModel: ObservableObject {
     @Published private(set) var content: String = ""
 
     /// Incremented every time `content` is reloaded. Views that need an
-    /// explicit "content changed" signal (e.g. for scroll preservation in
-    /// a later step) can observe this instead of diffing strings.
+    /// explicit "content changed" signal can observe this instead of diffing strings.
     @Published private(set) var revision: Int = 0
 
     /// Set when `fileURL` could not be read. Cleared on the next
@@ -223,6 +226,11 @@ class MarkdownPreviewModel: ObservableObject {
     /// like a browser's history after following a fresh link.
     private var history: [URL] = []
     private var historyIndex: Int = -1
+    private var scrollPositions: [MarkdownPreviewScrollPosition] = []
+
+    var scrollPosition: MarkdownPreviewScrollPosition? {
+        scrollPositions.indices.contains(historyIndex) ? scrollPositions[historyIndex] : nil
+    }
 
     private var watcher: MarkdownPreviewFileWatcher?
 
@@ -233,8 +241,10 @@ class MarkdownPreviewModel: ObservableObject {
     func open(url: URL) {
         if historyIndex + 1 < history.count {
             history.removeSubrange((historyIndex + 1)...)
+            scrollPositions.removeSubrange((historyIndex + 1)...)
         }
         history.append(url)
+        scrollPositions.append(MarkdownPreviewScrollPosition())
         historyIndex = history.count - 1
         updateNavigationState()
         show(url: url)

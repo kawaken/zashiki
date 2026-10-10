@@ -252,4 +252,43 @@ struct MarkdownPreviewModelTests {
         #expect(!model.canGoBack)
         #expect(model.canGoForward)
     }
+    @Test func scrollPositionsFollowHistoryEntriesAndTabs() throws {
+        let first = MarkdownPreviewModel()
+        let second = MarkdownPreviewModel()
+        let url = try temporaryFile("# Document")
+        first.open(url: url)
+        let original = try #require(first.scrollPosition)
+        original.offset = 120
+        first.open(url: url)
+        #expect(first.scrollPosition?.offset == 0)
+        first.scrollPosition?.offset = 240
+        first.goBack()
+        #expect(first.scrollPosition === original)
+        #expect(first.scrollPosition?.offset == 120)
+        first.goForward()
+        #expect(first.scrollPosition?.offset == 240)
+        second.open(url: url)
+        #expect(second.scrollPosition?.offset == 0)
+        first.close()
+        first.toggle()
+        first.reload()
+        #expect(first.scrollPosition?.offset == 240)
+    }
+
+    @Test func newNavigationDiscardsForwardScrollPosition() throws {
+        let model = MarkdownPreviewModel()
+        let url = try temporaryFile()
+        model.open(url: url)
+        model.open(url: url)
+        let discarded = try #require(model.scrollPosition)
+        discarded.offset = 500
+        model.goBack()
+        model.open(url: url)
+        #expect(model.scrollPosition !== discarded)
+        #expect(model.scrollPosition?.offset == 0)
+        // Late events from the old document cannot change the new entry.
+        discarded.offset = 900
+        #expect(model.scrollPosition?.offset == 0)
+    }
+
 }

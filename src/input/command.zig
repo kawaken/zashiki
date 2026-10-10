@@ -432,12 +432,6 @@ fn actionCommands(action: Action.Key) []const Command {
             },
         },
 
-        .toggle_tab_overview => comptime &.{.{
-            .action = .toggle_tab_overview,
-            .title = "Toggle Tab Overview",
-            .description = "Toggle the tab overview.",
-        }},
-
         .prompt_surface_title => comptime &.{.{
             .action = .prompt_surface_title,
             .title = "Change Terminal Title…",

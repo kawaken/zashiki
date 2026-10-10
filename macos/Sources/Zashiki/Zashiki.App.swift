@@ -649,8 +649,6 @@ extension Zashiki {
             case GHOSTTY_ACTION_PRESENT_TERMINAL:
                 return presentTerminal(app, target: target)
 
-            case GHOSTTY_ACTION_TOGGLE_TAB_OVERVIEW:
-                fallthrough
             case GHOSTTY_ACTION_SIZE_LIMIT:
                 fallthrough
             case GHOSTTY_ACTION_QUIT_TIMER:
@@ -1212,17 +1210,10 @@ extension Zashiki {
             target: ghostty_target_s,
             direction: ghostty_action_goto_window_e
         ) -> Bool {
-            // Collect candidate windows: visible terminal windows that are either
-            // standalone or the currently selected tab in their tab group. This
-            // treats each native tab group as a single "window" for navigation
-            // purposes, since goto_tab handles per-tab navigation.
+            // Tabs belong to their window, so each visible window is a candidate.
             let candidates: [NSWindow] = NSApplication.shared.windows.filter { window in
                 guard window.windowController is BaseTerminalController else { return false }
                 guard window.isVisible, !window.isMiniaturized else { return false }
-                // For native tabs, only include the selected tab in each group
-                if let group = window.tabGroup, group.selectedWindow !== window {
-                    return false
-                }
                 return true
             }
 

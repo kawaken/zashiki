@@ -18,6 +18,9 @@ struct WorktreeStatusSplit<Content: View>: View {
 
     @ObservedObject var agentStatus: AgentStatusModel
 
+    /// Space to leave for the window buttons in the top-left corner.
+    var windowButtonsInset: CGFloat = 0
+
     @ViewBuilder let content: () -> Content
 
     /// The fractional width of the pane vs. the terminal content.
@@ -49,6 +52,7 @@ struct WorktreeStatusSplit<Content: View>: View {
         if model.isVisible && agentStatus.isVisible {
             SplitView(.vertical, $panelSplit, dividerColor: ghostty.config.splitDividerColor, left: {
                 WorktreeStatusPane(model: model, directory: directory)
+                    .environment(\.windowButtonsInset, windowButtonsInset)
             }, right: {
                 AgentStatusPane(model: agentStatus, surfaces: surfaces)
             }, onEqualize: {
@@ -56,8 +60,10 @@ struct WorktreeStatusSplit<Content: View>: View {
             })
         } else if model.isVisible {
             WorktreeStatusPane(model: model, directory: directory)
+                .environment(\.windowButtonsInset, windowButtonsInset)
         } else {
             AgentStatusPane(model: agentStatus, surfaces: surfaces)
+                .environment(\.windowButtonsInset, windowButtonsInset)
         }
     }
 }
