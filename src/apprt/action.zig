@@ -106,9 +106,6 @@ pub const Action = union(Key) {
     /// Toggle fullscreen mode.
     toggle_fullscreen: Fullscreen,
 
-    /// Toggle tab overview.
-    toggle_tab_overview,
-
     /// Toggle the quick terminal in or out.
     toggle_quick_terminal,
 
@@ -345,7 +342,6 @@ pub const Action = union(Key) {
         close_all_windows,
         toggle_maximize,
         toggle_fullscreen,
-        toggle_tab_overview,
         toggle_quick_terminal,
         toggle_command_palette,
         toggle_visibility,

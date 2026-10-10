@@ -5,7 +5,7 @@ import SwiftUI
 struct AgentStatusPane: View {
     @ObservedObject var model: AgentStatusModel
 
-    /// Every Surface in the terminal window's tabGroup (every tab, not just
+    /// Every Surface in the terminal window (every tab, not just
     /// the focused one). The model is shared by all tabs in the window.
     let surfaces: [Zashiki.SurfaceView]
 

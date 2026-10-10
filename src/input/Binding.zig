@@ -587,13 +587,6 @@ pub const Action = union(enum) {
     /// the last tab.
     move_tab: isize,
 
-    /// Toggle the tab overview.
-    ///
-    /// This is only supported on Linux and when the system's libadwaita
-    /// version is 1.4 or newer. The current libadwaita version can be
-    /// found by running `ghostty +version`.
-    toggle_tab_overview,
-
     /// Change the title of the current focused surface via a pop-up prompt.
     prompt_surface_title,
 
@@ -1385,7 +1378,6 @@ pub const Action = union(enum) {
             .last_tab,
             .goto_tab,
             .move_tab,
-            .toggle_tab_overview,
             .new_split,
             .goto_split,
             .goto_window,

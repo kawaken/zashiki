@@ -699,18 +699,6 @@ class AppDelegate: NSObject,
     }
 
     private func localEventKeyDown(_ event: NSEvent) -> NSEvent? {
-        // If the tab overview is visible and escape is pressed, close it.
-        // This can't POSSIBLY be right and is probably a FirstResponder problem
-        // that we should handle elsewhere in our program. But this works and it
-        // is guarded by the tab overview currently showing.
-        if event.keyCode == 0x35, // Escape key
-           let window = NSApp.keyWindow,
-           let tabGroup = window.tabGroup,
-           tabGroup.isOverviewVisible {
-            window.toggleTabOverview(nil)
-            return nil
-        }
-
         // If we have a main window then we don't process any of the keys
         // because we let it capture and propagate.
         guard NSApp.mainWindow == nil else { return event }
@@ -1193,12 +1181,7 @@ class AppDelegate: NSObject,
                 $0.isVisible &&
                 !$0.styleMask.contains(.fullScreen)
             }.forEach { window in
-                // We only keep track of selectedWindow if it's in a tabGroup,
-                // so we can keep its selection state when restoring
-                let windowToHide = window.tabGroup?.selectedWindow ?? window
-                if !visibleWindows.contains(where: { $0.value === windowToHide }) {
-                    visibleWindows.append(Weak(windowToHide))
-                }
+                visibleWindows.append(Weak(window))
             }
             self.hiddenWindows = visibleWindows
         }

@@ -185,7 +185,13 @@ struct MarkdownPreviewPane: View {
                             .id(section.id)
                         }
                     }
+                    .background {
+                        if let position = model.scrollPosition {
+                            MarkdownPreviewScrollTracker(position: position)
+                        }
+                    }
                 }
+                .id(model.scrollPosition?.id)
                 .environment(\.openURL, OpenURLAction { url in
                     openLink(url, sections: sections, using: proxy)
                 })

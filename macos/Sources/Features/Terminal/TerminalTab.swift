@@ -24,6 +24,9 @@ final class TerminalTab: ObservableObject, Identifiable {
     /// When set, this takes precedence over the computed title from the terminal.
     @Published var titleOverride: String?
 
+    /// Transient UI state; never restored across launches.
+    @Published var isEditingTitle = false
+
     /// The title reported by the focused surface (without the override).
     @Published private(set) var surfaceTitle: String = TerminalTab.placeholderTitle
 

@@ -1164,7 +1164,8 @@ extension Zashiki {
     static func moveFocus(
         to: SurfaceView,
         from: SurfaceView? = nil,
-        delay: TimeInterval? = nil
+        delay: TimeInterval? = nil,
+        shouldFocus: @escaping () -> Bool = { true }
     ) {
         // The whole delay machinery is a bit of a hack to work around a
         // situation where the window is destroyed and the surface view
@@ -1185,10 +1186,11 @@ extension Zashiki {
         }
 
         let work: DispatchWorkItem = .init {
+            guard shouldFocus() else { return }
             // If the callback runs before the surface is attached to a view
             // then the window will be nil. We just reschedule in that case.
             guard let window = to.window else {
-                moveFocus(to: to, from: from, delay: nextDelay)
+                moveFocus(to: to, from: from, delay: nextDelay, shouldFocus: shouldFocus)
                 return
             }
 

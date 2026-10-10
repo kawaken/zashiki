@@ -27,6 +27,10 @@ protocol TerminalViewDelegate: AnyObject {
     /// A tab's close button was clicked in the tab bar.
     func tabBarDidClose(_ tab: TerminalTab)
 
+    func tabBarDidPerform(_ action: TerminalTabAction, on tab: TerminalTab)
+
+    func tabBarDidMove(_ source: UUID, relativeTo target: TerminalTab, after: Bool)
+
     /// The new tab button was clicked in the tab bar.
     func tabBarDidRequestNewTab()
 
@@ -133,6 +137,8 @@ struct TerminalView<ViewModel: TerminalViewModel>: View {
                                 selectedTab: viewModel.selectedTab,
                                 onSelect: { delegate?.tabBarDidSelect($0) },
                                 onClose: { delegate?.tabBarDidClose($0) },
+                                onAction: { delegate?.tabBarDidPerform($0, on: $1) },
+                                onMove: { delegate?.tabBarDidMove($0, relativeTo: $1, after: $2) },
                                 onNewTab: { delegate?.tabBarDidRequestNewTab() },
                                 isZoomed: viewModel.surfaceTree.zoomed != nil,
                                 onResetZoom: { delegate?.tabBarDidRequestResetZoom() },
