@@ -23,6 +23,7 @@ struct TerminalTabBar: View {
     var windowButtonsInset: CGFloat = 0
 
     static let height: CGFloat = WindowTopRow.height
+    private static let maximumTabWidth: CGFloat = 240
 
     var body: some View {
         HStack(spacing: 0) {
@@ -43,7 +44,7 @@ struct TerminalTabBar: View {
                     onClose: { onClose(tab) },
                     onAction: { onAction($0, tab) },
                     onMove: { onMove($0, tab, $1) })
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(maxWidth: Self.maximumTabWidth, maxHeight: .infinity)
 
                 Divider()
             }
@@ -57,7 +58,8 @@ struct TerminalTabBar: View {
             .help("New Tab")
             .accessibilityLabel("New Tab")
 
-            WindowDragHandle().frame(width: 32)
+            WindowDragHandle()
+                .frame(minWidth: 80, maxWidth: .infinity, maxHeight: .infinity)
 
             if isZoomed {
                 Divider()

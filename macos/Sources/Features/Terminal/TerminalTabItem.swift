@@ -311,7 +311,7 @@ private final class TabMenuItem: NSMenuItem {
     @objc private func invoke() { handler() }
 }
 
-/// A small empty region beside the tabs retains standard window movement.
+/// The space after the tabs retains standard window movement.
 struct WindowDragHandle: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView { DragView() }
     func updateNSView(_ view: NSView, context: Context) {}
