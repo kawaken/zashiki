@@ -57,7 +57,7 @@ const max_active_key_tables = 8;
 /// by the terminal-id CLI action after resolving the caller's PTY. It must
 /// not be zero as zero is used to indicate a null value when communicating an
 /// ID over DBus as DBus does not allow null/maybe values.
-id: u64,
+terminal_id: u64,
 
 /// Allocator
 alloc: Allocator,
@@ -572,7 +572,7 @@ pub fn init(
     errdefer io_thread.deinit();
 
     self.* = .{
-        .id = id: {
+        .terminal_id = terminal_id: {
             while (true) {
                 const candidate = candidate: {
                     const rng_impl: std.Random.IoSource = .{ .io = global.io() };
@@ -580,7 +580,7 @@ pub fn init(
                     break :candidate rng.int(u64);
                 };
                 if (candidate == 0) continue;
-                break :id candidate;
+                break :terminal_id candidate;
             }
         },
         .alloc = alloc,

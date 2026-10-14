@@ -505,11 +505,11 @@ fn hasSurface(self: *const App, surface: *const Surface) bool {
     return false;
 }
 
-/// Search for a surface by a 64 bit unique ID.
-pub fn findSurfaceByID(self: *const App, id: u64) ?*Surface {
+/// Search for a terminal by its 64-bit terminal ID.
+pub fn findSurfaceByTerminalID(self: *const App, terminal_id: u64) ?*Surface {
     for (self.surfaces.items) |v| {
         const surface: *Surface = v.core();
-        if (surface.id == id) return surface;
+        if (surface.terminal_id == terminal_id) return surface;
     }
 
     return null;

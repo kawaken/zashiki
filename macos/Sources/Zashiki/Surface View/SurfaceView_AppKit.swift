@@ -152,7 +152,7 @@ extension Zashiki {
         // the surface has been closed.
         var terminalID: UInt64? {
             guard let surface = self.surface else { return nil }
-            return ghostty_surface_id(surface)
+            return ghostty_terminal_id(surface)
         }
 
         /// Returns this surface's PTY device name, or nil if unavailable.

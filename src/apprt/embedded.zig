@@ -1438,11 +1438,10 @@ pub const CAPI = struct {
         return surface.core_surface.getProcessInfo(.foreground_pid) orelse 0;
     }
 
-    /// Returns the unique ID for this surface (see Surface.id in the core
-    /// surface). Exposed so embedders can correlate a surface with the ID
-    /// returned by the terminal-id CLI action.
-    export fn ghostty_surface_id(surface: *Surface) u64 {
-        return surface.core_surface.id;
+    /// Returns the terminal ID for this surface. Embedders can correlate a
+    /// terminal with the ID returned by the terminal-id CLI action.
+    export fn ghostty_terminal_id(surface: *Surface) u64 {
+        return surface.core_surface.terminal_id;
     }
 
     /// Returns the PTY name for the surface. The returned string must be
