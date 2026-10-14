@@ -19,7 +19,7 @@ OSCを使わないローカルIPCを検討する。
 
 - Unix domain socket、またはloopback HTTPの適合性を比較する
 - CLIヘルパーと起動中のZashikiの間で要求・応答をやり取りできる設計にする
-- `ZASHIKI_SURFACE_ID`を含む要求をどのように認証・検証するか決める
+- 実行元コンテキストIDを含む要求をどのように認証・検証するか決める
 - 他ユーザー・他アプリからの不正接続を防ぐセキュリティ境界を定義する
 
 ### Claude Code hookとの連携

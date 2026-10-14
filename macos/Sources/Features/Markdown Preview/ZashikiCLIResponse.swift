@@ -1,9 +1,9 @@
 import Foundation
 
-enum MarkdownPreviewOpenAcknowledgement {
+enum ZashikiCLIResponse {
     static let queryItemName = "response"
 
-    private static let filenamePrefix = "zashiki-preview-response-"
+    private static let filenamePrefix = "zashiki-cli-response-"
     private static let filenameSuffixLength = 22
     private static let allowedSuffixCharacters = CharacterSet(
         charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"

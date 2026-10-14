@@ -53,11 +53,10 @@ pub const min_window_height_cells: u32 = 4;
 /// given time. `activate_key_table` calls after this are ignored.
 const max_active_key_tables = 8;
 
-/// Unique ID used to identify this surface for IPC purposes. It is
-/// exposed to the commands running in surfaces as the environment variable
-/// ZASHIKI_SURFACE_ID. It must not be zero as zero is used to incicate a null
-/// value when communicating an ID over DBus as DBus does not allow null/maybe
-/// values.
+/// Unique ID used to identify this surface for IPC purposes. It is returned
+/// by the terminal-id CLI action after resolving the caller's PTY. It must
+/// not be zero as zero is used to indicate a null value when communicating an
+/// ID over DBus as DBus does not allow null/maybe values.
 id: u64,
 
 /// Allocator
@@ -635,12 +634,6 @@ pub fn init(
 
         // don't leak ZASHIKI_LOG to any subprocesses
         _ = env.orderedRemove("ZASHIKI_LOG");
-
-        var buf: [18]u8 = undefined;
-        try env.put(
-            "ZASHIKI_SURFACE_ID",
-            std.fmt.bufPrint(&buf, "0x{x:0>16}", .{self.id}) catch unreachable,
-        );
 
         // Initialize our IO backend
         var io_exec = try termio.Exec.init(alloc, .{

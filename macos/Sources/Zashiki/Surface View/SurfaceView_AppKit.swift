@@ -148,12 +148,18 @@ extension Zashiki {
             return ghostty_surface_process_exited(surface)
         }
 
-        // Returns this surface's unique Zashiki Surface ID (same value
-        // exposed to child processes as ZASHIKI_SURFACE_ID), or nil if the
+        // Returns this surface's unique Zashiki Surface ID, or nil if the
         // surface has been closed.
         var zashikiSurfaceID: UInt64? {
             guard let surface = self.surface else { return nil }
             return ghostty_surface_id(surface)
+        }
+
+        /// Returns this surface's PTY device name, or nil if unavailable.
+        var ttyName: String? {
+            guard let surface = self.surface else { return nil }
+            let ttyName = AllocatedString(ghostty_surface_tty_name(surface)).string
+            return ttyName.isEmpty ? nil : ttyName
         }
 
         /// Returns the data model for this surface.

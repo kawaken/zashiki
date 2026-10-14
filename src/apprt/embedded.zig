@@ -1439,9 +1439,8 @@ pub const CAPI = struct {
     }
 
     /// Returns the unique ID for this surface (see Surface.id in the core
-    /// surface). Exposed so embedders can correlate a surface with the
-    /// ZASHIKI_SURFACE_ID environment variable value observed by a child
-    /// process running in that surface.
+    /// surface). Exposed so embedders can correlate a surface with the ID
+    /// returned by the terminal-id CLI action.
     export fn ghostty_surface_id(surface: *Surface) u64 {
         return surface.core_surface.id;
     }
