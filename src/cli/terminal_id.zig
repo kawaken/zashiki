@@ -59,7 +59,7 @@ pub fn run(alloc: Allocator) !u8 {
     defer alloc.free(response);
 
     if (std.mem.eql(u8, response, "none")) {
-        try writeError("no Zashiki terminal matches the caller's TTY", error.NoMatchingSurface);
+        try writeError("no Zashiki terminal matches the caller's TTY", error.NoMatchingTerminal);
         return 1;
     }
     if (!isTerminalID(response)) {

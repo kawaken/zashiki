@@ -159,10 +159,10 @@ fn buildURL(alloc: Allocator, path: []const u8, terminal_id: ?[]const u8, respon
 
     try buffer.writer.writeAll("zashiki://markdown-preview/open?path=");
     try zashiki_url.appendQueryComponent(&buffer.writer, path);
-    if (terminal_id) |surface| {
-        if (!isTerminalID(surface)) return error.InvalidTerminalID;
-        try buffer.writer.writeAll("&surface=");
-        try zashiki_url.appendQueryComponent(&buffer.writer, surface);
+    if (terminal_id) |terminal| {
+        if (!isTerminalID(terminal)) return error.InvalidTerminalID;
+        try buffer.writer.writeAll("&terminal-id=");
+        try zashiki_url.appendQueryComponent(&buffer.writer, terminal);
     }
     try buffer.writer.writeAll("&response=");
     try zashiki_url.appendQueryComponent(&buffer.writer, response_path);
@@ -187,7 +187,7 @@ test "build markdown preview URL" {
     defer std.testing.allocator.free(url);
 
     try std.testing.expectEqualStrings(
-        "zashiki://markdown-preview/open?path=%2Ftmp%2F%E6%97%A5%E6%9C%AC%E8%AA%9E%20notes.md%3Fdraft%3Dtrue%23section&surface=0x0123456789abcdef&response=%2Ftmp%2Fzashiki-cli-response-abcdefghijklmnopqrstuv",
+        "zashiki://markdown-preview/open?path=%2Ftmp%2F%E6%97%A5%E6%9C%AC%E8%AA%9E%20notes.md%3Fdraft%3Dtrue%23section&terminal-id=0x0123456789abcdef&response=%2Ftmp%2Fzashiki-cli-response-abcdefghijklmnopqrstuv",
         url,
     );
 }
@@ -230,7 +230,7 @@ test "invalid terminal IDs are rejected" {
     try std.testing.expectError(error.InvalidTerminalID, buildURL(
         std.testing.allocator,
         "/tmp/readme.md",
-        "not-a-surface",
+        "not-a-terminal",
         "/tmp/zashiki-cli-response-abcdefghijklmnopqrstuv",
     ));
 }

@@ -148,9 +148,9 @@ extension Zashiki {
             return ghostty_surface_process_exited(surface)
         }
 
-        // Returns this surface's unique Zashiki Surface ID, or nil if the
-        // surface has been closed.
-        var zashikiSurfaceID: UInt64? {
+        // Returns the terminal ID associated with this surface, or nil if
+        // the surface has been closed.
+        var terminalID: UInt64? {
             guard let surface = self.surface else { return nil }
             return ghostty_surface_id(surface)
         }
