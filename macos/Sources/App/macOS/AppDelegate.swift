@@ -534,8 +534,9 @@ class AppDelegate: NSObject,
     /// it (e.g. `open`). This is RPC-over-URL, not REST -- there's no
     /// HTTP-verb axis, so `<verb>` stands in for it.
     ///
-    /// The `surface` query item is an originating terminal surface ID
-    /// (`0x` + 16 lowercase hex digits). When present and live, actions
+    /// The `surface` query item carries an originating terminal ID
+    /// (`0x` + 16 lowercase hex digits; internally the existing Surface ID).
+    /// When present and live, actions
     /// target its owning tab. The `response` item is an optional temporary
     /// file path used by CLI actions that need a synchronous result.
     ///
@@ -664,7 +665,7 @@ class AppDelegate: NSObject,
         }
         acknowledgeZashikiURL(
             components,
-            result: String(format: "0x%016llx", terminal.surfaceID)
+            result: String(format: "0x%016llx", terminal.terminalID)
         )
     }
 

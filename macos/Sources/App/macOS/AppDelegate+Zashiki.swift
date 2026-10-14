@@ -20,14 +20,14 @@ extension AppDelegate: Zashiki.Delegate {
     }
 
     /// Look up the terminal window controller that currently owns the
-    /// surface with the given Zashiki Surface ID. Returns nil if no window
+    /// terminal identified by the given ID. Returns nil if no window
     /// currently has a matching surface (e.g. it was closed after the ID
     /// was returned by the CLI).
     ///
     /// This is a different identifier from `zashikiSurface(id: UUID)`
     /// above (`Zashiki.SurfaceView.id`, a Swift-side UUID used for drag &
-    /// drop). This one round-trips through libghostty's `Surface.id`,
-    /// which is returned to CLI callers.
+    /// drop). The terminal ID reuses libghostty's `Surface.id` internally
+    /// and is returned to CLI callers.
     func terminalController(forZashikiSurfaceID id: UInt64) -> BaseTerminalController? {
         terminalTab(forZashikiSurfaceID: id)?.controller
     }
@@ -52,11 +52,11 @@ extension AppDelegate: Zashiki.Delegate {
 
     /// Resolve a caller's controlling terminal to the Surface and tab that
     /// own its PTY. The TTY name is queried at CLI invocation time, so a
-    /// long-lived process does not need to retain a Surface ID in its
+    /// long-lived process does not need to retain a terminal ID in its
     /// environment.
     func terminalTab(
         forTTYName ttyName: String
-    ) -> (controller: BaseTerminalController, tab: TerminalTab, surfaceID: UInt64)? {
+    ) -> (controller: BaseTerminalController, tab: TerminalTab, terminalID: UInt64)? {
         for window in NSApp.windows {
             guard let controller = window.windowController as? BaseTerminalController else {
                 continue
@@ -64,10 +64,10 @@ extension AppDelegate: Zashiki.Delegate {
 
             for tab in controller.tabs {
                 guard let surface = tab.surfaceTree.first(where: { $0.ttyName == ttyName }),
-                      let surfaceID = surface.zashikiSurfaceID else {
+                      let terminalID = surface.zashikiSurfaceID else {
                     continue
                 }
-                return (controller, tab, surfaceID)
+                return (controller, tab, terminalID)
             }
         }
 

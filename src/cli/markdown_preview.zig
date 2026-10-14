@@ -26,7 +26,7 @@ pub const Options = struct {
 ///
 /// The path is resolved to an absolute path and sent to the running Zashiki
 /// instance through its `zashiki://` URL handler. The command waits for the
-/// app to confirm that the preview pane opened. `--surface-id` can be used to
+/// app to confirm that the preview pane opened. `--terminal-id` can be used to
 /// target a specific terminal context; without it, the active window is used.
 pub fn run(alloc: Allocator) !u8 {
     if (comptime builtin.target.os.tag != .macos) {
@@ -46,7 +46,7 @@ pub fn run(alloc: Allocator) !u8 {
     const parsed = parseArgs(alloc) catch |err| switch (err) {
         Action.help_error => return err,
         else => {
-            try stderr.writeAll("Usage: zashiki +markdown-preview [--surface-id <id>] <file.md>\n");
+            try stderr.writeAll("Usage: zashiki +markdown-preview [--terminal-id <id>] <file.md>\n");
             return 1;
         },
     };
@@ -82,7 +82,7 @@ pub fn run(alloc: Allocator) !u8 {
     defer alloc.free(response_path);
     defer std.Io.Dir.deleteFileAbsolute(global.io(), response_path) catch {};
 
-    const url = try buildURL(alloc, absolute_path, parsed.surface_id, response_path);
+    const url = try buildURL(alloc, absolute_path, parsed.terminal_id, response_path);
     defer alloc.free(url);
 
     const response = zashiki_url.sendAndWaitForResponse(alloc, url, response_path) catch |err| {
@@ -112,7 +112,7 @@ pub fn run(alloc: Allocator) !u8 {
 
 const ParsedArgs = struct {
     path: []const u8,
-    surface_id: ?[]const u8,
+    terminal_id: ?[]const u8,
 };
 
 fn parseArgs(alloc: Allocator) !ParsedArgs {
@@ -123,7 +123,7 @@ fn parseArgs(alloc: Allocator) !ParsedArgs {
 
 fn parseArgsFrom(iter: anytype) !ParsedArgs {
     var path: ?[]const u8 = null;
-    var surface_id: ?[]const u8 = null;
+    var terminal_id: ?[]const u8 = null;
     var end_of_options = false;
     while (iter.next()) |arg| {
         if (!end_of_options and (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h"))) {
@@ -133,16 +133,16 @@ fn parseArgsFrom(iter: anytype) !ParsedArgs {
             end_of_options = true;
             continue;
         }
-        if (!end_of_options and std.mem.eql(u8, arg, "--surface-id")) {
-            if (surface_id != null) return error.MultipleSurfaceIDs;
-            surface_id = iter.next() orelse return error.MissingSurfaceID;
-            if (!isSurfaceID(surface_id.?)) return error.InvalidSurfaceID;
+        if (!end_of_options and std.mem.eql(u8, arg, "--terminal-id")) {
+            if (terminal_id != null) return error.MultipleTerminalIDs;
+            terminal_id = iter.next() orelse return error.MissingTerminalID;
+            if (!isTerminalID(terminal_id.?)) return error.InvalidTerminalID;
             continue;
         }
-        if (!end_of_options and std.mem.startsWith(u8, arg, "--surface-id=")) {
-            if (surface_id != null) return error.MultipleSurfaceIDs;
-            surface_id = arg["--surface-id=".len..];
-            if (!isSurfaceID(surface_id.?)) return error.InvalidSurfaceID;
+        if (!end_of_options and std.mem.startsWith(u8, arg, "--terminal-id=")) {
+            if (terminal_id != null) return error.MultipleTerminalIDs;
+            terminal_id = arg["--terminal-id=".len..];
+            if (!isTerminalID(terminal_id.?)) return error.InvalidTerminalID;
             continue;
         }
         if (!end_of_options and std.mem.startsWith(u8, arg, "-")) return error.InvalidArgument;
@@ -150,17 +150,17 @@ fn parseArgsFrom(iter: anytype) !ParsedArgs {
         path = arg;
     }
 
-    return .{ .path = path orelse return error.MissingPath, .surface_id = surface_id };
+    return .{ .path = path orelse return error.MissingPath, .terminal_id = terminal_id };
 }
 
-fn buildURL(alloc: Allocator, path: []const u8, surface_id: ?[]const u8, response_path: []const u8) ![]u8 {
+fn buildURL(alloc: Allocator, path: []const u8, terminal_id: ?[]const u8, response_path: []const u8) ![]u8 {
     var buffer: std.Io.Writer.Allocating = .init(alloc);
     defer buffer.deinit();
 
     try buffer.writer.writeAll("zashiki://markdown-preview/open?path=");
     try zashiki_url.appendQueryComponent(&buffer.writer, path);
-    if (surface_id) |surface| {
-        if (!isSurfaceID(surface)) return error.InvalidSurfaceID;
+    if (terminal_id) |surface| {
+        if (!isTerminalID(surface)) return error.InvalidTerminalID;
         try buffer.writer.writeAll("&surface=");
         try zashiki_url.appendQueryComponent(&buffer.writer, surface);
     }
@@ -169,7 +169,7 @@ fn buildURL(alloc: Allocator, path: []const u8, surface_id: ?[]const u8, respons
     return buffer.toOwnedSlice();
 }
 
-fn isSurfaceID(value: []const u8) bool {
+fn isTerminalID(value: []const u8) bool {
     if (value.len != 18 or !std.mem.startsWith(u8, value, "0x")) return false;
     for (value[2..]) |byte| {
         if (!std.ascii.isHex(byte)) return false;
@@ -192,17 +192,17 @@ test "build markdown preview URL" {
     );
 }
 
-test "parse markdown preview target and path" {
+test "parse markdown preview terminal ID and path" {
     const alloc = std.testing.allocator;
     var iter = try std.process.Args.IteratorGeneral(.{}).init(
         alloc,
-        "--surface-id 0x0123456789abcdef README.md",
+        "--terminal-id 0x0123456789abcdef README.md",
     );
     defer iter.deinit();
 
     const parsed = try parseArgsFrom(&iter);
     try std.testing.expectEqualStrings("README.md", parsed.path);
-    try std.testing.expectEqualStrings("0x0123456789abcdef", parsed.surface_id.?);
+    try std.testing.expectEqualStrings("0x0123456789abcdef", parsed.terminal_id.?);
 }
 
 test "parse markdown preview without target" {
@@ -212,22 +212,22 @@ test "parse markdown preview without target" {
 
     const parsed = try parseArgsFrom(&iter);
     try std.testing.expectEqualStrings("README.md", parsed.path);
-    try std.testing.expect(parsed.surface_id == null);
+    try std.testing.expect(parsed.terminal_id == null);
 }
 
 test "reject invalid markdown preview target" {
     const alloc = std.testing.allocator;
     var iter = try std.process.Args.IteratorGeneral(.{}).init(
         alloc,
-        "--surface-id invalid README.md",
+        "--terminal-id invalid README.md",
     );
     defer iter.deinit();
 
-    try std.testing.expectError(error.InvalidSurfaceID, parseArgsFrom(&iter));
+    try std.testing.expectError(error.InvalidTerminalID, parseArgsFrom(&iter));
 }
 
-test "invalid surface IDs are rejected" {
-    try std.testing.expectError(error.InvalidSurfaceID, buildURL(
+test "invalid terminal IDs are rejected" {
+    try std.testing.expectError(error.InvalidTerminalID, buildURL(
         std.testing.allocator,
         "/tmp/readme.md",
         "not-a-surface",

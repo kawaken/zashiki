@@ -16,14 +16,14 @@ pub const Options = struct {
     }
 };
 
-/// Query the running Zashiki instance for the Surface ID associated with the
+/// Query the running Zashiki instance for the terminal ID associated with the
 /// caller's controlling terminal.
 ///
 /// Usage:
 ///
 ///   zashiki +terminal-id
 ///
-/// The ID is written to stdout and can be passed to other Zashiki CLI actions.
+/// The terminal ID is written to stdout and can be passed to other Zashiki CLI actions.
 /// If the caller has no matching Zashiki terminal, the command exits nonzero.
 pub fn run(alloc: Allocator) !u8 {
     if (comptime builtin.target.os.tag != .macos) {
@@ -62,8 +62,8 @@ pub fn run(alloc: Allocator) !u8 {
         try writeError("no Zashiki terminal matches the caller's TTY", error.NoMatchingSurface);
         return 1;
     }
-    if (!isSurfaceID(response)) {
-        try writeError("Zashiki returned an invalid Surface ID", error.InvalidSurfaceID);
+    if (!isTerminalID(response)) {
+        try writeError("Zashiki returned an invalid terminal ID", error.InvalidTerminalID);
         return 1;
     }
 
@@ -111,7 +111,7 @@ fn buildURL(alloc: Allocator, tty_name: []const u8, response_path: []const u8) !
     return buffer.toOwnedSlice();
 }
 
-fn isSurfaceID(value: []const u8) bool {
+fn isTerminalID(value: []const u8) bool {
     if (value.len != 18 or !std.mem.startsWith(u8, value, "0x")) return false;
     for (value[2..]) |byte| {
         if (!std.ascii.isHex(byte)) return false;

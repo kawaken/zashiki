@@ -75,7 +75,7 @@ pub const Action = enum {
     // Open a Markdown file in the Zashiki preview pane.
     @"markdown-preview",
 
-    // Query the terminal Surface ID associated with the current TTY.
+    // Query the terminal ID associated with the current TTY.
     @"terminal-id",
 
     pub fn detectSpecialCase(arg: []const u8) ?SpecialCase(Action) {
