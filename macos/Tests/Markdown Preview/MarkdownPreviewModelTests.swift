@@ -13,17 +13,17 @@ struct MarkdownPreviewModelTests {
         return url
     }
 
-    @Test func markdownPreviewAcknowledgementOnlyUsesDedicatedTemporaryFiles() {
-        let validPath = "/tmp/zashiki-preview-response-abcdefghijklmnopqrstuv"
-        #expect(MarkdownPreviewOpenAcknowledgement.responseURL(for: validPath)?.path == validPath)
-        #expect(MarkdownPreviewOpenAcknowledgement.responseURL(
+    @Test func zashikiCLIResponseOnlyUsesDedicatedTemporaryFiles() {
+        let validPath = "/tmp/zashiki-cli-response-abcdefghijklmnopqrstuv"
+        #expect(ZashikiCLIResponse.responseURL(for: validPath)?.path == validPath)
+        #expect(ZashikiCLIResponse.responseURL(
             for: "/tmp/other-response-abcdefghijklmnopqrstuv"
         ) == nil)
-        #expect(MarkdownPreviewOpenAcknowledgement.responseURL(
-            for: "/tmp/zashiki-preview-response-../../outside"
+        #expect(ZashikiCLIResponse.responseURL(
+            for: "/tmp/zashiki-cli-response-../../outside"
         ) == nil)
-        #expect(MarkdownPreviewOpenAcknowledgement.responseURL(
-            for: "relative/zashiki-preview-response-abcdefghijklmnopqrstuv"
+        #expect(ZashikiCLIResponse.responseURL(
+            for: "relative/zashiki-cli-response-abcdefghijklmnopqrstuv"
         ) == nil)
     }
 

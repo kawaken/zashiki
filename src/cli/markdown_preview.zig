@@ -3,9 +3,8 @@ const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 const Action = @import("ghostty.zig").Action;
 const args = @import("args.zig");
-const compat_file = @import("../lib/compat/file.zig");
 const global = @import("../global.zig");
-const os_file = @import("../os/file.zig");
+const zashiki_url = @import("zashiki_url.zig");
 
 pub const Options = struct {
     pub fn deinit(self: Options) void {
@@ -27,9 +26,8 @@ pub const Options = struct {
 ///
 /// The path is resolved to an absolute path and sent to the running Zashiki
 /// instance through its `zashiki://` URL handler. The command waits for the
-/// app to confirm that the preview pane opened. When the command runs from a
-/// Zashiki shell, `ZASHIKI_SURFACE_ID` is also forwarded so the preview can
-/// be associated with the originating terminal window.
+/// app to confirm that the preview pane opened. `--terminal-id` can be used to
+/// target a specific terminal context; without it, the active window is used.
 pub fn run(alloc: Allocator) !u8 {
     if (comptime builtin.target.os.tag != .macos) {
         var stderr_buffer: [1024]u8 = undefined;
@@ -45,13 +43,14 @@ pub fn run(alloc: Allocator) !u8 {
     var stderr_writer = std.Io.File.stderr().writer(global.io(), &stderr_buffer);
     const stderr = &stderr_writer.interface;
 
-    const path = parsePath(alloc) catch |err| switch (err) {
+    const parsed = parseArgs(alloc) catch |err| switch (err) {
         Action.help_error => return err,
         else => {
-            try stderr.writeAll("Usage: zashiki +markdown-preview <file.md>\n");
+            try stderr.writeAll("Usage: zashiki +markdown-preview [--terminal-id <id>] <file.md>\n");
             return 1;
         },
     };
+    const path = parsed.path;
 
     var absolute_path_buf: [std.fs.max_path_bytes]u8 = undefined;
     const absolute_path_len = std.Io.Dir.cwd().realPathFile(
@@ -79,60 +78,16 @@ pub fn run(alloc: Allocator) !u8 {
         return 1;
     }
 
-    const surface_id = if (try global.environ().containsUnempty(alloc, "ZASHIKI_SURFACE_ID"))
-        try global.environ().getAlloc(alloc, "ZASHIKI_SURFACE_ID")
-    else
-        null;
-    defer if (surface_id) |value| alloc.free(value);
-
-    var response_name_buf: [os_file.random_basename_len]u8 = undefined;
-    const response_name = os_file.randomBasename(&response_name_buf) catch unreachable;
-    const response_path = try std.fmt.allocPrint(
-        alloc,
-        "/tmp/zashiki-preview-response-{s}",
-        .{response_name},
-    );
+    const response_path = try zashiki_url.newResponsePath(alloc);
     defer alloc.free(response_path);
     defer std.Io.Dir.deleteFileAbsolute(global.io(), response_path) catch {};
 
-    const url = try buildURL(alloc, absolute_path, surface_id, response_path);
+    const url = try buildURL(alloc, absolute_path, parsed.terminal_id, response_path);
     defer alloc.free(url);
 
-    const app_path = try applicationPath(alloc);
-    defer if (app_path) |value| alloc.free(value);
-
-    var app_argv: [4][]const u8 = undefined;
-    var default_argv: [2][]const u8 = undefined;
-    const argv: []const []const u8 = if (app_path) |app| blk: {
-        app_argv = .{ "/usr/bin/open", "-a", app, url };
-        break :blk &app_argv;
-    } else blk: {
-        default_argv = .{ "/usr/bin/open", url };
-        break :blk &default_argv;
-    };
-
-    var child = std.process.spawn(global.io(), .{
-        .argv = argv,
-        .stdout = .ignore,
-        .stderr = .inherit,
-    }) catch |err| {
-        try stderr.print("zashiki +markdown-preview: failed to run open: {}\n", .{err});
-        return 1;
-    };
-
-    const term = child.wait(global.io()) catch |err| {
-        try stderr.print("zashiki +markdown-preview: failed waiting for open: {}\n", .{err});
-        return 1;
-    };
-
-    switch (term) {
-        .exited => |code| if (code != 0) return code,
-        .signal, .stopped, .unknown => return 1,
-    }
-
-    const response = waitForResponse(alloc, response_path) catch |err| {
+    const response = zashiki_url.sendAndWaitForResponse(alloc, url, response_path) catch |err| {
         try stderr.print(
-            "zashiki +markdown-preview: Zashiki did not confirm opening the preview: {}\n",
+            "zashiki +markdown-preview: failed to get a response from Zashiki: {}\n",
             .{err},
         );
         return 1;
@@ -155,26 +110,20 @@ pub fn run(alloc: Allocator) !u8 {
     return 1;
 }
 
-fn waitForResponse(alloc: Allocator, path: []const u8) ![]u8 {
-    for (0..200) |_| {
-        const file = std.Io.Dir.openFileAbsolute(global.io(), path, .{ .mode = .read_only }) catch |err| switch (err) {
-            error.FileNotFound => {
-                try std.Io.sleep(global.io(), .fromMilliseconds(50), .awake);
-                continue;
-            },
-            else => return err,
-        };
-        defer file.close(global.io());
-        return try compat_file.readToEndAlloc(file, alloc, 1024);
-    }
-    return error.ResponseTimeout;
-}
+const ParsedArgs = struct {
+    path: []const u8,
+    terminal_id: ?[]const u8,
+};
 
-fn parsePath(alloc: Allocator) ![]const u8 {
+fn parseArgs(alloc: Allocator) !ParsedArgs {
     var iter = try args.argsIterator(alloc, global.args());
     defer iter.deinit();
+    return try parseArgsFrom(&iter);
+}
 
+fn parseArgsFrom(iter: anytype) !ParsedArgs {
     var path: ?[]const u8 = null;
+    var terminal_id: ?[]const u8 = null;
     var end_of_options = false;
     while (iter.next()) |arg| {
         if (!end_of_options and (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h"))) {
@@ -184,52 +133,43 @@ fn parsePath(alloc: Allocator) ![]const u8 {
             end_of_options = true;
             continue;
         }
+        if (!end_of_options and std.mem.eql(u8, arg, "--terminal-id")) {
+            if (terminal_id != null) return error.MultipleTerminalIDs;
+            terminal_id = iter.next() orelse return error.MissingTerminalID;
+            if (!isTerminalID(terminal_id.?)) return error.InvalidTerminalID;
+            continue;
+        }
+        if (!end_of_options and std.mem.startsWith(u8, arg, "--terminal-id=")) {
+            if (terminal_id != null) return error.MultipleTerminalIDs;
+            terminal_id = arg["--terminal-id=".len..];
+            if (!isTerminalID(terminal_id.?)) return error.InvalidTerminalID;
+            continue;
+        }
         if (!end_of_options and std.mem.startsWith(u8, arg, "-")) return error.InvalidArgument;
         if (path != null) return error.MultiplePaths;
         path = arg;
     }
 
-    return path orelse error.MissingPath;
+    return .{ .path = path orelse return error.MissingPath, .terminal_id = terminal_id };
 }
 
-fn buildURL(alloc: Allocator, path: []const u8, surface_id: ?[]const u8, response_path: []const u8) ![]u8 {
+fn buildURL(alloc: Allocator, path: []const u8, terminal_id: ?[]const u8, response_path: []const u8) ![]u8 {
     var buffer: std.Io.Writer.Allocating = .init(alloc);
     defer buffer.deinit();
 
     try buffer.writer.writeAll("zashiki://markdown-preview/open?path=");
-    try appendQueryComponent(&buffer.writer, path);
-    if (surface_id) |surface| {
-        if (isSurfaceID(surface)) {
-            try buffer.writer.writeAll("&surface=");
-            try appendQueryComponent(&buffer.writer, surface);
-        }
+    try zashiki_url.appendQueryComponent(&buffer.writer, path);
+    if (terminal_id) |terminal| {
+        if (!isTerminalID(terminal)) return error.InvalidTerminalID;
+        try buffer.writer.writeAll("&terminal-id=");
+        try zashiki_url.appendQueryComponent(&buffer.writer, terminal);
     }
     try buffer.writer.writeAll("&response=");
-    try appendQueryComponent(&buffer.writer, response_path);
+    try zashiki_url.appendQueryComponent(&buffer.writer, response_path);
     return buffer.toOwnedSlice();
 }
 
-fn appendQueryComponent(writer: *std.Io.Writer, value: []const u8) !void {
-    const hex = "0123456789ABCDEF";
-    for (value) |byte| {
-        if (isUnreserved(byte)) {
-            try writer.writeByte(byte);
-        } else {
-            try writer.writeByte('%');
-            try writer.writeByte(hex[byte >> 4]);
-            try writer.writeByte(hex[byte & 0x0f]);
-        }
-    }
-}
-
-fn isUnreserved(byte: u8) bool {
-    return switch (byte) {
-        'a'...'z', 'A'...'Z', '0'...'9', '-', '.', '_', '~' => true,
-        else => false,
-    };
-}
-
-fn isSurfaceID(value: []const u8) bool {
+fn isTerminalID(value: []const u8) bool {
     if (value.len != 18 or !std.mem.startsWith(u8, value, "0x")) return false;
     for (value[2..]) |byte| {
         if (!std.ascii.isHex(byte)) return false;
@@ -237,46 +177,60 @@ fn isSurfaceID(value: []const u8) bool {
     return true;
 }
 
-fn applicationPath(alloc: Allocator) !?[]u8 {
-    if (try global.environ().containsUnempty(alloc, "ZASHIKI_APP")) {
-        return try global.environ().getAlloc(alloc, "ZASHIKI_APP");
-    }
-
-    var executable_buf: [std.fs.max_path_bytes]u8 = undefined;
-    const executable = executable_buf[0..try std.process.executablePath(global.io(), &executable_buf)];
-    const executable_dir = std.fs.path.dirname(executable) orelse return null;
-    const contents_dir = std.fs.path.dirname(executable_dir) orelse return null;
-    const app_path = std.fs.path.dirname(contents_dir) orelse return null;
-    if (!std.mem.endsWith(u8, app_path, ".app")) return null;
-    return try alloc.dupe(u8, app_path);
-}
-
 test "build markdown preview URL" {
     const url = try buildURL(
         std.testing.allocator,
         "/tmp/日本語 notes.md?draft=true#section",
         "0x0123456789abcdef",
-        "/tmp/zashiki-preview-response-abcdefghijklmnopqrstuv",
+        "/tmp/zashiki-cli-response-abcdefghijklmnopqrstuv",
     );
     defer std.testing.allocator.free(url);
 
     try std.testing.expectEqualStrings(
-        "zashiki://markdown-preview/open?path=%2Ftmp%2F%E6%97%A5%E6%9C%AC%E8%AA%9E%20notes.md%3Fdraft%3Dtrue%23section&surface=0x0123456789abcdef&response=%2Ftmp%2Fzashiki-preview-response-abcdefghijklmnopqrstuv",
+        "zashiki://markdown-preview/open?path=%2Ftmp%2F%E6%97%A5%E6%9C%AC%E8%AA%9E%20notes.md%3Fdraft%3Dtrue%23section&terminal-id=0x0123456789abcdef&response=%2Ftmp%2Fzashiki-cli-response-abcdefghijklmnopqrstuv",
         url,
     );
 }
 
-test "invalid surface IDs are omitted" {
-    const url = try buildURL(
+test "parse markdown preview terminal ID and path" {
+    const alloc = std.testing.allocator;
+    var iter = try std.process.Args.IteratorGeneral(.{}).init(
+        alloc,
+        "--terminal-id 0x0123456789abcdef README.md",
+    );
+    defer iter.deinit();
+
+    const parsed = try parseArgsFrom(&iter);
+    try std.testing.expectEqualStrings("README.md", parsed.path);
+    try std.testing.expectEqualStrings("0x0123456789abcdef", parsed.terminal_id.?);
+}
+
+test "parse markdown preview without target" {
+    const alloc = std.testing.allocator;
+    var iter = try std.process.Args.IteratorGeneral(.{}).init(alloc, "README.md");
+    defer iter.deinit();
+
+    const parsed = try parseArgsFrom(&iter);
+    try std.testing.expectEqualStrings("README.md", parsed.path);
+    try std.testing.expect(parsed.terminal_id == null);
+}
+
+test "reject invalid markdown preview target" {
+    const alloc = std.testing.allocator;
+    var iter = try std.process.Args.IteratorGeneral(.{}).init(
+        alloc,
+        "--terminal-id invalid README.md",
+    );
+    defer iter.deinit();
+
+    try std.testing.expectError(error.InvalidTerminalID, parseArgsFrom(&iter));
+}
+
+test "invalid terminal IDs are rejected" {
+    try std.testing.expectError(error.InvalidTerminalID, buildURL(
         std.testing.allocator,
         "/tmp/readme.md",
-        "not-a-surface",
-        "/tmp/zashiki-preview-response-abcdefghijklmnopqrstuv",
-    );
-    defer std.testing.allocator.free(url);
-
-    try std.testing.expectEqualStrings(
-        "zashiki://markdown-preview/open?path=%2Ftmp%2Freadme.md&response=%2Ftmp%2Fzashiki-preview-response-abcdefghijklmnopqrstuv",
-        url,
-    );
+        "not-a-terminal",
+        "/tmp/zashiki-cli-response-abcdefghijklmnopqrstuv",
+    ));
 }

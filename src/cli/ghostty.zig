@@ -20,6 +20,7 @@ const validate_config = @import("validate_config.zig");
 const crash_report = @import("crash_report.zig");
 const show_face = @import("show_face.zig");
 const markdown_preview = @import("markdown_preview.zig");
+const terminal_id = @import("terminal_id.zig");
 const global = @import("../global.zig");
 
 /// Special commands that can be invoked via CLI flags. These are all
@@ -73,6 +74,9 @@ pub const Action = enum {
 
     // Open a Markdown file in the Zashiki preview pane.
     @"markdown-preview",
+
+    // Query the terminal ID associated with the current TTY.
+    @"terminal-id",
 
     pub fn detectSpecialCase(arg: []const u8) ?SpecialCase(Action) {
         // If we see a "-e" and we haven't seen a command yet, then
@@ -156,6 +160,7 @@ pub const Action = enum {
             .@"crash-report" => try crash_report.run(alloc),
             .@"show-face" => try show_face.run(alloc),
             .@"markdown-preview" => try markdown_preview.run(alloc),
+            .@"terminal-id" => try terminal_id.run(alloc),
         };
     }
 
@@ -196,6 +201,7 @@ pub const Action = enum {
                 .@"crash-report" => crash_report.Options,
                 .@"show-face" => show_face.Options,
                 .@"markdown-preview" => markdown_preview.Options,
+                .@"terminal-id" => terminal_id.Options,
             };
         }
     }
@@ -295,6 +301,16 @@ test "parse action markdown preview" {
     defer iter.deinit();
     const action = try actionpkg.detectIter(Action, &iter);
     try testing.expect(action.? == .@"markdown-preview");
+}
+
+test "parse action terminal id" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+
+    var iter = try std.process.Args.IteratorGeneral(.{}).init(alloc, "+terminal-id");
+    defer iter.deinit();
+    const action = try actionpkg.detectIter(Action, &iter);
+    try testing.expect(action.? == .@"terminal-id");
 }
 
 test "parse action plus ignores -e" {

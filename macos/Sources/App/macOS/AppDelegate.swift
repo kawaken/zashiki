@@ -534,19 +534,14 @@ class AppDelegate: NSObject,
     /// it (e.g. `open`). This is RPC-over-URL, not REST -- there's no
     /// HTTP-verb axis, so `<verb>` stands in for it.
     ///
-    /// One query item is reserved across every action: `surface`, the
-    /// originating terminal surface's ID (`0x` + 16 lowercase hex
-    /// digits, same value as the `ZASHIKI_SURFACE_ID` environment
-    /// variable set in that surface's child processes). It's optional;
-    /// when present and still live, the action targets that surface's
-    /// window instead of guessing. It's resolved once here, before host
-    /// dispatch, so every action gets a consistently-resolved (possibly
-    /// nil) source controller instead of re-parsing it individually.
+    /// The `terminal-id` query item carries an originating terminal ID
+    /// (`0x` + 16 lowercase hex digits). When present and live, actions target
+    /// its owning tab. The `response` item is an optional temporary
+    /// file path used by CLI actions that need a synchronous result.
     ///
-    /// Recognized: `zashiki://markdown-preview/open?path=<percent-encoded
-    /// absolute path>&surface=<0x...>&response=<temporary response path>`.
-    /// `surface` and `response` are optional for callers that do not need
-    /// window targeting or an open result.
+    /// Recognized: `zashiki://terminal/id?tty=<PTY path>&response=<path>`
+    /// and `zashiki://markdown-preview/open?path=<absolute path>
+    /// [&terminal-id=<0x...>][&response=<path>]`.
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
             handleZashikiURL(url)
@@ -560,54 +555,61 @@ class AppDelegate: NSObject,
             return
         }
 
-        let source = resolveSource(components)
+        let terminalTarget = resolveTerminalTarget(components)
 
         switch components.host {
+        case "terminal":
+            handleTerminalIDURL(components)
+
         case "markdown-preview":
-            handleMarkdownPreviewURL(components, source: source)
+            handleMarkdownPreviewURL(components, terminalTarget: terminalTarget)
 
         default:
             Self.logger.warning("zashiki URL: unknown host \(components.host ?? "(nil)", privacy: .public)")
         }
     }
 
-    /// Parses the `surface` query item (if present) and resolves it to
-    /// the terminal window controller and tab that currently own that
-    /// surface. Returns nil if `surface` is absent, malformed, or no longer
-    /// resolves to a live surface (e.g. the window was closed) --
-    /// callers should fall back to their own default target in that
-    /// case.
-    private func resolveSource(
+    /// Parses the `terminal-id` query item (if present) and resolves it to
+    /// the terminal window controller and tab that own that terminal.
+    /// Returns nil if the item is absent, malformed, or no longer resolves;
+    /// callers reject a malformed or stale explicit ID.
+    private func resolveTerminalTarget(
         _ components: URLComponents
     ) -> (controller: BaseTerminalController, tab: TerminalTab)? {
-        guard let raw = components.queryItems?.first(where: { $0.name == "surface" })?.value else {
+        guard let rawTerminalID = components.queryItems?.first(where: { $0.name == "terminal-id" })?.value else {
             return nil
         }
-        guard raw.hasPrefix("0x"),
-              let id = UInt64(raw.dropFirst(2), radix: 16) else {
-            Self.logger.warning("zashiki URL: malformed 'surface' query item \(raw, privacy: .public)")
+        guard rawTerminalID.hasPrefix("0x"),
+              let terminalID = UInt64(rawTerminalID.dropFirst(2), radix: 16) else {
+            Self.logger.warning("zashiki URL: malformed 'terminal-id' query item \(rawTerminalID, privacy: .public)")
             return nil
         }
-        guard let source = terminalTab(forZashikiSurfaceID: id) else {
-            Self.logger.warning("zashiki URL: no live surface for id \(raw, privacy: .public)")
+        guard let terminalTarget = terminalTab(forTerminalID: terminalID) else {
+            Self.logger.warning("zashiki URL: no live terminal for ID \(rawTerminalID, privacy: .public)")
             return nil
         }
-        return source
+        return terminalTarget
     }
 
     private func handleMarkdownPreviewURL(
         _ components: URLComponents,
-        source: (controller: BaseTerminalController, tab: TerminalTab)?
+        terminalTarget: (controller: BaseTerminalController, tab: TerminalTab)?
     ) {
         guard components.path == "/open" else {
             Self.logger.warning("zashiki URL: unknown markdown-preview path \(components.path, privacy: .public)")
-            acknowledgeMarkdownPreviewURL(components, result: "error:unknown-action")
+            acknowledgeZashikiURL(components, result: "error:unknown-action")
             return
         }
         guard let path = components.queryItems?.first(where: { $0.name == "path" })?.value,
               path.hasPrefix("/") else {
             Self.logger.warning("zashiki URL: markdown-preview/open requires an absolute 'path' query item")
-            acknowledgeMarkdownPreviewURL(components, result: "error:invalid-path")
+            acknowledgeZashikiURL(components, result: "error:invalid-path")
+            return
+        }
+
+        let hasTerminalID = components.queryItems?.contains(where: { $0.name == "terminal-id" }) ?? false
+        guard !hasTerminalID || terminalTarget != nil else {
+            acknowledgeZashikiURL(components, result: "error:terminal-not-found")
             return
         }
 
@@ -615,19 +617,19 @@ class AppDelegate: NSObject,
         guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
               !isDirectory.boolValue else {
             Self.logger.warning("zashiki URL: markdown-preview file not found: \(path, privacy: .public)")
-            acknowledgeMarkdownPreviewURL(components, result: "error:file-not-found")
+            acknowledgeZashikiURL(components, result: "error:file-not-found")
             return
         }
 
-        // Prefer the tab of the surface that made the request, even if it
+        // Prefer the tab identified by the terminal ID, even if it
         // isn't the selected tab: the preview's content is per tab. Mirrors
         // application(_:openFile:) below: if there's no window to
-        // attach to (no resolved source, no preferred parent, e.g. all
+        // attach to (no resolved terminal target, no preferred parent, e.g. all
         // windows were closed or we're still early in launch), open a
         // new one rather than silently dropping the request.
         let preview: MarkdownPreviewModel
-        if let source {
-            preview = source.tab.markdownPreview
+        if let terminalTarget {
+            preview = terminalTarget.tab.markdownPreview
         } else {
             let controller: BaseTerminalController = TerminalController.preferredParent
                 ?? TerminalController.newWindow(ghostty)
@@ -637,22 +639,43 @@ class AppDelegate: NSObject,
         preview.open(url: previewURL)
         guard preview.isVisible,
               preview.fileURL?.standardizedFileURL == previewURL else {
-            acknowledgeMarkdownPreviewURL(components, result: "error:preview-not-opened")
+            acknowledgeZashikiURL(components, result: "error:preview-not-opened")
             return
         }
-        acknowledgeMarkdownPreviewURL(components, result: "opened")
+        acknowledgeZashikiURL(components, result: "opened")
     }
 
-    private func acknowledgeMarkdownPreviewURL(_ components: URLComponents, result: String) {
+    private func handleTerminalIDURL(_ components: URLComponents) {
+        guard components.path == "/id" else {
+            acknowledgeZashikiURL(components, result: "error:unknown-action")
+            return
+        }
+        guard let ttyName = components.queryItems?.first(where: { $0.name == "tty" })?.value,
+              ttyName.hasPrefix("/dev/") else {
+            acknowledgeZashikiURL(components, result: "error:invalid-tty")
+            return
+        }
+
+        guard let terminal = terminalTab(forTTYName: ttyName) else {
+            acknowledgeZashikiURL(components, result: "none")
+            return
+        }
+        acknowledgeZashikiURL(
+            components,
+            result: String(format: "0x%016llx", terminal.terminalID)
+        )
+    }
+
+    private func acknowledgeZashikiURL(_ components: URLComponents, result: String) {
         guard let responsePath = components.queryItems?
-            .first(where: { $0.name == MarkdownPreviewOpenAcknowledgement.queryItemName })?.value else {
+            .first(where: { $0.name == ZashikiCLIResponse.queryItemName })?.value else {
             return
         }
 
         do {
-            try MarkdownPreviewOpenAcknowledgement.write(result, to: responsePath)
+            try ZashikiCLIResponse.write(result, to: responsePath)
         } catch {
-            Self.logger.warning("zashiki URL: failed to write Markdown preview response: \(error.localizedDescription, privacy: .public)")
+            Self.logger.warning("zashiki URL: failed to write CLI response: \(error.localizedDescription, privacy: .public)")
         }
     }
 
