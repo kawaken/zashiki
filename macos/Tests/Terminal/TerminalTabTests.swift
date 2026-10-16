@@ -17,6 +17,42 @@ struct TerminalTabTests {
         return Controller(app, withSurfaceTree: .init())
     }
 
+    @Test(arguments: [1, 2])
+    func pressingBackgroundTabSelectsBeforeReleaseOrRename(clickCount: Int) throws {
+        let controller = try controller()
+        let tabs = [TerminalTab(), TerminalTab()]
+        controller.replaceTabs(tabs, selected: tabs[0])
+        let view = TerminalTabItemView()
+        var selectionCount = 0
+        view.item = TerminalTabItem(
+            tab: tabs[1], isSelected: false, shortcut: nil, showsBellInTitle: false,
+            canCloseOthers: true, canCloseRight: false,
+            onSelect: {
+                selectionCount += 1
+                controller.selectTab(tabs[1])
+            }, onClose: {}, onAction: { action in
+                #expect(controller.selectedTab === tabs[1])
+                controller.tabBarDidPerform(action, on: tabs[1])
+            }, onMove: { _, _ in })
+        let event = try #require(NSEvent.mouseEvent(
+            with: .leftMouseDown, location: NSPoint(x: 40, y: 18), modifierFlags: [],
+            timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0,
+            clickCount: clickCount, pressure: 1))
+
+        view.mouseDown(with: event)
+        // A drag can consume mouse-up, so selection must already be complete.
+        #expect(controller.selectedTab === tabs[1])
+        #expect(selectionCount == 1)
+        #expect(tabs[1].isEditingTitle == (clickCount == 2))
+
+        let release = try #require(NSEvent.mouseEvent(
+            with: .leftMouseUp, location: event.locationInWindow, modifierFlags: [],
+            timestamp: 1, windowNumber: 0, context: nil, eventNumber: 1,
+            clickCount: clickCount, pressure: 0))
+        view.mouseUp(with: release)
+        #expect(selectionCount == 1)
+    }
+
     @Test func titlebarTabHitTestingDoesNotAdvertiseWindowDragging() throws {
         let tab = TerminalTab()
         let container = TerminalViewContainer {
