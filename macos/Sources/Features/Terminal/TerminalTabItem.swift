@@ -160,13 +160,12 @@ final class TerminalTabItemView: NSView, NSTextFieldDelegate, NSDraggingSource {
 
     override func mouseDown(with event: NSEvent) {
         mouseDownEvent = event
+        item?.onSelect()
         if event.clickCount == 2 { item?.onAction(.rename) }
     }
 
     override func mouseUp(with event: NSEvent) {
-        guard mouseDownEvent != nil else { return }
         mouseDownEvent = nil
-        item?.onSelect()
     }
 
     override func mouseDragged(with event: NSEvent) {
