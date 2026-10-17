@@ -83,11 +83,7 @@ struct MarkdownPreviewPane: View {
                 fontSizeControls
             }
 
-            Text(model.fileURL?.lastPathComponent ?? "Markdown Preview")
-                .font(.headline)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .help(model.fileURL?.path ?? "")
+            fileMenu
 
             Spacer()
 
@@ -112,6 +108,53 @@ struct MarkdownPreviewPane: View {
     }
 
     @State private var isFontSizePresented = false
+
+    private var fileMenu: some View {
+        Menu {
+            Button("Copy Markdown") {
+                copyToPasteboard(model.markdownForCopy)
+            }
+            .disabled(model.markdownForCopy == nil)
+
+            Divider()
+
+            Button("Copy Absolute Path") {
+                copyToPasteboard(model.fileURL?.path)
+            }
+
+            Button("Copy Relative Path") {
+                copyToPasteboard(model.relativePath)
+            }
+            .disabled(model.relativePath == nil)
+            .help(model.baseDirectoryURL.map {
+                "Relative to the working directory when opened: \($0.path)"
+            } ?? "The working directory when opened is unavailable")
+        } label: {
+            HStack(spacing: 4) {
+                Text(model.fileURL?.lastPathComponent ?? "Markdown Preview")
+                    .font(.headline)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Image(systemName: "chevron.down")
+                    .font(.caption)
+            }
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .foregroundStyle(.primary)
+        .fixedSize(horizontal: false, vertical: true)
+        .disabled(model.fileURL == nil)
+        .help(model.fileURL?.path ?? "")
+        .accessibilityLabel("Markdown File Actions")
+        .accessibilityValue(model.fileURL?.lastPathComponent ?? "No file open")
+    }
+
+    private func copyToPasteboard(_ string: String?) {
+        guard let string else { return }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(string, forType: .string)
+    }
 
     private var fontSizeControls: some View {
         let fontSizeRange = Double(MarkdownPreviewFontSizePolicy.minimumSize)...Double(

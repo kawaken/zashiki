@@ -142,6 +142,19 @@ enum MarkdownPreviewDocument {
 struct MarkdownPreviewHistoryEntry: Identifiable, Equatable {
     let id: Int
     let url: URL
+    let baseDirectoryURL: URL?
+
+    /// The directory captured by the CLI belongs to this open, not to a tab's
+    /// current focus or to all history entries for the same file.
+    var relativePath: String? {
+        guard let baseDirectoryURL, baseDirectoryURL.isFileURL, url.isFileURL else { return nil }
+        let base = baseDirectoryURL.standardizedFileURL.pathComponents
+        let file = url.standardizedFileURL.pathComponents
+        let sharedCount = zip(base, file).prefix { $0 == $1 }.count
+        let components = Array(repeating: "..", count: base.count - sharedCount)
+            + Array(file.dropFirst(sharedCount))
+        return components.isEmpty ? "." : components.joined(separator: "/")
+    }
 }
 
 enum MarkdownPreviewFontSizePolicy {
@@ -224,9 +237,25 @@ class MarkdownPreviewModel: ObservableObject {
     /// `goForward()` move within this list without altering it;
     /// `open(url:)` truncates any forward entries and appends the new one,
     /// like a browser's history after following a fresh link.
-    private var history: [URL] = []
+    private var history: [MarkdownPreviewHistoryEntry] = []
     private var historyIndex: Int = -1
     private var scrollPositions: [MarkdownPreviewScrollPosition] = []
+
+    var baseDirectoryURL: URL? {
+        guard history.indices.contains(historyIndex) else { return nil }
+        return history[historyIndex].baseDirectoryURL
+    }
+
+    var relativePath: String? {
+        guard history.indices.contains(historyIndex) else { return nil }
+        return history[historyIndex].relativePath
+    }
+
+    /// Empty files are valid; a missing or unreadable document is not.
+    var markdownForCopy: String? {
+        guard fileURL != nil, errorMessage == nil else { return nil }
+        return content
+    }
 
     var scrollPosition: MarkdownPreviewScrollPosition? {
         scrollPositions.indices.contains(historyIndex) ? scrollPositions[historyIndex] : nil
@@ -238,16 +267,19 @@ class MarkdownPreviewModel: ObservableObject {
     /// contents, shows the pane, and starts watching `url` for changes.
     /// Replaces any previously-watched file. Any forward history is
     /// discarded, matching browser back/forward semantics.
-    func open(url: URL) {
+    func open(url: URL, baseDirectoryURL: URL? = nil) {
         if historyIndex + 1 < history.count {
             history.removeSubrange((historyIndex + 1)...)
             scrollPositions.removeSubrange((historyIndex + 1)...)
         }
-        history.append(url)
+        let entry = MarkdownPreviewHistoryEntry(
+            id: history.count, url: url, baseDirectoryURL: baseDirectoryURL?.standardizedFileURL
+        )
+        history.append(entry)
         scrollPositions.append(MarkdownPreviewScrollPosition())
         historyIndex = history.count - 1
         updateNavigationState()
-        show(url: url)
+        show(url: entry.url)
     }
 
     /// Moves to the previous entry in history, if any.
@@ -255,7 +287,7 @@ class MarkdownPreviewModel: ObservableObject {
         guard canGoBack else { return }
         historyIndex -= 1
         updateNavigationState()
-        show(url: history[historyIndex])
+        show(url: history[historyIndex].url)
     }
 
     /// Moves to the next entry in history, if any.
@@ -263,7 +295,7 @@ class MarkdownPreviewModel: ObservableObject {
         guard canGoForward else { return }
         historyIndex += 1
         updateNavigationState()
-        show(url: history[historyIndex])
+        show(url: history[historyIndex].url)
     }
 
     /// Moves directly to an existing history entry without adding a new one.
@@ -271,7 +303,7 @@ class MarkdownPreviewModel: ObservableObject {
         guard history.indices.contains(index), index != historyIndex else { return }
         historyIndex = index
         updateNavigationState()
-        show(url: history[index])
+        show(url: history[index].url)
     }
 
     private func show(url: URL) {
@@ -283,9 +315,7 @@ class MarkdownPreviewModel: ObservableObject {
     }
 
     private func updateNavigationState() {
-        historyEntries = history.enumerated().map { index, url in
-            MarkdownPreviewHistoryEntry(id: index, url: url)
-        }
+        historyEntries = history
         currentHistoryIndex = history.indices.contains(historyIndex) ? historyIndex : nil
         canGoBack = historyIndex > 0
         canGoForward = historyIndex < history.count - 1

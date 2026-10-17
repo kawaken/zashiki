@@ -28,6 +28,7 @@ pub const Options = struct {
 /// instance through its `zashiki://` URL handler. The command waits for the
 /// app to confirm that the preview pane opened. `--terminal-id` can be used to
 /// target a specific terminal context; without it, the active window is used.
+/// The invocation's working directory is sent as the relative-copy base.
 pub fn run(alloc: Allocator) !u8 {
     if (comptime builtin.target.os.tag != .macos) {
         var stderr_buffer: [1024]u8 = undefined;
@@ -63,6 +64,13 @@ pub fn run(alloc: Allocator) !u8 {
     };
     const absolute_path = absolute_path_buf[0..absolute_path_len];
 
+    // Capture the CLI's directory, including when invoked inside tmux. The
+    // containing terminal may report an unrelated directory. If cwd is no
+    // longer available, opening an absolute file path can still succeed.
+    var base_directory_buf: [std.fs.max_path_bytes]u8 = undefined;
+    const base_directory_len: ?usize = std.Io.Dir.cwd().realPathFile(global.io(), ".", &base_directory_buf) catch null;
+    const base_directory = if (base_directory_len) |len| base_directory_buf[0..len] else null;
+
     var file = std.Io.Dir.openFileAbsolute(global.io(), absolute_path, .{}) catch |err| {
         try stderr.print("zashiki +markdown-preview: cannot open '{s}': {}\n", .{ absolute_path, err });
         return 1;
@@ -82,7 +90,7 @@ pub fn run(alloc: Allocator) !u8 {
     defer alloc.free(response_path);
     defer std.Io.Dir.deleteFileAbsolute(global.io(), response_path) catch {};
 
-    const url = try buildURL(alloc, absolute_path, parsed.terminal_id, response_path);
+    const url = try buildURL(alloc, absolute_path, base_directory, parsed.terminal_id, response_path);
     defer alloc.free(url);
 
     const response = zashiki_url.sendAndWaitForResponse(alloc, url, response_path) catch |err| {
@@ -153,12 +161,22 @@ fn parseArgsFrom(iter: anytype) !ParsedArgs {
     return .{ .path = path orelse return error.MissingPath, .terminal_id = terminal_id };
 }
 
-fn buildURL(alloc: Allocator, path: []const u8, terminal_id: ?[]const u8, response_path: []const u8) ![]u8 {
+fn buildURL(
+    alloc: Allocator,
+    path: []const u8,
+    base_directory: ?[]const u8,
+    terminal_id: ?[]const u8,
+    response_path: []const u8,
+) ![]u8 {
     var buffer: std.Io.Writer.Allocating = .init(alloc);
     defer buffer.deinit();
 
     try buffer.writer.writeAll("zashiki://markdown-preview/open?path=");
     try zashiki_url.appendQueryComponent(&buffer.writer, path);
+    if (base_directory) |directory| {
+        try buffer.writer.writeAll("&base-directory=");
+        try zashiki_url.appendQueryComponent(&buffer.writer, directory);
+    }
     if (terminal_id) |terminal| {
         if (!isTerminalID(terminal)) return error.InvalidTerminalID;
         try buffer.writer.writeAll("&terminal-id=");
@@ -181,13 +199,30 @@ test "build markdown preview URL" {
     const url = try buildURL(
         std.testing.allocator,
         "/tmp/日本語 notes.md?draft=true#section",
+        "/tmp/作業 notes?#",
         "0x0123456789abcdef",
         "/tmp/zashiki-cli-response-abcdefghijklmnopqrstuv",
     );
     defer std.testing.allocator.free(url);
 
     try std.testing.expectEqualStrings(
-        "zashiki://markdown-preview/open?path=%2Ftmp%2F%E6%97%A5%E6%9C%AC%E8%AA%9E%20notes.md%3Fdraft%3Dtrue%23section&terminal-id=0x0123456789abcdef&response=%2Ftmp%2Fzashiki-cli-response-abcdefghijklmnopqrstuv",
+        "zashiki://markdown-preview/open?path=%2Ftmp%2F%E6%97%A5%E6%9C%AC%E8%AA%9E%20notes.md%3Fdraft%3Dtrue%23section&base-directory=%2Ftmp%2F%E4%BD%9C%E6%A5%AD%20notes%3F%23&terminal-id=0x0123456789abcdef&response=%2Ftmp%2Fzashiki-cli-response-abcdefghijklmnopqrstuv",
+        url,
+    );
+}
+
+test "build markdown preview URL without base directory or target" {
+    const url = try buildURL(
+        std.testing.allocator,
+        "/tmp/readme.md",
+        null,
+        null,
+        "/tmp/zashiki-cli-response-abcdefghijklmnopqrstuv",
+    );
+    defer std.testing.allocator.free(url);
+
+    try std.testing.expectEqualStrings(
+        "zashiki://markdown-preview/open?path=%2Ftmp%2Freadme.md&response=%2Ftmp%2Fzashiki-cli-response-abcdefghijklmnopqrstuv",
         url,
     );
 }
@@ -230,6 +265,7 @@ test "invalid terminal IDs are rejected" {
     try std.testing.expectError(error.InvalidTerminalID, buildURL(
         std.testing.allocator,
         "/tmp/readme.md",
+        null,
         "not-a-terminal",
         "/tmp/zashiki-cli-response-abcdefghijklmnopqrstuv",
     ));
