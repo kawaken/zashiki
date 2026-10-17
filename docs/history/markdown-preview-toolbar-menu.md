@@ -83,8 +83,8 @@
 
 ## 進め方
 
-- IssueとPlanのPRを作成済み。ユーザーの指示でdraftを解除し、会話で合意した内容の実装を同じPRで進める。
-- 実装・検証の結果を追記して `docs/history/` へ移す。
+- IssueとPlanのPRを作成後、ユーザーの指示でdraftを解除し、会話で合意した内容を同じPRで実装した。
+- 実装・検証の結果を追記して、この記録を `docs/history/` へ移した。
 - PRには `needs-verification` を付けた。実機確認が済みラベルが外れたら通常のAutoMergeへ進む。
 - 必要なPRがすべてマージされた後、Issueに結果を記録して `wip` を外し、Issueを明示的に完了する。
 
@@ -106,8 +106,10 @@
 - `just lint`: Swift 201ファイルで違反なし。変更ファイルのSwift構文チェックと差分の空白チェックも成功。
 - `zig build -Dxcframework-target=native`: 成功。最終版のアプリでヘッダーの表示、本文右クリック・Control-clickのCopy／Shareと共通項目、文字サイズpopover、ターミナル独自の右クリックメニューを確認した。
 - 実ソースを参照する依存なしの一時Swiftパッケージで、既存モデル21テストと追加メニュー6テストの計27テストが成功。一時パッケージは提出差分に含めない。
-- `just test-fast` はsandbox内のXcode依存解決に失敗したため、権限を確保して再実行。アプリのSwiftコンパイルは成功し、Zig全体テストは実行中。
-- 標準タスクの `just test-filter markdown_preview` でもmacOS単体テストを実行中。
+- `just test-fast`: sandbox内のXcode依存解決に失敗したため、権限を確保して再実行し成功。Zig全体テストとアプリのSwiftコンパイルを確認した。
+- `just test-filter markdown_preview`: 成功。ビルド定義を確認したところ、フィルタ指定時はmacOS単体テストが対象外となるため、`just test` も実行する。
+- `just test` のmacOS単体テスト: `TEST SUCCEEDED`。追加したメニュー6テストも実アプリのテストターゲットで成功した。
+- CIの `just lint`: 成功。最終コミットのテストと実機確認用アプリのビルドはPRで継続して確認する。
 - 実際のクリップボード内容、外部アプリ・Finder起動、狭いパネル、複数ウィンドウなどの最終的なユーザー確認は `needs-verification` のPR成果物で行う。
 
 ## 対象外
