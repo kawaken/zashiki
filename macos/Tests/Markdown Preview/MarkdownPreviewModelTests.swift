@@ -79,6 +79,75 @@ struct MarkdownPreviewModelTests {
         #expect(!model.canGoForward)
     }
 
+    @Test func relativePathsUseComponentsAndKeepUnicodeAndSpaces() {
+        let examples: [(String, String, String)] = [
+            ("/project", "/project/docs/design.md", "docs/design.md"),
+            ("/project/src", "/project/docs/design.md", "../docs/design.md"),
+            ("/project", "/project-other/design.md", "../project-other/design.md"),
+            ("/project/作業 notes", "/project/作業 notes/仕様 draft.md", "仕様 draft.md"),
+            ("/", "/project/docs/design.md", "project/docs/design.md"),
+            ("/project/./src/..", "/project/docs/../design.md", "design.md")
+        ]
+        for (base, file, expected) in examples {
+            let entry = MarkdownPreviewHistoryEntry(
+                id: 0, url: URL(fileURLWithPath: file), baseDirectoryURL: URL(fileURLWithPath: base)
+            )
+            #expect(entry.relativePath == expected)
+        }
+        let withoutBase = MarkdownPreviewHistoryEntry(
+            id: 0, url: URL(fileURLWithPath: "/project/design.md"), baseDirectoryURL: nil
+        )
+        #expect(withoutBase.relativePath == nil)
+    }
+
+    @Test func copyBaseBelongsToEachOpenAndFollowsHistoryNavigation() throws {
+        let model = MarkdownPreviewModel()
+        let file = try temporaryFile("# Document")
+        let parent = file.deletingLastPathComponent()
+        let otherBase = parent.appendingPathComponent("another-directory", isDirectory: true)
+
+        model.open(url: file, baseDirectoryURL: parent)
+        model.open(url: file, baseDirectoryURL: otherBase)
+        #expect(model.relativePath == "../\(file.lastPathComponent)")
+        #expect(model.historyEntries.map(\.baseDirectoryURL) == [parent, otherBase])
+
+        model.goBack()
+        #expect(model.baseDirectoryURL == parent)
+        #expect(model.relativePath == file.lastPathComponent)
+        model.goForward()
+        #expect(model.baseDirectoryURL == otherBase)
+        model.go(toHistoryEntryAt: 0)
+        model.reload()
+        model.close()
+        model.toggle()
+        #expect(model.relativePath == file.lastPathComponent)
+
+        // An open without CLI metadata must not inherit an earlier base.
+        model.open(url: file)
+        #expect(model.baseDirectoryURL == nil)
+        #expect(model.relativePath == nil)
+        #expect(model.historyEntries.map(\.baseDirectoryURL) == [parent, nil])
+        #expect(!model.canGoForward)
+        model.goBack()
+        #expect(model.baseDirectoryURL == parent)
+    }
+
+    @Test func markdownCopyUsesFullSourceAndRejectsReadErrors() throws {
+        let model = MarkdownPreviewModel()
+        #expect(model.markdownForCopy == nil)
+        let source = "---\ntitle: 仕様\n---\n\n# Heading\n\n**Markdown**\n"
+        let file = try temporaryFile(source)
+        model.open(url: file)
+        #expect(model.markdownForCopy == source)
+        try "".write(to: file, atomically: true, encoding: .utf8)
+        model.reload()
+        #expect(model.markdownForCopy == "")
+
+        model.open(url: file.deletingLastPathComponent().appendingPathComponent(UUID().uuidString))
+        #expect(model.errorMessage != nil)
+        #expect(model.markdownForCopy == nil)
+    }
+
     @Test func testGoBackAndForward() throws {
         let model = MarkdownPreviewModel()
         let first = try temporaryFile()

@@ -607,6 +607,17 @@ class AppDelegate: NSObject,
             return
         }
 
+        let baseDirectoryURL: URL?
+        if let item = components.queryItems?.first(where: { $0.name == "base-directory" }) {
+            guard let directory = item.value, directory.hasPrefix("/") else {
+                acknowledgeZashikiURL(components, result: "error:invalid-base-directory")
+                return
+            }
+            baseDirectoryURL = URL(fileURLWithPath: directory, isDirectory: true).standardizedFileURL
+        } else {
+            baseDirectoryURL = nil
+        }
+
         let hasTerminalID = components.queryItems?.contains(where: { $0.name == "terminal-id" }) ?? false
         guard !hasTerminalID || terminalTarget != nil else {
             acknowledgeZashikiURL(components, result: "error:terminal-not-found")
@@ -636,7 +647,7 @@ class AppDelegate: NSObject,
             preview = controller.markdownPreview
         }
         let previewURL = URL(fileURLWithPath: path).standardizedFileURL
-        preview.open(url: previewURL)
+        preview.open(url: previewURL, baseDirectoryURL: baseDirectoryURL)
         guard preview.isVisible,
               preview.fileURL?.standardizedFileURL == previewURL else {
             acknowledgeZashikiURL(components, result: "error:preview-not-opened")
