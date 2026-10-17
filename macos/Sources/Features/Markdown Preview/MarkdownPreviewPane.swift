@@ -9,6 +9,8 @@ struct MarkdownPreviewPane: View {
     @ObservedObject var model: MarkdownPreviewModel
 
     @State private var isHistoryPresented = false
+    @ObservedObject private var externalApps = MarkdownExternalApps.shared
+    @State private var externalAppError: String?
     @FocusedValue(\.zashikiSurfaceCellSize) private var cellSize
     @Environment(\.zashikiLastFocusedSurface) private var lastFocusedSurface
     @AppStorage("MarkdownPreviewFontSizeOverride", store: .zashiki)
@@ -32,6 +34,13 @@ struct MarkdownPreviewPane: View {
             content
         }
         .background(Color(nsColor: .textBackgroundColor))
+        .alert("Could Not Open File", isPresented: Binding(
+            get: { externalAppError != nil }, set: { if !$0 { externalAppError = nil } }
+        )) {
+            Button("OK") { externalAppError = nil }
+        } message: {
+            Text(externalAppError ?? "")
+        }
     }
 
     private var header: some View {
@@ -87,6 +96,17 @@ struct MarkdownPreviewPane: View {
 
             Spacer()
 
+            Button {
+                if let app = externalApps.configuration.defaultApp { openExternalApp(app) }
+            } label: {
+                Image(systemName: "arrow.up.forward.square")
+            }
+            .buttonStyle(.plain)
+            .disabled(model.fileURL == nil || externalApps.configuration.defaultApp == nil)
+            .help(externalApps.configuration.defaultApp.map { "Open in \($0.name)" } ?? "No external app configured")
+            .accessibilityLabel(externalApps.configuration.defaultApp.map { "Open in \($0.name)" } ?? "Open in External App")
+            .contextMenu { externalAppMenu }
+
             Button(action: revealFileInFinder) {
                 Image(systemName: "folder")
             }
@@ -129,6 +149,10 @@ struct MarkdownPreviewPane: View {
             .help(model.baseDirectoryURL.map {
                 "Relative to the working directory when opened: \($0.path)"
             } ?? "The working directory when opened is unavailable")
+
+            Divider()
+            Menu("Open With") { externalAppChoices }
+            Button("Configure External Apps…") { MarkdownExternalAppsSettingsController.shared.show() }
         } label: {
             HStack(spacing: 4) {
                 Text(model.fileURL?.lastPathComponent ?? "Markdown Preview")
@@ -147,6 +171,36 @@ struct MarkdownPreviewPane: View {
         .help(model.fileURL?.path ?? "")
         .accessibilityLabel("Markdown File Actions")
         .accessibilityValue(model.fileURL?.lastPathComponent ?? "No file open")
+    }
+
+    @ViewBuilder
+    private var externalAppChoices: some View {
+        ForEach(externalApps.configuration.apps) { app in
+            Button {
+                openExternalApp(app)
+            } label: {
+                if app.id == externalApps.configuration.defaultID {
+                    Label(app.name, systemImage: "checkmark")
+                } else {
+                    Text(app.name)
+                }
+            }
+        }
+        if externalApps.configuration.apps.isEmpty {
+            Text("No apps configured")
+        }
+    }
+
+    @ViewBuilder
+    private var externalAppMenu: some View {
+        externalAppChoices
+        Divider()
+        Button("Configure External Apps…") { MarkdownExternalAppsSettingsController.shared.show() }
+    }
+
+    private func openExternalApp(_ app: MarkdownExternalApp) {
+        guard let fileURL = model.fileURL else { return }
+        externalAppError = externalApps.open(app, fileURL: fileURL)
     }
 
     private func copyToPasteboard(_ string: String?) {
