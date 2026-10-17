@@ -9,6 +9,7 @@ struct MarkdownPreviewPane: View {
     @ObservedObject var model: MarkdownPreviewModel
 
     @State private var isHistoryPresented = false
+    @State private var isFontSizePresented = false
     @ObservedObject private var externalApps = MarkdownExternalApps.shared
     @State private var externalAppError: String?
     @FocusedValue(\.zashikiSurfaceCellSize) private var cellSize
@@ -34,6 +35,9 @@ struct MarkdownPreviewPane: View {
             content
         }
         .background(Color(nsColor: .textBackgroundColor))
+        .background {
+            MarkdownPreviewContextMenu(makeMenu: makeActionsMenu)
+        }
         .alert("Could Not Open File", isPresented: Binding(
             get: { externalAppError != nil }, set: { if !$0 { externalAppError = nil } }
         )) {
@@ -81,18 +85,11 @@ struct MarkdownPreviewPane: View {
                 }
             }
 
-            Button {
-                isFontSizePresented.toggle()
-            } label: {
-                Image(systemName: "textformat.size")
-            }
-            .buttonStyle(.plain)
-            .help("Markdown Preview Font Size")
-            .popover(isPresented: $isFontSizePresented, arrowEdge: .top) {
-                fontSizeControls
-            }
-
-            fileMenu
+            Text(model.fileURL?.lastPathComponent ?? "Markdown Preview")
+                .font(.headline)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .help(model.fileURL?.path ?? "")
 
             Spacer()
 
@@ -105,14 +102,13 @@ struct MarkdownPreviewPane: View {
             .disabled(model.fileURL == nil || externalApps.configuration.defaultApp == nil)
             .help(externalApps.configuration.defaultApp.map { "Open in \($0.name)" } ?? "No external app configured")
             .accessibilityLabel(externalApps.configuration.defaultApp.map { "Open in \($0.name)" } ?? "Open in External App")
-            .contextMenu { externalAppMenu }
 
-            Button(action: revealFileInFinder) {
-                Image(systemName: "folder")
-            }
-            .buttonStyle(.plain)
-            .disabled(model.fileURL == nil)
-            .help("Reveal File in Finder")
+            MarkdownPreviewActionsButton(makeMenu: makeActionsMenu)
+                .frame(width: 18, height: 20)
+                .help("Markdown Preview Actions")
+                .popover(isPresented: $isFontSizePresented, arrowEdge: .top) {
+                    fontSizeControls
+                }
 
             Button {
                 model.close()
@@ -127,87 +123,19 @@ struct MarkdownPreviewPane: View {
         .frame(height: WindowTopRow.height)
     }
 
-    @State private var isFontSizePresented = false
-
-    private var fileMenu: some View {
-        Menu {
-            Button("Copy Markdown") {
-                copyToPasteboard(model.markdownForCopy)
+    private func makeActionsMenu() -> NSMenu {
+        MarkdownPreviewActions(
+            model: model, configuration: externalApps.configuration, openApp: openExternalApp,
+            showFontSize: {
+                // Present after native menu tracking has finished.
+                DispatchQueue.main.async { isFontSizePresented = true }
             }
-            .disabled(model.markdownForCopy == nil)
-
-            Divider()
-
-            Button("Copy Absolute Path") {
-                copyToPasteboard(model.fileURL?.path)
-            }
-
-            Button("Copy Relative Path") {
-                copyToPasteboard(model.relativePath)
-            }
-            .disabled(model.relativePath == nil)
-            .help(model.baseDirectoryURL.map {
-                "Relative to the working directory when opened: \($0.path)"
-            } ?? "The working directory when opened is unavailable")
-
-            Divider()
-            Menu("Open With") { externalAppChoices }
-            Button("Configure External Apps…") { MarkdownExternalAppsSettingsController.shared.show() }
-        } label: {
-            HStack(spacing: 4) {
-                Text(model.fileURL?.lastPathComponent ?? "Markdown Preview")
-                    .font(.headline)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Image(systemName: "chevron.down")
-                    .font(.caption)
-            }
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .foregroundStyle(.primary)
-        .fixedSize(horizontal: false, vertical: true)
-        .disabled(model.fileURL == nil)
-        .help(model.fileURL?.path ?? "")
-        .accessibilityLabel("Markdown File Actions")
-        .accessibilityValue(model.fileURL?.lastPathComponent ?? "No file open")
-    }
-
-    @ViewBuilder
-    private var externalAppChoices: some View {
-        ForEach(externalApps.configuration.apps) { app in
-            Button {
-                openExternalApp(app)
-            } label: {
-                if app.id == externalApps.configuration.defaultID {
-                    Label(app.name, systemImage: "checkmark")
-                } else {
-                    Text(app.name)
-                }
-            }
-        }
-        if externalApps.configuration.apps.isEmpty {
-            Text("No apps configured")
-        }
-    }
-
-    @ViewBuilder
-    private var externalAppMenu: some View {
-        externalAppChoices
-        Divider()
-        Button("Configure External Apps…") { MarkdownExternalAppsSettingsController.shared.show() }
+        ).makeMenu()
     }
 
     private func openExternalApp(_ app: MarkdownExternalApp) {
         guard let fileURL = model.fileURL else { return }
         externalAppError = externalApps.open(app, fileURL: fileURL)
-    }
-
-    private func copyToPasteboard(_ string: String?) {
-        guard let string else { return }
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(string, forType: .string)
     }
 
     private var fontSizeControls: some View {
@@ -338,11 +266,6 @@ struct MarkdownPreviewPane: View {
                 .padding(.horizontal)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private func revealFileInFinder() {
-        guard let fileURL = model.fileURL else { return }
-        NSWorkspace.shared.activateFileViewerSelecting([fileURL])
     }
 }
 
