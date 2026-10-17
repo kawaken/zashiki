@@ -1094,6 +1094,10 @@ class AppDelegate: NSObject,
         ghostty.openConfig()
     }
 
+    @IBAction func openMarkdownExternalAppsSettings(_ sender: Any?) {
+        MarkdownExternalAppsSettingsController.shared.show()
+    }
+
     @IBAction func reloadConfig(_ sender: Any?) {
         ghostty.reloadConfig()
     }

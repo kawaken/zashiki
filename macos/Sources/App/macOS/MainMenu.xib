@@ -98,6 +98,12 @@
                                     <action selector="openConfig:" target="bbz-4X-AYv" id="X65-fg-iWU"/>
                                 </connections>
                             </menuItem>
+                            <menuItem title="Markdown External Apps…" id="MDA-EX-app">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <connections>
+                                    <action selector="openMarkdownExternalAppsSettings:" target="bbz-4X-AYv" id="MDA-EX-act"/>
+                                </connections>
+                            </menuItem>
                             <menuItem title="Reload Configuration" id="KKH-XX-5py">
                                 <modifierMask key="keyEquivalentModifierMask"/>
                                 <connections>
