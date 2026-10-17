@@ -83,10 +83,32 @@
 
 ## 進め方
 
-- まずIssueを作成・claimし、調査とこのPlanをdraft PRへ出す。
-- Planレビュー後、同じPRで実装・検証し、結果を追記して `docs/history/` へ移す。
-- 実装完了後にPRをreadyにする。実機確認が済み `needs-verification` が外れたら通常のAutoMergeへ進む。
+- IssueとPlanのPRを作成済み。ユーザーの指示でdraftを解除し、会話で合意した内容の実装を同じPRで進める。
+- 実装・検証の結果を追記して `docs/history/` へ移す。
+- PRには `needs-verification` を付けた。実機確認が済みラベルが外れたら通常のAutoMergeへ進む。
 - 必要なPRがすべてマージされた後、Issueに結果を記録して `wip` を外し、Issueを明示的に完了する。
+
+## 実装時の決定
+
+- 「…」もAppKitのメニューを表示するボタンにし、右クリックと同じメニュー生成処理を使う。SwiftUI用とAppKit用でメニュー定義を二重管理しない。
+- パネルの背景に操作を遮らないNSViewを置き、window・可視領域・イベント種別で絞ったローカルイベント監視を行う。対象のViewから `menu(for:)` を取得し、既存項目の後に共通操作を追加する。
+- 既存メニューの自動検証を保持するため、追加項目自身が利用可否を検証する。選択Copy・Shareのselectorとtargetを変更しない。
+- 文字サイズのpopoverはメニューを閉じた後のrun loopで表示する。
+- AppKitのテストではsandbox内で作ったwindowの番号が0になり、合成イベントからwindowを取得できなかった。WindowServerへの接続が可能な環境で同じテストを実行して、27テストすべて成功した。
+- `NSView.visibleRect` はboundsの外側まで広がる場合があるため、イベントの対象範囲は `bounds` と `visibleRect` の両方で制限する。
+
+## 実装結果と検証状況
+
+- ファイル名を表示だけにし、独立したFinder・文字サイズボタンとパネル内の外部アプリ設定への入口を取り除いた。
+- 「…」と右クリックは `MarkdownPreviewActions.makeMenu()` を共有する。原文コピーの表示名は `Copy Markdown Source` とし、選択Copyと区別した。
+- 既存のAppKitメニューを維持し、共通項目だけを追加する。追加項目自身が利用可否を検証し、元のメニューの自動検証は維持する。
+- windowが変わった時・Viewの破棄時にイベント監視を解除する。
+- `just lint`: Swift 201ファイルで違反なし。変更ファイルのSwift構文チェックと差分の空白チェックも成功。
+- `zig build -Dxcframework-target=native`: 成功。最終版のアプリでヘッダーの表示、本文右クリック・Control-clickのCopy／Shareと共通項目、文字サイズpopover、ターミナル独自の右クリックメニューを確認した。
+- 実ソースを参照する依存なしの一時Swiftパッケージで、既存モデル21テストと追加メニュー6テストの計27テストが成功。一時パッケージは提出差分に含めない。
+- `just test-fast` はsandbox内のXcode依存解決に失敗したため、権限を確保して再実行。アプリのSwiftコンパイルは成功し、Zig全体テストは実行中。
+- 標準タスクの `just test-filter markdown_preview` でもmacOS単体テストを実行中。
+- 実際のクリップボード内容、外部アプリ・Finder起動、狭いパネル、複数ウィンドウなどの最終的なユーザー確認は `needs-verification` のPR成果物で行う。
 
 ## 対象外
 
