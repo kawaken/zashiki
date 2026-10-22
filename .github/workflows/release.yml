@@ -7,18 +7,20 @@ name: Release
 # 「タグを打ったらad-hoc署名のZashiki.appをzipにしてGitHub Releaseに
 # 添付する」だけの最小構成に全面書き換えたもの。
 #
-# Sparkleの署名付きappcastはGitHub Releaseへ公開する。ただしApple Developer
-# Program登録・notarization前は更新の自動チェックを有効化しない。
+# Sparkleの署名付きappcastとrelease-manifestはGitHub Releaseへ公開する。
+# ただしApple Developer Program登録・notarization前は更新の自動チェックを
+# 有効化しない。
 #
 # test.yml(push/PR)はCI時間短縮のため-Dmacos-app-xctest=falseで
 # xcodebuild test(macOSアプリ側のXCTest)を除外し、Swiftコンパイルの検証
 # (xcodebuild build)のみ行っている。XCTestを含む品質保証はここ
 # (このworkflowのfull test)で担保する。
 #
-# このworkflowは手動起動を唯一のリリース入口とする。tagが既存ならその
-# commitを使い、存在しないtagならmainのHEADにローカルtagを作ってから
-# test/buildし、成功後にPATでtagをpushする。GITHUB_TOKENのイベント連鎖に
-# 依存せず、タグ作成からGitHub Release公開までを同じ実行で完了させる。
+# このworkflowはstable正式版の手動起動を唯一のリリース入口とする。tagが
+# 既存ならそのcommitを使い、存在しないtagならmainのHEADにローカルtagを
+# 作ってからtest/buildし、成功後にPATでtagをpushする。GITHUB_TOKENの
+# イベント連鎖に依存せず、タグ作成からGitHub Release公開までを同じ実行で
+# 完了させる。
 
 on:
   workflow_dispatch:
@@ -27,11 +29,6 @@ on:
         description: "リリースするバージョン (例: 0.1.0)"
         required: true
         type: string
-      rc:
-        description: "RCとしてリリースする（番号は自動採番）"
-        required: true
-        default: false
-        type: boolean
 
 concurrency:
   group: release-${{ github.ref }}
@@ -52,7 +49,6 @@ jobs:
         id: target
         env:
           INPUT_VERSION: ${{ inputs.version }}
-          INPUT_RC: ${{ inputs.rc }}
         run: |
           set -euo pipefail
 
@@ -65,33 +61,18 @@ jobs:
             exit 1
           fi
 
-          if [[ "$INPUT_RC" == "true" ]]; then
-            git fetch --force --tags origin
-            rc_prefix="v${INPUT_VERSION}-rc."
-            latest_rc="$({
-              git tag -l "${rc_prefix}*" |
-                awk -v prefix="$rc_prefix" '
-                  index($0, prefix) == 1 {
-                    suffix = substr($0, length(prefix) + 1)
-                    if (suffix ~ /^[0-9]+$/) print suffix
-                  }
-                ' |
-                sort -n |
-                tail -n1
-            } || true)"
-            if [[ -n "$latest_rc" ]]; then
-              next_rc=$((10#$latest_rc + 1))
-            else
-              next_rc=1
+          IFS=. read -r major minor patch <<< "$INPUT_VERSION"
+          for component in "$major" "$minor" "$patch"; do
+            if (( 10#$component > 999 )); then
+              echo "::error::versionの各要素は999以下にしてください (入力値: $INPUT_VERSION)"
+              exit 1
             fi
-            TAG="${rc_prefix}${next_rc}"
-            echo "次のRCタグを作成します: $TAG"
-          else
-            TAG="v${INPUT_VERSION}"
-          fi
+          done
 
-          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]]; then
-            echo "::error::tagはvX.Y.ZまたはvX.Y.Z-rc.N形式で指定してください (入力値: $TAG)"
+          TAG="v${INPUT_VERSION}"
+
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::stableのtagはvX.Y.Z形式で指定してください (入力値: $TAG)"
             exit 1
           fi
 
@@ -122,13 +103,11 @@ jobs:
           echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
 
       - name: Prepare release notes
-        env:
-          RELEASE_VERSION: ${{ steps.target.outputs.release_tag }}
         run: |
           set -euo pipefail
-          # Both RCs and stable releases use the changes accumulated under
-          # Unreleased. Stable releases archive this section after the
-          # GitHub Release is created.
+          # Stable releases use the changes accumulated under Unreleased.
+          # The stable release step archives this section after the GitHub
+          # Release is created.
           changelog_heading="Unreleased"
           awk -v version="$changelog_heading" '
             $0 ~ "^## " version "([[:space:]]|$)" {
@@ -191,13 +170,67 @@ jobs:
 
       - name: Zip Zashiki.app
         run: |
+          set -euo pipefail
           cd zig-out
           zip -9 -r --symlinks "../Zashiki-${RELEASE_TAG}-macos.zip" Zashiki.app
+
+      - name: Inspect release artifacts
+        id: artifact
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          app_path="zig-out/Zashiki.app"
+          info_plist="$app_path/Contents/Info.plist"
+          archive_name="Zashiki-${RELEASE_TAG}-macos.zip"
+
+          if [[ ! -f "$info_plist" || ! -f "$archive_name" ]]; then
+            echo "::error::Release artifactが見つかりません。"
+            exit 1
+          fi
+
+          version="$(plutil -extract CFBundleShortVersionString raw -o - "$info_plist")"
+          build_version="$(plutil -extract CFBundleVersion raw -o - "$info_plist")"
+          minimum_macos_version="$(plutil -extract LSMinimumSystemVersion raw -o - "$info_plist")"
+
+          IFS=. read -r major minor patch <<< "$INPUT_VERSION"
+          expected_build_version=$((10#$major * 1000000 + 10#$minor * 1000 + 10#$patch))
+
+          if [[ "$version" != "$INPUT_VERSION" ]]; then
+            echo "::error::CFBundleShortVersionStringが入力versionと一致しません: $version"
+            exit 1
+          fi
+          if [[ "$build_version" != "$expected_build_version" ]]; then
+            echo "::error::CFBundleVersionが期待値と一致しません: $build_version (期待値: $expected_build_version)"
+            exit 1
+          fi
+          if [[ -z "$minimum_macos_version" ]]; then
+            echo "::error::LSMinimumSystemVersionが空です。"
+            exit 1
+          fi
+
+          unzip -tq "$archive_name"
+          archive_size="$(stat -f '%z' "$archive_name")"
+          archive_sha256="$(shasum -a 256 "$archive_name" | awk '{print $1}')"
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "build_version=$build_version" >> "$GITHUB_OUTPUT"
+          echo "minimum_macos_version=$minimum_macos_version" >> "$GITHUB_OUTPUT"
+          echo "archive_name=$archive_name" >> "$GITHUB_OUTPUT"
+          echo "archive_size=$archive_size" >> "$GITHUB_OUTPUT"
+          echo "archive_sha256=$archive_sha256" >> "$GITHUB_OUTPUT"
 
       - name: Generate signed appcast
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          ARCHIVE_NAME: ${{ steps.artifact.outputs.archive_name }}
+          ARCHIVE_SIZE: ${{ steps.artifact.outputs.archive_size }}
+          VERSION: ${{ steps.artifact.outputs.version }}
+          BUILD_VERSION: ${{ steps.artifact.outputs.build_version }}
         run: |
+          set -euo pipefail
+
           if [ -z "${SPARKLE_PRIVATE_KEY:-}" ]; then
             echo "::error::SPARKLE_PRIVATE_KEY repository secret is required to sign appcast.xml."
             exit 1
@@ -205,14 +238,51 @@ jobs:
 
           archives_dir="$RUNNER_TEMP/zashiki-sparkle-archives"
           mkdir -p "$archives_dir"
-          cp "Zashiki-${RELEASE_TAG}-macos.zip" "$archives_dir/"
+          cp "$ARCHIVE_NAME" "$archives_dir/"
 
-          # Preserve entries from the previous stable feed. On the first
-          # release this URL is a 404, which is expected.
-          curl --fail --location --retry 3 \
+          # Preserve entries from the previous stable feed. Only a genuine
+          # 404 means that the history does not exist yet. Network, auth, and
+          # server failures must stop the release instead of deleting history.
+          history_url="https://github.com/${{ github.repository }}/releases/latest/download/appcast.xml"
+          history_path="$archives_dir/appcast.xml"
+          set +e
+          history_status="$(curl --silent --show-error --location --retry 3 \
             --output "$archives_dir/appcast.xml" \
-            "https://github.com/${{ github.repository }}/releases/latest/download/appcast.xml" \
-            || rm -f "$archives_dir/appcast.xml"
+            --write-out '%{http_code}' \
+            "$history_url")"
+          history_curl_status=$?
+          set -e
+
+          if (( history_curl_status != 0 )); then
+            rm -f "$history_path"
+            echo "::error::過去のappcast取得に失敗しました (curl exit: $history_curl_status)。初回扱いにはしません。"
+            exit 1
+          fi
+
+          case "$history_status" in
+            2[0-9][0-9])
+              if [[ ! -s "$history_path" ]]; then
+                echo "::error::過去のappcastが空です。初回扱いにはしません。"
+                exit 1
+              fi
+              history_available=true
+              ;;
+            404)
+              rm -f "$history_path"
+              history_available=false
+              echo "過去のappcastはまだありません。初回として生成します。"
+              ;;
+            *)
+              rm -f "$history_path"
+              echo "::error::過去のappcast取得がHTTP $history_statusで失敗しました。初回扱いにはしません。"
+              exit 1
+              ;;
+          esac
+
+          old_versions=""
+          if [[ "$history_available" == true ]]; then
+            old_versions="$(grep -oE '<sparkle:version>[^<]+' "$history_path" | sed 's/<sparkle:version>//')"
+          fi
 
           sparkle_project=$(find "$HOME/Library/Developer/Xcode/DerivedData" \
             -path '*/SourcePackages/checkouts/Sparkle/Sparkle.xcodeproj' \
@@ -237,6 +307,20 @@ jobs:
             "$archives_dir"
           cp "$archives_dir/appcast.xml" appcast.xml
 
+          for old_version in $old_versions; do
+            if ! grep -Fq "<sparkle:version>$old_version</sparkle:version>" appcast.xml; then
+              echo "::error::既存の正式版項目がappcastから消えました: $old_version"
+              exit 1
+            fi
+          done
+
+          expected_archive_url="https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/${ARCHIVE_NAME}"
+          grep -Fq "<sparkle:version>$BUILD_VERSION</sparkle:version>" appcast.xml
+          grep -Fq "<sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>" appcast.xml
+          grep -Fq "url=\"$expected_archive_url\"" appcast.xml
+          grep -Fq "length=\"$ARCHIVE_SIZE\"" appcast.xml
+          grep -Fq "sparkle:edSignature=\"" appcast.xml
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
@@ -247,10 +331,108 @@ jobs:
             appcast.xml
           generate_release_notes: false
           body_path: release-notes.md
-          prerelease: ${{ contains(steps.target.outputs.release_tag, '-rc') }}
+          prerelease: false
+
+      - name: Generate and attach release manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.artifact.outputs.version }}
+          BUILD_VERSION: ${{ steps.artifact.outputs.build_version }}
+          MINIMUM_MACOS_VERSION: ${{ steps.artifact.outputs.minimum_macos_version }}
+          ARCHIVE_NAME: ${{ steps.artifact.outputs.archive_name }}
+          ARCHIVE_SIZE: ${{ steps.artifact.outputs.archive_size }}
+          ARCHIVE_SHA256: ${{ steps.artifact.outputs.archive_sha256 }}
+        run: |
+          set -euo pipefail
+
+          published_at="$(gh release view "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json publishedAt \
+            --jq '.publishedAt')"
+          appcast_sha256="$(shasum -a 256 appcast.xml | awk '{print $1}')"
+          release_notes_url="https://github.com/$GITHUB_REPOSITORY/releases/tag/$RELEASE_TAG"
+          archive_url="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/$ARCHIVE_NAME"
+
+          jq -n \
+            --argjson schema_version 1 \
+            --arg version "$VERSION" \
+            --arg build_version "$BUILD_VERSION" \
+            --arg tag "$RELEASE_TAG" \
+            --arg published_at "$published_at" \
+            --arg minimum_macos_version "$MINIMUM_MACOS_VERSION" \
+            --arg release_notes_url "$release_notes_url" \
+            --arg archive_name "$ARCHIVE_NAME" \
+            --arg archive_url "$archive_url" \
+            --argjson archive_size "$ARCHIVE_SIZE" \
+            --arg archive_sha256 "$ARCHIVE_SHA256" \
+            --arg appcast_sha256 "$appcast_sha256" \
+            '{
+              schema_version: $schema_version,
+              version: $version,
+              build_version: $build_version,
+              tag: $tag,
+              published_at: $published_at,
+              minimum_macos_version: $minimum_macos_version,
+              release_notes_url: $release_notes_url,
+              archive: {
+                name: $archive_name,
+                url: $archive_url,
+                size: $archive_size,
+                sha256: $archive_sha256
+              },
+              appcast: {
+                name: "appcast.xml",
+                sha256: $appcast_sha256
+              }
+            }' > release-manifest.json
+
+          gh release upload "$RELEASE_TAG" release-manifest.json \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+
+      - name: Validate release manifest
+        env:
+          ARCHIVE_NAME: ${{ steps.artifact.outputs.archive_name }}
+          ARCHIVE_SIZE: ${{ steps.artifact.outputs.archive_size }}
+          ARCHIVE_SHA256: ${{ steps.artifact.outputs.archive_sha256 }}
+          VERSION: ${{ steps.artifact.outputs.version }}
+          BUILD_VERSION: ${{ steps.artifact.outputs.build_version }}
+          MINIMUM_MACOS_VERSION: ${{ steps.artifact.outputs.minimum_macos_version }}
+        run: |
+          set -euo pipefail
+
+          appcast_sha256="$(shasum -a 256 appcast.xml | awk '{print $1}')"
+          release_notes_url="https://github.com/$GITHUB_REPOSITORY/releases/tag/$RELEASE_TAG"
+          archive_url="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/$ARCHIVE_NAME"
+
+          jq -e \
+            --arg version "$VERSION" \
+            --arg build_version "$BUILD_VERSION" \
+            --arg tag "$RELEASE_TAG" \
+            --arg minimum_macos_version "$MINIMUM_MACOS_VERSION" \
+            --arg release_notes_url "$release_notes_url" \
+            --arg archive_name "$ARCHIVE_NAME" \
+            --arg archive_url "$archive_url" \
+            --arg archive_sha256 "$ARCHIVE_SHA256" \
+            --arg appcast_sha256 "$appcast_sha256" \
+            --argjson archive_size "$ARCHIVE_SIZE" \
+            '
+              .schema_version == 1 and
+              (.version | type) == "string" and .version == $version and
+              (.build_version | type) == "string" and .build_version == $build_version and
+              .tag == $tag and
+              (.published_at | type) == "string" and
+              .minimum_macos_version == $minimum_macos_version and
+              .release_notes_url == $release_notes_url and
+              .archive.name == $archive_name and
+              .archive.url == $archive_url and
+              .archive.size == $archive_size and
+              .archive.sha256 == $archive_sha256 and
+              .appcast.name == "appcast.xml" and
+              .appcast.sha256 == $appcast_sha256
+            ' release-manifest.json
 
       - name: Finalize stable CHANGELOG
-        if: ${{ !contains(steps.target.outputs.release_tag, '-rc') }}
         env:
           GH_TOKEN: ${{ secrets.GH_PAT_PR_CREATE }}
         run: |

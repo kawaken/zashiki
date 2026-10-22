@@ -2873,26 +2873,13 @@ term: []const u8 = "xterm-ghostty",
 /// Changing this value at runtime works after a small delay.
 @"auto-update": ?AutoUpdate = null,
 
-/// The release channel to use for auto-updates.
+/// Legacy compatibility key for the removed update-channel setting.
 ///
-/// The default value of this matches the release channel of the currently
-/// running Ghostty version. If you download a pre-release version of Ghostty
-/// then this will be set to `tip` and you will receive pre-release updates.
-/// If you download a stable version of Ghostty then this will be set to
-/// `stable` and you will receive stable updates.
+/// Zashiki distributes and checks stable releases only. Existing config files
+/// may still contain this key, so it remains parseable, but it has no effect.
+/// New configurations should omit it.
 ///
-/// Valid values are:
-///
-///  * `stable` - Stable, tagged releases such as "1.0.0".
-///  * `tip` - Pre-release versions generated from each commit to the
-///    main branch. This is the version that was in use during private
-///    beta testing by thousands of people. It is generally stable but
-///    will likely have more bugs than the stable channel.
-///
-/// Changing this configuration requires a full restart of
-/// Ghostty to take effect.
-///
-/// This only works on macOS since only macOS has an auto-update feature.
+/// This only applies on macOS, where the auto-update feature exists.
 @"auto-update-channel": ?build_config.ReleaseChannel = null,
 
 /// This is set by the CLI parser for deinit.

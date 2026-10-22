@@ -158,11 +158,10 @@ struct ConfigTests {
         #expect(config.backgroundOpacity == 0.7)
     }
 
-    @Test func defaultConfigIsLoaded() throws {
-        let config = try TemporaryConfig("")
-        #expect(config.optionalAutoUpdateChannel != nil) // release or tip
-        let config1 = try TemporaryConfig("", finalize: false)
-        #expect(config1.optionalAutoUpdateChannel == nil)
+    @Test(arguments: ["stable", "tip"])
+    func legacyAutoUpdateChannelIsAccepted(raw: String) throws {
+        let config = try TemporaryConfig("auto-update-channel = \(raw)")
+        #expect(config.errors.isEmpty)
     }
 
     @Test func errorsEmptyForValidConfig() throws {
