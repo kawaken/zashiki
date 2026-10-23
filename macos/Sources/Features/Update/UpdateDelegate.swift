@@ -1,22 +1,11 @@
 import Sparkle
-import Cocoa
 
 extension UpdateDriver: SPUUpdaterDelegate {
     func feedURLString(for updater: SPUUpdater) -> String? {
-        guard let appDelegate = NSApplication.shared.delegate as? AppDelegate else {
-            return nil
-        }
-
-        // Sparkle supports a native concept of "channels" but it requires that
-        // you share a single appcast file. We don't want to do that so we
-        // do this instead.
-        switch appDelegate.ghostty.config.autoUpdateChannel {
-        // A tip appcast is not published yet. This URL intentionally returns
-        // no updates until the nightly release workflow is introduced.
-        case .tip: return "https://github.com/kawaken/zashiki/releases/download/tip/appcast.xml"
-        case .stable:
-            return "https://github.com/kawaken/zashiki/releases/latest/download/appcast.xml"
-        }
+        // Stable releases are published through the public feed. Keep the
+        // GitHub Release appcast assets available for existing installations
+        // during the migration, but new builds use this fixed URL.
+        return "https://apps.kawaken.dev/zashiki/appcast.xml"
     }
 
     /// Called when an update is scheduled to install silently,

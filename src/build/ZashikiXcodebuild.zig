@@ -89,6 +89,16 @@ pub fn init(
         });
     const marketing_version_arg = b.fmt("MARKETING_VERSION={s}", .{marketing_version});
 
+    // Sparkle compares CFBundleVersion, not CFBundleShortVersionString. The
+    // Xcode project historically used 1 for every build, which caused
+    // generate_appcast to replace the previous item instead of preserving the
+    // release history. Encode the stable semantic version into a monotonic
+    // build number while keeping the value compatible with old installations.
+    const build_version = config.version.major * 1_000_000 +
+        config.version.minor * 1_000 +
+        config.version.patch;
+    const build_version_arg = b.fmt("CURRENT_PROJECT_VERSION={d}", .{build_version});
+
     // Our step to build the Zashiki macOS app.
     const build = build: {
         // External environment variables can mess up xcodebuild, so
@@ -129,6 +139,7 @@ pub fn init(
             // "unable to resolve module dependency" errors.
             b.fmt("SYMROOT={s}", .{b.pathFromRoot("macos/build")}),
             marketing_version_arg,
+            build_version_arg,
             "-destination",
             xc_destination,
             // Swift's "explicit module build" (the default since Xcode 26)
