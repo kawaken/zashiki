@@ -28,16 +28,20 @@ glad:
     fi
 
 # Run the complete test suite, including macOS XCTest.
-test:
+test: test-shell-integration
     zig build test
 
 # Run the PR-sized test suite: Zig tests and Swift compilation without XCTest.
-test-fast:
+test-fast: test-shell-integration
     zig build test -Dmacos-app-xctest=false
 
 # Run Zig tests matching NAME.
 test-filter NAME:
     zig build test -Dtest-filter='{{ NAME }}'
+
+# Capture shell notifications and check their handling of untrusted names.
+test-shell-integration:
+    python3 test/shell-integration-security.py
 
 # Check formatting for tracked Zig files only.
 _zig-fmt-check:
