@@ -119,7 +119,7 @@ pub const Error = error{
 /// Returns true if the data looks safe to paste. Data is considered
 /// unsafe if it contains any of the following:
 ///
-/// - `\n`: Newlines can be used to inject commands.
+/// - `\n` or `\r`: Line terminators can be used to inject commands.
 /// - `\x1b[201~`: This is the end of a bracketed paste. This cane be used
 ///   to exit a bracketed paste and inject commands.
 ///
@@ -129,8 +129,28 @@ pub const Error = error{
 /// should raise suspicion that the producer of the paste data is
 /// acting strangely.
 pub fn isSafe(data: []const u8) bool {
-    return std.mem.indexOf(u8, data, "\n") == null and
+    return std.mem.indexOfAny(u8, data, "\r\n") == null and
         std.mem.indexOf(u8, data, "\x1b[201~") == null;
+}
+
+/// Check safety for the encoding used by the running program. Line
+/// terminators are safe inside a bracketed paste, but its terminator is not.
+pub fn isSafeWith(data: []const u8, opts: Options) bool {
+    return if (opts.bracketed)
+        std.mem.indexOf(u8, data, "\x1b[201~") == null
+    else
+        isSafe(data);
+}
+
+test "isSafeWith line terminators and bracket terminator" {
+    for ([_][]const u8{ "\r", "hello\r", "hello\n", "hello\r\nworld" }) |data| {
+        try std.testing.expect(!isSafeWith(data, .{ .bracketed = false }));
+        try std.testing.expect(isSafeWith(data, .{ .bracketed = true }));
+    }
+    for ([_]bool{ false, true }) |bracketed| {
+        try std.testing.expect(isSafeWith("日本語 text\t", .{ .bracketed = bracketed }));
+        try std.testing.expect(!isSafeWith("a\x1b[201~b", .{ .bracketed = bracketed }));
+    }
 }
 
 test isSafe {
@@ -139,6 +159,11 @@ test isSafe {
     try testing.expect(!isSafe("hello\n"));
     try testing.expect(!isSafe("hello\nworld"));
     try testing.expect(!isSafe("he\x1b[201~llo"));
+    try testing.expect(isSafe("日本語\ttext"));
+    try testing.expect(!isSafe("\r"));
+    try testing.expect(!isSafe("hello\r"));
+    try testing.expect(!isSafe("hello\rworld"));
+    try testing.expect(!isSafe("hello\r\nworld"));
 }
 
 test "encode bracketed" {

@@ -47,4 +47,36 @@ ATOK文節下線、IME周辺文字列通知、独自タブ管理を維持する�
 
 ## 調査・実装記録
 
-実装と検証の進行に合わせて追記する。
+- #285: Surface.completeClipboardPasteからisSafeへ到達し、非bracketed時のCRが通る。
+  保護設定の意味を維持して判定をisSafeWithへ集約し、CR/LF/CRLF/終端/日本語を検証する。
+- #286: performDragOperationはinsertTextを直接呼んでいた。IMEのinsertTextを変更せず、
+  明示テキスト用C APIを追加して既存completeClipboardRequestへ接続する。
+  現行APIは旧形式なのでGhostty #14679の新しいclipboard content構造体は採用しない。
+  標準Zigテストはstandalone runtimeでembedded moduleを参照していなかった。
+  単純なmodule参照ではruntime型が合わないため、macOS用embeddedテスト入口を追加する。
+  本番と同じruntimeのメモリ内surface・通知キューでC APIをテストし、PTYは作らない。
+  参照前のfocused実行はAPIテスト成功という根拠には含めない。
+- #287: zsh cwdは展開ありprint、bash cwdは制御文字未除去。コマンドtitleは既に除去するが、
+  cwd由来titleも別途監査する。Ghostty #14859を個別採用する。
+  実際のbashプロンプト展開を捕捉するテストで、PS1の`\w`によるcwdタイトルにも
+  生のESC/BELが入りOSCフレームが壊れることを確認した。cwdタイトルはprecmdで
+  制御文字を除去して通知する。zshのcwdタイトルにも明示的な除去を適用する。
+- #288: OSC 8だけでなくunknownもNSWorkspaceへ直接渡る。
+  Ghostty #13634と後続#14683を組み合わせ、generic openerもfail closedにする。
+- #291/#292: DCS 1000pからtmux viewerへ入り、ペイン状態・レイアウトが端末出力だけで到達する。
+  Ghostty #14858のsnapshot変更はZashikiにその機能がないため対象外。
+  新規だけでなく既存ペインの過大寸法もコピー前に拒否する。
+  #14680のテストは上流の初期画面選択修正を前提としていたため、現行では
+  pane-stateで更新されるprimaryカーソルを確認し、別にactive出力のスクロールも検証する。
+- #293: #14857は#14686のcursorPageReplacedに依存する。現行には後者もないため、
+  単一行の通常スクロール時のページ破棄修正と回帰テストも必要な依存として採用する。
+- #294: openFileからquoteしたパスがinitialInputへ入る。C0/DEL/C1をquote前に拒否する。
+- 初回ZigテストはMetal Toolchain不足でテスト本体に到達せず失敗。成功扱いしない。
+- #290: `af2faa311a`（ディレクトリ境界）、`ec04900ab9`（open後検証）、
+  `f766f303a7`（共有メモリ）、`590d669c4a`（PNG）、`e5840bb9ba`（配置）を確認。
+  画像寸法は上限確認後に乗算し、PNGデコーダの個別割当を400MiB以下へ制限する。
+  新しい画像C API・animation・relative placementは採用しない。
+  現行renderer/image.zigの可視判定はpage pinからの矩形を使い、上流C APIのi32加算は存在しない。
+  macOS一時ディレクトリの別名に関する後続修正#14569も確認する。
+  open後検証は一時領域内の2ファイルとsymlink差替えでハンドルの同一性をテストし、
+  デバイスのblocklistは文字列テストで分離する。特殊ファイルを開く再現は行わない。
