@@ -1019,6 +1019,8 @@ pub const Viewer = struct {
                     size.CellCountInt,
                     data.scroll_region_lower,
                 ) orelse break :scroll;
+                // Screen operations assume an ordered region within the pane.
+                if (scroll_top >= scroll_bottom or scroll_bottom >= t.rows) break :scroll;
                 t.scrolling_region.top = scroll_top;
                 t.scrolling_region.bottom = scroll_bottom;
             }
@@ -2445,6 +2447,90 @@ test "two pane flow with pane state" {
         .{
             .input = .{ .tmux = .exit },
             .contains_tags = &.{.exit},
+        },
+    });
+}
+
+test "pane state validates ordered in-bounds scroll regions" {
+    const alloc = testing.allocator;
+    for ([_][2]usize{ .{ 9, 2 }, .{ 5, 5 }, .{ 0, 24 }, .{ 70000, 70001 }, .{ 2, 8 } }) |region| {
+        var viewer = try Viewer.init(testing.io, alloc);
+        defer viewer.deinit();
+        try viewer.panes.put(alloc, 0, .{ .terminal = try Terminal.init(testing.io, alloc, .{ .cols = 80, .rows = 24 }) });
+        const line = try std.fmt.allocPrint(
+            alloc,
+            "%0;0;5;1;;;0;0;4294967295;4294967295;0;1;0;0;0;0;0;0;0;0;0;0;0;{d};{d};",
+            .{ region[0], region[1] },
+        );
+        defer alloc.free(line);
+        try viewer.receivedPaneState(line);
+        const t = &viewer.panes.getPtr(0).?.terminal;
+        try testing.expectEqual(5, t.screens.active.cursor.y);
+        const valid = region[0] < region[1] and region[1] < t.rows;
+        try testing.expectEqual(if (valid) region[0] else 0, t.scrolling_region.top);
+        try testing.expectEqual(if (valid) region[1] else 23, t.scrolling_region.bottom);
+        try viewer.receivedOutput(0, "\x0b" ** 30);
+        try testing.expect(t.screens.active.cursor.y < t.rows);
+    }
+}
+
+test "pane state ignores out of bounds scroll region" {
+    var viewer = try Viewer.init(testing.io, testing.allocator);
+    defer viewer.deinit();
+
+    try testViewer(&viewer, &.{
+        .{ .input = .{ .tmux = .{ .block_end = "" } } },
+        .{
+            .input = .{ .tmux = .{ .session_changed = .{
+                .id = 0,
+                .name = "0",
+            } } },
+            .contains_command = "display-message",
+        },
+        .{
+            .input = .{ .tmux = .{ .block_end = "3.5a" } },
+            .contains_command = "list-windows",
+        },
+        .{
+            .input = .{ .tmux = .{
+                .block_end = "$0 @0 80 24 b25d,80x24,0,0,0",
+            } },
+            .contains_tags = &.{ .windows, .command },
+        },
+        // capture-pane primary/alternate history/visible
+        .{ .input = .{ .tmux = .{ .block_end = "" } } },
+        .{ .input = .{ .tmux = .{ .block_end = "" } } },
+        .{ .input = .{ .tmux = .{ .block_end = "" } } },
+        .{ .input = .{ .tmux = .{ .block_end = "" } } },
+        // list-panes with a scroll region bottom far past the screen
+        .{
+            .input = .{ .tmux = .{
+                .block_end = "%0;0;5;1;;;0;0;4294967295;4294967295;0;1;0;0;0;0;0;0;0;0;0;0;0;0;60000;",
+            } },
+            .check = (struct {
+                fn check(v: *Viewer, _: []const Viewer.Action) anyerror!void {
+                    const pane: *Viewer.Pane = v.panes.getEntry(0).?.value_ptr;
+                    const t: *Terminal = &pane.terminal;
+                    // Verify the line parsed and was applied.
+                    try testing.expectEqual(5, t.screens.get(.primary).?.cursor.y);
+                    try testing.expectEqual(0, t.scrolling_region.top);
+                    try testing.expectEqual(t.rows - 1, t.scrolling_region.bottom);
+                }
+            }).check,
+        },
+        // Vertical tabs act as linefeeds and must scroll within the screen.
+        .{
+            .input = .{ .tmux = .{ .output = .{
+                .pane_id = 0,
+                .data = "\x0b" ** 30,
+            } } },
+            .check = (struct {
+                fn check(v: *Viewer, _: []const Viewer.Action) anyerror!void {
+                    const pane: *Viewer.Pane = v.panes.getEntry(0).?.value_ptr;
+                    const t: *Terminal = &pane.terminal;
+                    try testing.expectEqual(t.rows - 1, t.screens.active.cursor.y);
+                }
+            }).check,
         },
     });
 }
