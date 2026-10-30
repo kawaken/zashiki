@@ -475,6 +475,19 @@ class AppDelegate: NSObject,
             // somehow is tricked into `open`-ing a non-sandboxed application.
             requiresConfirm = true
 
+            // Quotes are interpreted by the shell after terminal control keys.
+            // Reject hidden input before showing the execution confirmation.
+            guard !Zashiki.Shell.containsControlCharacters(filename) else {
+                Self.logger.warning("refusing to execute file with control characters path=\(filename.debugDescription, privacy: .public)")
+                let alert = NSAlert()
+                alert.messageText = "Cannot Execute File"
+                alert.informativeText = "This file's path contains hidden control characters, which could run a different command than the one shown."
+                alert.addButton(withTitle: "OK")
+                alert.alertStyle = .warning
+                alert.runModal()
+                return false
+            }
+
             // When opening a file, we want to execute the file. To do this, we
             // don't override the command directly, because it won't load the
             // profile/rc files for the shell, which is super important on macOS

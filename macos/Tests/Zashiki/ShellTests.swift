@@ -2,6 +2,36 @@ import Testing
 @testable import Zashiki
 
 struct ShellTests {
+
+    @Test(arguments: [
+        // Ordinary paths, including non-English text, are allowed.
+        ("", false),
+        ("/tmp/script.sh", false),
+        ("/tmp/my file (1).command", false),
+        ("/tmp/café/日本語.sh", false),
+
+        // This emoji is joined with invisible zero-width joiners (U+200D).
+        // Those are formatting characters, not control characters, so
+        // they're allowed.
+        ("/tmp/👨‍👩‍👧.sh", false),
+
+        // Ctrl-U erases the line, then Return runs `ls`.
+        ("/tmp/Foo\u{15}ls\r", true),
+
+        // Common control characters.
+        ("/tmp/a\nb", true),
+        ("/tmp/a\rb", true),
+        ("/tmp/a\tb", true),
+        ("/tmp/a\u{00}b", true),
+        ("/tmp/a\u{1B}b", true),
+
+        // Delete, and a control character from the U+0080 to U+009F range.
+        ("/tmp/a\u{7F}b", true),
+        ("/tmp/a\u{9B}b", true),
+    ])
+    func containsControlCharacters(input: String, expected: Bool) {
+        #expect(Zashiki.Shell.containsControlCharacters(input) == expected)
+    }
     @Test(arguments: [
         ("hello", "hello"),
         ("", ""),
@@ -40,6 +70,7 @@ struct ShellTests {
         ("file\\name", "'file\\name'"),
         ("it's", "'it'\"'\"'s'"),
         ("file$'name'", "'file$'\"'\"'name'\"'\"''"),
+        ("/tmp/日本語 file's.sh", "'/tmp/日本語 file'\"'\"'s.sh'"),
     ])
     func quote(input: String, expected: String) {
         #expect(Zashiki.Shell.quote(input) == expected)
