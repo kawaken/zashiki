@@ -695,6 +695,13 @@ extension Zashiki {
         ) -> Bool {
             let action = Zashiki.Action.OpenURL(c: v)
 
+            if action.kind == .osc8 {
+                return openUntrustedURL(UntrustedURL(action.url))
+            }
+            if action.kind == .unknown {
+                return openUntrustedURL(UntrustedURL(detectedLink: action.url))
+            }
+
             // If the URL doesn't have a valid scheme we assume its a file path. The URL
             // initializer will gladly take invalid URLs (e.g. plain file paths) and turn
             // them into schema-less URLs, but these won't open properly in text editors.
@@ -722,12 +729,26 @@ extension Zashiki {
                 // The extension will be HTML and we do the right thing automatically.
                 break
 
-            case .unknown:
-                break
+            case .unknown, .osc8:
+                assertionFailure("Untrusted URLs must use the safe-opening policy")
+                return true
             }
 
             // Open with the default application for the URL
             NSWorkspace.shared.open(url)
+            return true
+        }
+
+        private static func openUntrustedURL(_ target: UntrustedURL) -> Bool {
+            switch target.decision {
+            case .allow(let url):
+                _ = NSWorkspace.shared.open(url)
+            case .confirm(let url):
+                UntrustedURLAlert.presentConfirmation(for: url, displayString: target.displayString)
+            case .deny(let reason):
+                UntrustedURLAlert.presentBlock(reason: reason, displayString: target.displayString)
+            }
+            // A refusal must never fall through to the core's generic opener.
             return true
         }
 

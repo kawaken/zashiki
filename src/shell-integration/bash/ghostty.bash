@@ -166,10 +166,6 @@ function __ghostty_precmd() {
       [[ "$PS0" != *'\[\e[0 q\]'* ]] && PS0=$PS0'\[\e[0 q\]' # reset
     fi
 
-    # Title (working directory)
-    if [[ "$ZASHIKI_SHELL_FEATURES" == *"title"* ]]; then
-      PS1=$PS1'\[\e]2;\w\a\]'
-    fi
   fi
 
   if test "$_ghostty_executing" != ""; then
@@ -193,7 +189,24 @@ function __ghostty_precmd() {
   # command like cd /test && cat. PS0 is evaluated before cd is run.
   if [[ "$_ghostty_last_reported_cwd" != "$PWD" ]]; then
     _ghostty_last_reported_cwd="$PWD"
-    builtin printf "\e]7;kitty-shell-cwd://%s%s\a" "$HOSTNAME" "$PWD"
+    # Remove control bytes from the hostname and directory before sending
+    # them. A directory name that contains a raw ESC or BEL byte could
+    # otherwise end our OSC 7 early and start a sequence of its own, such
+    # as an OSC 52 clipboard write. Backslashes are safe here because
+    # printf only expands escapes in the format string, not in %s values.
+    builtin printf "\e]7;kitty-shell-cwd://%s%s\a" "${HOSTNAME//[[:cntrl:]]/}" "${PWD//[[:cntrl:]]/}"
+  fi
+
+  # Do not interpolate \w into an OSC in PS1: bash expands raw directory
+  # control bytes there after we have built the prompt. Report sanitized text
+  # directly, retaining the usual home-directory abbreviation.
+  if [[ "$ZASHIKI_SHELL_FEATURES" == *"title"* ]]; then
+    builtin local title="$PWD"
+    case "$title" in
+      "$HOME") title='~' ;;
+      "$HOME/"*) title="~/${title#"$HOME/"}" ;;
+    esac
+    builtin printf "\e]2;%s\a" "${title//[[:cntrl:]]/}"
   fi
 
   _ghostty_executing=0

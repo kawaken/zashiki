@@ -255,6 +255,27 @@ pub fn build(b: *std.Build) !void {
         config.addPatchElf(test_exe, &test_run.step);
         test_step.dependOn(&test_run.step);
 
+        if (config.target.result.os.tag == .macos) {
+            const embedded_tests = b.addTest(.{
+                .name = "ghostty-embedded-test",
+                .filters = &.{"external paste"},
+                .root_module = b.createModule(.{
+                    .root_source_file = b.path("src/embedded_tests.zig"),
+                    .target = config.baselineTarget(b.graph.io),
+                    .optimize = .Debug,
+                }),
+                .use_llvm = true,
+            });
+            var embedded_deps = deps;
+            embedded_deps.options = b.addOptions();
+            try config.addOptions(embedded_deps.options);
+            embedded_deps.options.addOption(bool, "embedded_test_runtime", true);
+            _ = try embedded_deps.add(embedded_tests);
+            embedded_tests.root_module.linkFramework("Metal", .{});
+            addGhosttyH(b, embedded_tests.root_module, config.baselineTarget(b.graph.io), .Debug);
+            test_step.dependOn(&b.addRunArtifact(embedded_tests).step);
+        }
+
         // Normal tests always test our libghostty modules
 
         // Valgrind test running

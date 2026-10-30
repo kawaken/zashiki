@@ -25,6 +25,98 @@ const log = std.log.scoped(.embedded_window);
 
 pub const resourcesDir = internal_os.resourcesDir;
 
+test "external paste uses confirmation and encoding without a running shell" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    const io = testing.io;
+    const termio = @import("../termio.zig");
+    const Capture = struct {
+        pending: ?*apprt.ClipboardRequest = null,
+        text: ?[:0]const u8 = null,
+
+        fn confirm(
+            userdata: ?*anyopaque,
+            text: [*:0]const u8,
+            state: *apprt.ClipboardRequest,
+            request: apprt.ClipboardRequestType,
+        ) callconv(.c) void {
+            const self: *@This() = @ptrCast(@alignCast(userdata.?));
+            std.debug.assert(request == .paste);
+            self.pending = state;
+            // Match the host contract: copy before the C API returns.
+            self.text = std.testing.allocator.dupeZ(u8, std.mem.span(text)) catch unreachable;
+        }
+    };
+
+    // Only initialize the state used by explicit clipboard pastes. No window,
+    // worker thread, PTY, filesystem access, or child process is created.
+    const core_app = try alloc.create(CoreApp);
+    defer alloc.destroy(core_app);
+    core_app.alloc = alloc;
+    var app: App = undefined;
+    app.core_app = core_app;
+    app.opts.confirm_read_clipboard = Capture.confirm;
+    var s: Surface = undefined;
+    s.app = &app;
+    s.core_surface.alloc = alloc;
+    s.core_surface.readonly = false;
+    s.core_surface.config.clipboard_paste_protection = true;
+    s.core_surface.config.clipboard_paste_bracketed_safe = true;
+    var mutex: std.Io.Mutex = .init;
+    s.core_surface.renderer_state.mutex = &mutex;
+    s.core_surface.io.terminal = try terminal.Terminal.init(io, alloc, .{ .cols = 80, .rows = 24 });
+    defer s.core_surface.io.terminal.deinit(alloc);
+    s.core_surface.io.mailbox = try termio.Mailbox.initSPSC(alloc);
+    defer s.core_surface.io.mailbox.deinit(alloc);
+    s.core_surface.renderer_thread.wakeup = try global.xev.Async.init();
+    defer s.core_surface.renderer_thread.wakeup.deinit();
+
+    const Case = struct {
+        text: [:0]const u8,
+        bracketed: bool = false,
+        confirm: bool = false,
+        cancel: bool = false,
+        expected: []const u8,
+    };
+    for ([_]Case{
+        .{ .text = "日本語 text", .expected = "日本語 text" },
+        .{ .text = "/tmp/my\\ file.txt", .expected = "/tmp/my\\ file.txt" },
+        .{ .text = "line\nnext", .confirm = true, .expected = "line\rnext" },
+        .{ .text = "line\rnext", .confirm = true, .expected = "line\rnext" },
+        .{ .text = "line\r\nnext", .bracketed = true, .expected = "\x1b[200~line\r\nnext\x1b[201~" },
+        .{ .text = "a\x1b[201~b", .bracketed = true, .confirm = true, .expected = "\x1b[200~a [201~b\x1b[201~" },
+        .{ .text = "line\n", .confirm = true, .cancel = true, .expected = "" },
+        .{ .text = "", .expected = "" },
+    }) |case| {
+        var capture: Capture = .{};
+        defer if (capture.text) |v| alloc.free(v);
+        s.userdata = &capture;
+        s.core_surface.io.terminal.modes.set(.bracketed_paste, case.bracketed);
+        const text = try alloc.dupeZ(u8, case.text);
+        CAPI.ghostty_surface_paste_text(&s, text.ptr, text.len);
+        alloc.free(text);
+        try testing.expectEqual(case.confirm, capture.pending != null);
+        if (capture.pending) |pending| {
+            try testing.expect(s.core_surface.io.mailbox.spsc.queue.pop(io) == null);
+            try testing.expectEqualStrings(case.text, capture.text.?);
+            s.completeClipboardRequest(if (case.cancel) "" else capture.text.?, pending, !case.cancel);
+        }
+        var written: std.Io.Writer.Allocating = .init(alloc);
+        defer written.deinit();
+        while (s.core_surface.io.mailbox.spsc.queue.pop(io)) |msg| {
+            switch (msg) {
+                .write_small => |v| try written.writer.writeAll(v.data[0..v.len]),
+                .write_alloc => |v| {
+                    defer alloc.free(v.data);
+                    try written.writer.writeAll(v.data);
+                },
+                else => return error.UnexpectedMessage,
+            }
+        }
+        try testing.expectEqualStrings(case.expected, written.written());
+    }
+}
+
 pub const App = struct {
     /// Because we only expect the embedding API to be used in embedded
     /// environments, the options are extern so that we can expose it
@@ -644,6 +736,18 @@ pub const Surface = struct {
         }
 
         return true;
+    }
+
+    /// Paste external text through the clipboard protection and encoding path.
+    /// The heap request survives this call when confirmation is needed.
+    pub fn pasteText(self: *Surface, text: [:0]const u8) void {
+        if (text.len == 0) return;
+        const state = self.app.core_app.alloc.create(apprt.ClipboardRequest) catch |err| {
+            log.err("error allocating paste request err={}", .{err});
+            return;
+        };
+        state.* = .{ .paste = {} };
+        self.completeClipboardRequest(text, state, false);
     }
 
     fn completeClipboardRequest(
@@ -1542,6 +1646,16 @@ pub const CAPI = struct {
         len: usize,
     ) void {
         surface.textCallback(ptr[0..len]);
+    }
+
+    /// Paste external UTF-8 text, applying clipboard confirmation and encoding.
+    /// The buffer must end in NUL at len and is copied as needed before return.
+    export fn ghostty_surface_paste_text(
+        surface: *Surface,
+        ptr: [*:0]const u8,
+        len: usize,
+    ) void {
+        surface.pasteText(ptr[0..len :0]);
     }
 
     /// Set the preedit text for the surface. This is used for IME

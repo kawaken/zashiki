@@ -844,10 +844,8 @@ pub const OpenUrl = struct {
     ///
     /// Sync with: ghostty_action_open_url_kind_e
     pub const Kind = enum(c_int) {
-        /// The type is unknown. This is the default and apprts should
-        /// open the URL in the most generic way possible. For example,
-        /// on macOS this would be the equivalent of `open` or on Linux
-        /// this would be `xdg-open`.
+        /// Untrusted detected link or plain path from terminal output. Like
+        /// OSC 8, this must pass the apprt's safety policy before opening.
         unknown,
 
         /// The URL is known to be a text file. In this case, the apprt
@@ -857,6 +855,10 @@ pub const OpenUrl = struct {
 
         /// The URL is known to contain HTML content.
         html,
+
+        /// Untrusted OSC 8 target supplied by terminal output. The apprt must
+        /// apply its platform safety policy before dispatching to the OS.
+        osc8,
 
         test "ghostty.h OpenUrl.Kind" {
             try lib.checkGhosttyHEnum(Kind, "GHOSTTY_ACTION_OPEN_URL_KIND_");

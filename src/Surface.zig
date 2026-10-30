@@ -4314,7 +4314,7 @@ fn processLinks(self: *Surface, pos: apprt.CursorPos) !bool {
                 log.warn("failed to get URI for OSC8 hyperlink", .{});
                 return false;
             };
-            try self.openUrl(.{ .kind = .unknown, .url = uri });
+            try self.openUrl(.{ .kind = .osc8, .url = uri });
         },
     }
 
@@ -5741,18 +5741,9 @@ fn completeClipboardPaste(
             // This is set during confirmation usually.
             if (allow_unsafe) break :unsafe false;
 
-            if (opts.bracketed) {
-                // If we're bracketed and the paste contains and ending
-                // bracket then something naughty might be going on and we
-                // never trust it.
-                if (std.mem.indexOf(u8, data, "\x1B[201~") != null) break :unsafe true;
-
-                // If we are bracketed and configured to trust that then the
-                // paste is not unsafe.
-                if (self.config.clipboard_paste_bracketed_safe) break :unsafe false;
-            }
-
-            break :unsafe !input.paste.isSafe(data);
+            break :unsafe !input.paste.isSafeWith(data, .{
+                .bracketed = opts.bracketed and self.config.clipboard_paste_bracketed_safe,
+            });
         };
 
         if (unsafe) {

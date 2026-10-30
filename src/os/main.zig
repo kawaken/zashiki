@@ -47,6 +47,7 @@ test {
     _ = path;
     _ = uri;
     _ = shell;
+    _ = openpkg;
 
     if (comptime builtin.os.tag.isDarwin()) {
         _ = mach;

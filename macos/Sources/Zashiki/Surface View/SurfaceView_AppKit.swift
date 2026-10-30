@@ -2379,10 +2379,11 @@ extension Zashiki.SurfaceView {
 
         if let content {
             DispatchQueue.main.async {
-                self.insertText(
-                    content,
-                    replacementRange: NSRange(location: 0, length: 0)
-                )
+                guard let surface = self.surface else { return }
+                // External drops use paste protection; IME insertText stays separate.
+                content.withCString { ptr in
+                    ghostty_surface_paste_text(surface, ptr, UInt(content.utf8.count))
+                }
             }
             return true
         }
