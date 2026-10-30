@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 正式版の配布をGitHub Releasesに統一し、署名付きappcastを使った手動更新チェックに対応
+
 ## v0.11.0 (2026-10-17)
 
 - Markdownプレビューから、Front Matterを含むMarkdown原文・絶対パス・相対パスをコピーできるように。相対パスはプレビューを開いた時の作業ディレクトリを基準にする
