@@ -2738,6 +2738,52 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             }, cursor_style);
         }
 
+        test "preedit uses configured glyph thickening and preserves clause underlines" {
+            const testing = std.testing;
+            const alloc = testing.allocator;
+            var lib = try font.Library.init(alloc);
+            defer lib.deinit();
+            var collection = font.Collection.init();
+            collection.load_options = .{ .library = lib };
+            _ = try collection.add(alloc, try .init(lib, font.embedded.regular, .{
+                .size = .{ .points = 12, .xdpi = 96, .ydpi = 96 },
+            }), .{ .style = .regular, .fallback = false, .size_adjustment = .none });
+            var grid = try font.SharedGrid.init(alloc, .{ .collection = collection });
+            defer grid.deinit(alloc);
+            var r: Self = undefined;
+            r.alloc = alloc;
+            r.font_grid = &grid;
+            r.grid_metrics = grid.metrics;
+            r.cells = .{ .bg_cells = &.{} };
+            try r.cells.resize(alloc, .{ .rows = 1, .columns = 4 });
+            defer r.cells.deinit(alloc);
+            const fg: terminal.color.RGB = .{ .r = 255, .g = 255, .b = 255 };
+            for ([_]bool{ false, true }) |thicken| for ([_]u8{ 0, 100, 255 }) |strength| {
+                r.config.font_thicken = thicken;
+                r.config.font_thicken_strength = strength;
+                for ([_]bool{ false, true }) |emphasized| {
+                    r.cells.reset();
+                    try r.addPreeditCell(.{ .codepoint = 'A', .wide = true, .emphasized = emphasized }, .{ .x = 0, .y = 0 }, fg);
+                    const expected = (try grid.renderCodepoint(alloc, 'A', .regular, .text, .{
+                        .grid_metrics = grid.metrics,
+                        .thicken = thicken,
+                        .thicken_strength = strength,
+                    })).?;
+                    const underline = try grid.renderGlyph(alloc, font.sprite_index, @intFromEnum(
+                        if (emphasized) font.Sprite.underline_thick else font.Sprite.underline,
+                    ), .{ .cell_width = 1, .grid_metrics = grid.metrics });
+                    const cells = r.cells.fg_rows.lists[1].items;
+                    try testing.expectEqual(3, cells.len);
+                    try testing.expectEqual(expected.glyph.atlas_x, cells[0].glyph_pos[0]);
+                    try testing.expectEqual(expected.glyph.atlas_y, cells[0].glyph_pos[1]);
+                    for (cells[1..]) |cell| {
+                        try testing.expectEqual(underline.glyph.atlas_x, cell.glyph_pos[0]);
+                        try testing.expectEqual(underline.glyph.atlas_y, cell.glyph_pos[1]);
+                    }
+                }
+            };
+        }
+
         fn addPreeditCell(
             self: *Self,
             cp: renderer.State.Preedit.Codepoint,
@@ -2750,7 +2796,11 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
                 @intCast(cp.codepoint),
                 .regular,
                 .text,
-                .{ .grid_metrics = self.grid_metrics },
+                .{
+                    .grid_metrics = self.grid_metrics,
+                    .thicken = self.config.font_thicken,
+                    .thicken_strength = self.config.font_thicken_strength,
+                },
             ) catch |err| {
                 log.warn("error rendering preedit glyph err={}", .{err});
                 return;
