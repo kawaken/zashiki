@@ -48,6 +48,8 @@ pub const Health = enum(c_int) {
 };
 
 test {
+    if (@import("builtin").os.tag == .macos) _ = @import("renderer/DisplayLink.zig");
+
     // Our comptime-chosen renderer
     _ = Renderer;
 

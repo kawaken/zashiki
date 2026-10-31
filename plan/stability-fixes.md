@@ -63,3 +63,5 @@
 - #299実装・検証: 元surfaceのidentityを確認する完了一回の応答objectをsheetと重複拒否で共有。重複拒否は次のmain queue turnへ移す。native要求は完了まで独立保持し、二重完了はdereference前に無視、閉鎖で全pendingを回収する。100連続要求、deferred前の閉鎖・surface差替え、承認/キャンセルをSwiftテストで検証。遅延を外すとcallback中の完了を検出して失敗。nativeの既存external pasteテストに重複・完了・未応答破棄を追加し成功。#313の制御文字、bracketed paste、drop相当の文字列経路を維持。実際の確認sheet操作は未実施。
 
 - #302追加回帰: 実際のSurface.writeScreenFileをembedded runtimeのhost callbackまで通し、screen/history/selection × plain/VT/HTMLを8反復（72出力）、consumerへ渡す直前のOOMを8回、選択なしを32回実行。各回のFD数がbaselineと一致し、成功時は返却後のファイル読込が成功。外部アプリの実起動はしていない。embedded test targetへ常時登録した。
+
+- #301実装・検証: CoreVideo操作をmainだけに限定し、render側はatomic desired stateと非同期queueのみ使用。停止を要求した後でもrenderer.Thread.draw_nowはrenderer.close完了まで生存させる。queued syncが残る場合はwrapperの解放を最後のqueued callbackへ委譲。mockの4テスト（集約、close、開始失敗/外部停止、開始中stop要求）成功。desired変更時のqueueを外すとstop要求テストが失敗。実際のスリープ・hotplug・解像度変更、thread spawn失敗注入は未実施。
