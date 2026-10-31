@@ -1733,7 +1733,12 @@ const ReflowCursor = struct {
             }
 
             // Move any tracked pins from the source.
-            if (row_has_pins) {
+            // A wide glyph at the last column first writes a spacer head and
+            // retries on the next row. Keep its pins on the source until that
+            // retry, otherwise they point at the spacer instead of the glyph.
+            const wide_wrap = cells[x].wide == .wide and
+                self.page.size.cols > 1 and self.x == self.page.size.cols - 1;
+            if (row_has_pins and !wide_wrap) {
                 const pin_keys = list.tracked_pins.keys();
                 for (pin_keys) |p| {
                     if (p.node != row.node or

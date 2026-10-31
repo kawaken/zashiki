@@ -1,5 +1,5 @@
 //! Opt-in reflow measurement. Run with ZASHIKI_REFLOW_BENCHMARK=1 and
-//! zig build test -Doptimize=ReleaseFast -Dtest-filter='reflow benchmark'.
+//! zig build test -Dtest-optimize=ReleaseFast -Dtest-filter='reflow benchmark'.
 const std = @import("std");
 const Terminal = @import("Terminal.zig");
 

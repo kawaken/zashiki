@@ -15413,6 +15413,40 @@ test "Terminal: resize less cols without reflow cutting wide char tail" {
     try testing.expect(t.screens.active.pages.getCell(.{ .active = .{ .x = 1 } }).?.cell.isEmpty());
 }
 
+test "Terminal: reflow preserves mixed managed text and tracked cursor" {
+    const alloc = testing.allocator;
+    var t = try init(testing.io, alloc, .{ .cols = 12, .rows = 6, .max_scrollback_bytes = 5_000_000 });
+    defer t.deinit(alloc);
+    var stream = t.vtStream();
+    defer stream.deinit();
+    for (0..80) |_| stream.nextSlice("\x1b[31m日本語😀\x1b[0m e\u{0301} \x1b]8;;https://example.com/日本\x1b\\link語\x1b]8;;\x1b\\\r\n");
+    stream.nextSlice("cursor語");
+    // Track a text cell. Non-cursor pins in trailing blanks intentionally
+    // clamp to the destination width rather than introducing new content.
+    t.setCursorPos(t.screens.active.cursor.y + 1, 7);
+    const pages = &t.screens.active.pages;
+    const pin = try pages.trackPin(t.screens.active.cursor.page_pin.*);
+    defer pages.untrackPin(pin);
+    const cp = pin.rowAndCell().cell.codepoint();
+    var before: std.Io.Writer.Allocating = .init(alloc);
+    defer before.deinit();
+    var formatter: @import("formatter.zig").ScreenFormatter = .init(t.screens.active, .{ .emit = .vt, .unwrap = true });
+    try formatter.format(&before.writer);
+    for ([_]u16{ 5, 23, 7, 12, 31, 12 }) |cols| {
+        try t.resize(alloc, .{ .cols = cols, .rows = 6 });
+        try testing.expectEqual(cp, pin.rowAndCell().cell.codepoint());
+        try testing.expect(t.screens.active.cursor.page_pin.eql(pin.*));
+        t.screens.active.assertIntegrity();
+    }
+    var after: std.Io.Writer.Allocating = .init(alloc);
+    defer after.deinit();
+    formatter = .init(t.screens.active, .{ .emit = .vt, .unwrap = true });
+    try formatter.format(&after.writer);
+    // VT output compares styles, combining codepoints and OSC8 links as well
+    // as text, across all pages and both slow and bulk-copy rows.
+    try testing.expectEqualStrings(before.written(), after.written());
+}
+
 test "Terminal: resize with reflow and saved cursor" {
     const alloc = testing.allocator;
     const io_impl = testing.io;
