@@ -9501,6 +9501,38 @@ test "Terminal: eraseChars clearing wrapped wide char marks spacer head row dirt
     }
 }
 
+test "Terminal: wide erasure dirties previous page on both screens" {
+    const alloc = testing.allocator;
+    for ([_]bool{ false, true }) |alternate| {
+        for ([_]bool{ false, true }) |delete| {
+            var t = try init(testing.io, alloc, .{ .cols = 5, .rows = 3 });
+            defer t.deinit(alloc);
+            if (alternate) try t.switchScreenMode(.@"1049", true);
+            const boundary = 1;
+            const pages = &t.screens.active.pages;
+            try pages.split(pages.pin(.{ .active = .{ .y = boundary } }).?);
+            t.screens.active.cursorReload();
+            // A region straddling the page boundary, with a wide glyph
+            // wrapped from the final row of the first page onto the second.
+            t.setTopAndBottomMargin(boundary, boundary + 2);
+            t.setCursorPos(boundary, 1);
+            try t.printString("ABCD字");
+            const head = pages.pin(.{ .screen = .{ .x = 4, .y = boundary - 1 } }).?;
+            const glyph_pin = head.down(1).?;
+            try testing.expect(head.node != glyph_pin.node);
+            try testing.expectEqual(Cell.Wide.spacer_head, head.rowAndCell().cell.wide);
+            t.setCursorPos(boundary + 1, 1);
+            t.clearDirty();
+            if (delete) t.deleteChars(1) else t.eraseChars(1);
+            try testing.expect(t.isDirty(.{ .screen = .{ .y = boundary - 1 } }));
+            try testing.expect(t.isDirty(.{ .screen = .{ .y = boundary } }));
+            try testing.expect(!t.isDirty(.{ .screen = .{ .y = boundary + 1 } }));
+            try testing.expectEqual(Cell.Wide.narrow, head.rowAndCell().cell.wide);
+            t.screens.active.assertIntegrity();
+        }
+    }
+}
+
 test "Terminal: reverseIndex" {
     const alloc = testing.allocator;
     const io_impl = testing.io;
