@@ -44,6 +44,7 @@ test "external paste uses confirmation and encoding without a running shell" {
             std.debug.assert(request == .paste);
             self.pending = state;
             // Match the host contract: copy before the C API returns.
+            if (self.text) |old| std.testing.allocator.free(old);
             self.text = std.testing.allocator.dupeZ(u8, std.mem.span(text)) catch unreachable;
         }
     };
@@ -58,6 +59,8 @@ test "external paste uses confirmation and encoding without a running shell" {
     app.opts.confirm_read_clipboard = Capture.confirm;
     var s: Surface = undefined;
     s.app = &app;
+    s.clipboard_requests = .empty;
+    defer s.deinitClipboardRequests();
     s.core_surface.alloc = alloc;
     s.core_surface.readonly = false;
     s.core_surface.config.clipboard_paste_protection = true;
@@ -115,6 +118,21 @@ test "external paste uses confirmation and encoding without a running shell" {
         }
         try testing.expectEqualStrings(case.expected, written.written());
     }
+    // Overlapping confirmations retain independent state. Closing the surface
+    // releases every pending state even if the host never answers the sheets.
+    var capture: Capture = .{};
+    defer if (capture.text) |v| alloc.free(v);
+    s.userdata = &capture;
+    s.pasteText("pending\nfirst");
+    s.pasteText("pending\nsecond");
+    try testing.expectEqual(2, s.clipboard_requests.count());
+    const last = capture.pending.?;
+    s.completeClipboardRequest("", last, true);
+    try testing.expectEqual(1, s.clipboard_requests.count());
+    // Repeating completion is ignored without reading the destroyed pointer.
+    s.completeClipboardRequest("", last, true);
+    s.deinitClipboardRequests();
+    try testing.expectEqual(0, s.clipboard_requests.count());
 }
 
 pub const App = struct {
@@ -484,6 +502,9 @@ pub const Surface = struct {
     size: apprt.SurfaceSize,
     cursor_pos: apprt.CursorPos,
 
+    /// Pending host confirmations own their state until completion or close.
+    clipboard_requests: std.AutoHashMapUnmanaged(*apprt.ClipboardRequest, void) = .empty,
+
     /// The current title of the surface. The embedded apprt saves this so
     /// that getTitle works without the implementer needing to save it.
     title: ?[:0]const u8 = null,
@@ -662,6 +683,8 @@ pub const Surface = struct {
     }
 
     pub fn deinit(self: *Surface) void {
+        self.deinitClipboardRequests();
+
         // Free our title
         if (self.title) |v| self.app.core_app.alloc.free(v);
 
@@ -720,10 +743,8 @@ pub const Surface = struct {
         // so that it is stable until the read_clipboard callback and call
         // complete_clipboard_request. This sucks but clipboard requests aren't
         // high throughput so it's probably fine.
-        const alloc = self.app.core_app.alloc;
-        const state_ptr = try alloc.create(apprt.ClipboardRequest);
-        errdefer alloc.destroy(state_ptr);
-        state_ptr.* = state;
+        const state_ptr = try self.createClipboardRequest(state);
+        errdefer self.destroyClipboardRequest(state_ptr);
 
         const started = self.app.opts.read_clipboard(
             self.userdata,
@@ -731,7 +752,7 @@ pub const Surface = struct {
             state_ptr,
         );
         if (!started) {
-            alloc.destroy(state_ptr);
+            self.destroyClipboardRequest(state_ptr);
             return false;
         }
 
@@ -742,11 +763,10 @@ pub const Surface = struct {
     /// The heap request survives this call when confirmation is needed.
     pub fn pasteText(self: *Surface, text: [:0]const u8) void {
         if (text.len == 0) return;
-        const state = self.app.core_app.alloc.create(apprt.ClipboardRequest) catch |err| {
+        const state = self.createClipboardRequest(.{ .paste = {} }) catch |err| {
             log.err("error allocating paste request err={}", .{err});
             return;
         };
-        state.* = .{ .paste = {} };
         self.completeClipboardRequest(text, state, false);
     }
 
@@ -756,7 +776,8 @@ pub const Surface = struct {
         state: *apprt.ClipboardRequest,
         confirmed: bool,
     ) void {
-        const alloc = self.app.core_app.alloc;
+        // Ignore already consumed requests before dereferencing host state.
+        if (!self.clipboard_requests.contains(state)) return;
 
         // Attempt to complete the request, but we may request
         // confirmation.
@@ -783,7 +804,28 @@ pub const Surface = struct {
 
         // We don't defer this because the clipboard confirmation route
         // preserves the clipboard request.
-        alloc.destroy(state);
+        self.destroyClipboardRequest(state);
+    }
+
+    fn createClipboardRequest(self: *Surface, request: apprt.ClipboardRequest) !*apprt.ClipboardRequest {
+        const alloc = self.app.core_app.alloc;
+        const state = try alloc.create(apprt.ClipboardRequest);
+        errdefer alloc.destroy(state);
+        state.* = request;
+        try self.clipboard_requests.put(alloc, state, {});
+        return state;
+    }
+
+    fn destroyClipboardRequest(self: *Surface, state: *apprt.ClipboardRequest) void {
+        if (self.clipboard_requests.remove(state)) self.app.core_app.alloc.destroy(state);
+    }
+
+    fn deinitClipboardRequests(self: *Surface) void {
+        const alloc = self.app.core_app.alloc;
+        var it = self.clipboard_requests.keyIterator();
+        while (it.next()) |state| alloc.destroy(state.*);
+        self.clipboard_requests.deinit(alloc);
+        self.clipboard_requests = .empty;
     }
 
     pub fn setClipboard(
@@ -1082,7 +1124,7 @@ pub const CAPI = struct {
     };
 
     // ghostty_clipboard_content_s
-    const ClipboardContent = extern struct {
+    pub const ClipboardContent = extern struct {
         mime: [*:0]const u8,
         data: [*:0]const u8,
     };

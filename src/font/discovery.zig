@@ -376,7 +376,7 @@ pub const CoreText = struct {
         // last font used by CoreText if it can't find anything else and
         // only contains replacement characters.
         last_resort: {
-            const name_str = font.copyPostScriptName();
+            const name_str = font.copyPostScriptName() orelse return null;
             defer name_str.release();
 
             // If the name doesn't fit in our buffer, then it can't

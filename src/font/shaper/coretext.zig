@@ -361,7 +361,7 @@ pub const Shaper = struct {
         // Make room for the attributed string, CTTypesetter, and CTLine.
         try self.cf_release_pool.ensureUnusedCapacity(self.alloc, 4);
 
-        const str = macos.foundation.String.createWithCharactersNoCopy(state.unichars.items);
+        const str = try macos.foundation.String.createWithCharactersNoCopy(state.unichars.items);
         self.cf_release_pool.appendAssumeCapacity(str);
 
         // Create an attributed string from our string
@@ -381,7 +381,7 @@ pub const Shaper = struct {
         self.cf_release_pool.appendAssumeCapacity(typesetter);
 
         // Create a line from the typesetter
-        const line = typesetter.createLine(.{ .location = 0, .length = 0 });
+        const line = try typesetter.createLine(.{ .location = 0, .length = 0 });
         self.cf_release_pool.appendAssumeCapacity(line);
 
         // This keeps track of the current x offset (sum of advance.width) and
@@ -2676,4 +2676,40 @@ fn testShaperWithDiscoveredFont(alloc: Allocator, font_req: [:0]const u8) !TestS
         .grid = grid_ptr,
         .lib = lib,
     };
+}
+
+test "CoreText boundary creation errors and Japanese shaping" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    var data = try testShaper(alloc);
+    defer data.deinit();
+    var t = try terminal.Terminal.init(testing.io, alloc, .{ .cols = 40, .rows = 2 });
+    defer t.deinit(alloc);
+    var stream = t.vtStream();
+    defer stream.deinit();
+    stream.nextSlice("日本語かな漢字 ATOK");
+    var state: terminal.RenderState = .empty;
+    defer state.deinit(alloc);
+    try state.update(alloc, &t);
+    const mode = if (std.c.getenv("ZASHIKI_CORETEXT_FAULT")) |v| std.mem.span(v) else "";
+    const fail = std.mem.eql(u8, mode, "string") or std.mem.eql(u8, mode, "typesetter") or std.mem.eql(u8, mode, "line");
+    // Repeat so that failure cleanup and recovery cannot accumulate objects.
+    for (0..8) |_| {
+        var it = data.shaper.runIterator(.{
+            .grid = data.grid,
+            .cells = state.row_data.get(0).cells.slice(),
+        });
+        var runs: usize = 0;
+        while (try it.next(alloc)) |run| {
+            runs += 1;
+            if (fail) {
+                try testing.expectError(error.OutOfMemory, data.shaper.shape(run));
+            } else {
+                try testing.expect((try data.shaper.shape(run)).len > 0);
+            }
+        }
+        try testing.expect(runs > 0);
+        data.shaper.endFrame();
+        try testing.expectEqual(0, data.shaper.cf_release_pool.items.len);
+    }
 }

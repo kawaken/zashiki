@@ -37,7 +37,7 @@ const macos = switch (builtin.os.tag) {
 };
 
 const DisplayLink = switch (builtin.os.tag) {
-    .macos => *macos.video.DisplayLink,
+    .macos => @import("DisplayLink.zig").DisplayLink,
     else => void,
 };
 
@@ -114,6 +114,7 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
 
         /// True if the window is focused
         focused: bool,
+        visible: bool = true,
 
         /// The most recent scrollbar state. We use this as a cache to
         /// determine if we need to notify the apprt that there was a
@@ -180,7 +181,10 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
         /// The CVDisplayLink used to drive the rendering loop in
         /// sync with the display. This is void on platforms that
         /// don't support a display link.
-        display_link: ?DisplayLink = null,
+        display_link: if (DisplayLink != void) ?*DisplayLink else void =
+            if (DisplayLink != void) null else {},
+        display_link_callback: ?*xev.Async = null,
+        macos_display_id: u32 = 0,
 
         /// Health of the most recently completed frame.
         health: std.atomic.Value(Health) = .{ .raw = .healthy },
@@ -541,15 +545,6 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
                 };
             };
 
-            const display_link: ?DisplayLink = switch (builtin.os.tag) {
-                .macos => if (options.config.vsync)
-                    try macos.video.DisplayLink.createWithActiveCGDisplays()
-                else
-                    null,
-                else => null,
-            };
-            errdefer if (display_link) |v| v.release();
-
             var result: Self = .{
                 .alloc = alloc,
                 .config = options.config,
@@ -606,7 +601,6 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
                 // Graphics API stuff
                 .api = api,
                 .swap_chain = swap_chain,
-                .display_link = display_link,
             };
 
             try result.initShaders();
@@ -626,12 +620,7 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             if (self.search_matches) |*m| m.arena.deinit();
             self.swap_chain.deinit();
 
-            if (DisplayLink != void) {
-                if (self.display_link) |display_link| {
-                    display_link.stop() catch {};
-                    display_link.release();
-                }
-            }
+            self.stopDisplayLink();
 
             self.cells.deinit(self.alloc);
 
@@ -679,6 +668,16 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             }
         }
 
+        /// Main thread only, after the render thread has joined. Stop the
+        /// callback before freeing renderer.Thread, including init failures.
+        pub fn stopDisplayLink(self: *Self) void {
+            if (comptime DisplayLink == void) return;
+            if (self.display_link) |display_link| {
+                display_link.close();
+                self.display_link = null;
+            }
+        }
+
         /// Callback called by renderer.Thread when it begins.
         pub fn threadEnter(self: *const Self, surface: *apprt.Surface) !void {
             // If our API has to do things on thread enter, let it.
@@ -705,16 +704,10 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             // If we don't support a display link we have no work to do.
             if (comptime DisplayLink == void) return;
 
-            // This is when we know our "self" pointer is stable so we can
-            // setup the display link. To setup the display link we set our
-            // callback and we can start it immediately.
-            const display_link = self.display_link orelse return;
-            try display_link.setOutputCallback(
-                xev.Async,
-                &displayLinkCallback,
-                &thr.draw_now,
-            );
-            display_link.start() catch {};
+            // The callback target is stable until renderer.deinit closes the
+            // link on main, before renderer.Thread destroys draw_now.
+            self.display_link_callback = &thr.draw_now;
+            self.syncDisplayLink();
         }
 
         /// Called by renderer.Thread when it exits the main loop.
@@ -731,7 +724,7 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             // that we either never started it or the view its attached to
             // is gone which is fine.
             const display_link = self.display_link orelse return;
-            display_link.stop() catch {};
+            display_link.setRunning(false);
         }
 
         /// This is called by the GTK apprt after the surface is
@@ -800,11 +793,8 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
         /// Called when we get an updated display ID for our display link.
         pub fn setMacOSDisplayID(self: *Self, id: u32) !void {
             if (comptime DisplayLink == void) return;
-            const display_link = self.display_link orelse return;
-            log.info("updating display link display id={}", .{id});
-            display_link.setCurrentCGDisplay(id) catch |err| {
-                log.warn("error setting display link display id err={}", .{err});
-            };
+            self.macos_display_id = id;
+            self.syncDisplayLink();
         }
 
         /// True if our renderer has animations so that a higher frequency
@@ -817,8 +807,11 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
         /// True if our renderer is using vsync. If true, the renderer or apprt
         /// is responsible for triggering draw_now calls to the render thread.
         /// That is the only way to trigger a drawFrame.
-        pub fn hasVsync(self: *const Self) bool {
+        pub fn hasVsync(self: *Self) bool {
             if (comptime DisplayLink == void) return false;
+            // Retry creation/start after temporarily unavailable displays or
+            // CoreVideo stopping the link during reconfiguration.
+            self.syncDisplayLink();
             const display_link = self.display_link orelse return false;
             return display_link.isRunning();
         }
@@ -831,34 +824,31 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
 
             self.focused = focus;
 
-            // If we're not focused, then we want to stop the display link
-            // because it is a waste of resources and we can move to pure
-            // change-driven updates.
-            if (comptime DisplayLink != void) link: {
-                const display_link = self.display_link orelse break :link;
-                if (focus) {
-                    display_link.start() catch {};
-                } else {
-                    display_link.stop() catch {};
-                }
-            }
+            self.syncDisplayLink();
         }
 
-        /// Callback when the window is visible or occluded.
-        ///
         /// Must be called on the render thread.
         pub fn setVisible(self: *Self, visible: bool) void {
-            // If we're not visible, then we want to stop the display link
-            // because it is a waste of resources and we can move to pure
-            // change-driven updates.
-            if (comptime DisplayLink != void) link: {
-                const display_link = self.display_link orelse break :link;
-                if (visible and self.focused) {
-                    display_link.start() catch {};
-                } else {
-                    display_link.stop() catch {};
-                }
-            }
+            self.visible = visible;
+            self.syncDisplayLink();
+        }
+
+        /// Publish desired state without waiting for main. Main may itself be
+        /// waiting for this thread to exit, so dispatch_sync would deadlock.
+        fn syncDisplayLink(self: *Self) void {
+            if (comptime DisplayLink == void) return;
+            const display_link = self.display_link orelse create_link: {
+                if (!self.config.vsync) return;
+                const callback = self.display_link_callback orelse return;
+                const result = DisplayLink.create(self.alloc, xev.Async, &displayLinkCallback, callback) catch |err| {
+                    log.warn("error creating display link; using fallback rendering err={}", .{err});
+                    return;
+                };
+                self.display_link = result;
+                break :create_link result;
+            };
+            display_link.setDisplay(self.macos_display_id);
+            display_link.setRunning(self.focused and self.visible);
         }
 
         /// Set the new font grid.
@@ -922,6 +912,9 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             state: *renderer.State,
             cursor_blink_visible: bool,
         ) Allocator.Error!void {
+            // Flush retained CoreText objects even when rebuilding fails.
+            defer self.font_shaper.endFrame();
+
             // We fully deinit and reset the terminal state every so often
             // so that a particularly large terminal state doesn't cause
             // the renderer to hold on to retained memory.
@@ -1185,10 +1178,6 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
                     else => {},
                 };
             }
-
-            // Notify our shaper we're done for the frame. For some shapers,
-            // such as CoreText, this triggers off-thread cleanup logic.
-            self.font_shaper.endFrame();
         }
 
         /// Draw the frame to the screen.

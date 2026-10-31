@@ -55,15 +55,15 @@ pub const Font = opaque {
         _ = c.CFRetain(self);
     }
 
-    pub fn copyDescriptor(self: *Font) *text.FontDescriptor {
+    pub fn copyDescriptor(self: *Font) ?*text.FontDescriptor {
         return @ptrCast(@constCast(c.CTFontCopyFontDescriptor(@ptrCast(self))));
     }
 
-    pub fn copyFeatures(self: *Font) *foundation.Array {
+    pub fn copyFeatures(self: *Font) ?*foundation.Array {
         return @ptrCast(@constCast(c.CTFontCopyFeatures(@ptrCast(self))));
     }
 
-    pub fn copyDefaultCascadeListForLanguages(self: *Font) *foundation.Array {
+    pub fn copyDefaultCascadeListForLanguages(self: *Font) ?*foundation.Array {
         return @ptrCast(@constCast(c.CTFontCopyDefaultCascadeListForLanguages(@ptrCast(self), null)));
     }
 
@@ -152,15 +152,15 @@ pub const Font = opaque {
         )));
     }
 
-    pub fn copyFamilyName(self: *Font) *foundation.String {
+    pub fn copyFamilyName(self: *Font) ?*foundation.String {
         return @ptrFromInt(@intFromPtr(c.CTFontCopyFamilyName(@ptrCast(self))));
     }
 
-    pub fn copyDisplayName(self: *Font) *foundation.String {
+    pub fn copyDisplayName(self: *Font) ?*foundation.String {
         return @ptrFromInt(@intFromPtr(c.CTFontCopyDisplayName(@ptrCast(self))));
     }
 
-    pub fn copyPostScriptName(self: *Font) *foundation.String {
+    pub fn copyPostScriptName(self: *Font) ?*foundation.String {
         return @ptrFromInt(@intFromPtr(c.CTFontCopyPostScriptName(@ptrCast(self))));
     }
 

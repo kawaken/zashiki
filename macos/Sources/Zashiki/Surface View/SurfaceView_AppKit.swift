@@ -2497,49 +2497,85 @@ extension Zashiki.SurfaceView {
 /// Caches a value for some period of time, evicting it automatically when that time expires.
 /// We use this to cache our surface content. This probably should be extracted some day
 /// to a more generic helper.
-class CachedValue<T> {
+final class CachedValue<T> {
+    private let lock = NSLock()
     private var value: T?
     private let fetch: () -> T
     private let duration: Duration
+    private let sleep: (ContinuousClock.Instant) async throws -> Void
     private var expiryTask: Task<Void, Never>?
+    private var generation: UInt64 = 0
 
-    init(duration: Duration, fetch: @escaping () -> T) {
+    init(
+        duration: Duration,
+        sleep: @escaping (ContinuousClock.Instant) async throws -> Void = { try await Task.sleep(until: $0) },
+        fetch: @escaping () -> T
+    ) {
         self.duration = duration
+        self.sleep = sleep
         self.fetch = fetch
     }
 
     deinit {
+        lock.lock()
         expiryTask?.cancel()
+        expiryTask = nil
+        lock.unlock()
     }
 
     func get() -> T {
+        lock.lock()
         if let value {
+            lock.unlock()
             return value
         }
+        let fetchedGeneration = generation
+        lock.unlock()
 
-        // We don't have a value (or it expired). Fetch and store.
+        // Fetch can call into the core or reenter the cache (including
+        // invalidate). Never hold the state lock across that call. Concurrent
+        // misses may fetch more than once; the first current result is cached.
         let result = fetch()
-        let now = ContinuousClock.now
-        let expires = now + duration
-        self.value = result
 
-        // Schedule a task to clear the value
+        lock.lock()
+        defer { lock.unlock() }
+        // An in-flight read may finish after invalidation, but cannot publish
+        // its old result into the new generation.
+        guard generation == fetchedGeneration else { return result }
+        if let value { return value }
+        value = result
+
+        let expires = ContinuousClock.now + duration
+        let sleep = self.sleep
         expiryTask = Task { [weak self] in
             do {
-                try await Task.sleep(until: expires)
-                self?.value = nil
-                self?.expiryTask = nil
+                try await sleep(expires)
+                self?.expire(generation: fetchedGeneration)
             } catch {
-                // Task was cancelled, do nothing
+                // Cancellation leaves the newer generation untouched.
             }
         }
-
         return result
     }
 
-    /// Clear the cached value immediately, ignoring the configured
-    /// duration. The next call to `get()` will call `fetch()` again.
+    /// Clear the cached value immediately. The next get fetches again.
     func invalidate() {
+        lock.lock()
+        defer { lock.unlock() }
+        invalidateLocked()
+    }
+
+    private func expire(generation: UInt64) {
+        lock.lock()
+        defer { lock.unlock() }
+        // Cancellation alone is insufficient: an old task may already have
+        // finished sleeping and be waiting for our lock when we invalidate.
+        guard self.generation == generation else { return }
+        invalidateLocked()
+    }
+
+    private func invalidateLocked() {
+        generation &+= 1
         value = nil
         expiryTask?.cancel()
         expiryTask = nil
