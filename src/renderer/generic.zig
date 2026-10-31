@@ -906,6 +906,39 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             };
         }
 
+        /// Periodically release retained CPU render state after large frames.
+        fn cycleTerminalState(self: *Self) void {
+            // About 12 minutes at 120Hz. Restart the interval after cleanup.
+            if (self.terminal_state_frame_count >= 100_000) {
+                self.terminal_state.deinit(self.alloc);
+                self.terminal_state = .empty;
+                self.terminal_state_frame_count = 0;
+            }
+            self.terminal_state_frame_count += 1;
+        }
+
+        test "retained terminal state cleanup restarts its interval" {
+            const testing = std.testing;
+            var r: Self = undefined;
+            r.alloc = testing.allocator;
+            r.terminal_state = .empty;
+            defer r.terminal_state.deinit(r.alloc);
+            r.terminal_state_frame_count = 99_999;
+            // A sentinel in otherwise empty state reveals unwanted rebuilds.
+            r.terminal_state.cols = 80;
+            r.cycleTerminalState();
+            try testing.expectEqual(80, r.terminal_state.cols);
+            r.cycleTerminalState();
+            try testing.expectEqual(0, r.terminal_state.cols);
+            try testing.expectEqual(1, r.terminal_state_frame_count);
+            r.terminal_state.cols = 80;
+            for (0..99_999) |_| r.cycleTerminalState();
+            try testing.expectEqual(80, r.terminal_state.cols);
+            r.cycleTerminalState();
+            try testing.expectEqual(0, r.terminal_state.cols);
+            try testing.expectEqual(1, r.terminal_state_frame_count);
+        }
+
         /// Update the frame data.
         pub fn updateFrame(
             self: *Self,
@@ -915,17 +948,7 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             // Flush retained CoreText objects even when rebuilding fails.
             defer self.font_shaper.endFrame();
 
-            // We fully deinit and reset the terminal state every so often
-            // so that a particularly large terminal state doesn't cause
-            // the renderer to hold on to retained memory.
-            //
-            // Frame count is ~12 minutes at 120Hz.
-            const max_terminal_state_frame_count = 100_000;
-            if (self.terminal_state_frame_count >= max_terminal_state_frame_count) {
-                self.terminal_state.deinit(self.alloc);
-                self.terminal_state = .empty;
-            }
-            self.terminal_state_frame_count += 1;
+            self.cycleTerminalState();
 
             // Create an arena for all our temporary allocations while rebuilding
             var arena = ArenaAllocator.init(self.alloc);
