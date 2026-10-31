@@ -52,7 +52,7 @@
 
 - #302実装: 成功時はretain close、失敗・選択なしはdelete closeへ統一。initのエラー時も親handleと作成済みディレクトリを回収。128回のretain/delete、FD閉鎖、保持した日本語内容の再読込テストを追加し、osのtest rootへ登録した。親closeを外すとBADF期待で失敗、復元すると`just test-filter TempDir`成功。実際の外部エディタ起動は未実施。
 
-- #300: libxevのkqueue backendはloop停止後に未処理callbackを再実行せず、stream.deinitはFDを閉じない。通常の終了はsubprocess.stopでFDを閉じ、IO thread内でpoolを最後に解放する。3MiBを137 byteずつ読み取りつつ3回追加する回帰テストは、元のSegmentedPoolでexpected 0 / found 125のデータ不一致を再現。修正後に一致しCRLF・日本語も維持。closed FDによる実OS write error callbackを検証。write errorは回復不能なapp障害ではなく、警告ログとしテストの意図したerror log失敗も避ける。未完了要求を残したloop停止でtesting allocatorに漏れなし。
+- #300: libxevのkqueue backendはloop停止後に未処理callbackを再実行せず、stream.deinitはFDを閉じない。通常の終了はsubprocess.stopでFDを閉じ、IO thread内でpoolを最後に解放する。3MiBを137 byteずつ読み取りつつ3回追加する回帰テストは、元のSegmentedPoolでexpected 0 / found 125のデータ不一致を再現。修正後に一致しCRLF・日本語も維持。SIGPIPEを抑制したbroken pipeによる実OS write error callbackを検証。write errorは回復不能なapp障害ではなく、警告ログとしテストの意図したerror log失敗も避ける。未完了要求を残したloop停止でtesting allocatorに漏れなし。
 
 - #303実装: display name欠落はfamily nameへfallback。Copy文字列は呼び出し側bufferにコピーしてrelease。descriptor/family/PostScriptの失敗もoptional化し、font resizeはOOM、fallback discoveryは候補なしとして扱う。CFString・Typesetter lineのOOMをshaperへ伝播し、renderer.updateFrameはdeferでendFrameを必ず呼ぶ。日本語shapingと8 frame反復を検証。dyld interpositionによるdisplay/string/typesetter/lineの4種類のnull注入はすべて成功。displayのnull判定だけ外すとSIGABRTで失敗し、復元後に再成功。実OSのOOMやATOKの視覚操作は未実施。
 
@@ -65,3 +65,5 @@
 - #302追加回帰: 実際のSurface.writeScreenFileをembedded runtimeのhost callbackまで通し、screen/history/selection × plain/VT/HTMLを8反復（72出力）、consumerへ渡す直前のOOMを8回、選択なしを32回実行。各回のFD数がbaselineと一致し、成功時は返却後のファイル読込が成功。外部アプリの実起動はしていない。embedded test targetへ常時登録した。
 
 - #301実装・検証: CoreVideo操作をmainだけに限定し、render側はatomic desired stateと非同期queueのみ使用。停止を要求した後でもrenderer.Thread.draw_nowはrenderer.close完了まで生存させる。queued syncが残る場合はwrapperの解放を最後のqueued callbackへ委譲。mockの4テスト（集約、close、開始失敗/外部停止、開始中stop要求）成功。desired変更時のqueueを外すとstop要求テストが失敗。実際のスリープ・hotplug・解像度変更、thread spawn失敗注入は未実施。
+
+- #300テスト調整: closed FDはlibxev内でUnexpected errnoのstack traceを出すため、実際の切断相当のbroken pipeでerror completionを検証する形に変更。実行成功し、不要な診断出力もなくなった。

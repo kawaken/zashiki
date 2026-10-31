@@ -1990,7 +1990,7 @@ test "PTY writes release requests after write errors" {
     var loop = try xev.Loop.init(.{});
     defer loop.deinit();
     const fds = try compat_fd.pipe2(.{ .CLOEXEC = true, .NONBLOCK = true });
-    defer _ = posix.system.close(fds[0]);
+    defer _ = posix.system.close(fds[1]);
     var td: termio.Termio.ThreadData = undefined;
     td.loop = &loop;
     td.backend = .{ .exec = .{
@@ -2003,8 +2003,9 @@ test "PTY writes release requests after write errors" {
         .termios_timer = try xev.Timer.init(),
     } };
     defer td.backend.deinit(alloc);
-    // A positive, closed descriptor exercises the OS error completion.
-    _ = posix.system.close(fds[1]);
+    // A broken pipe exercises the OS write-error completion without SIGPIPE.
+    _ = posix.system.fcntl(fds[1], posix.F.SETNOSIGPIPE, @as(c_int, 1));
+    _ = posix.system.close(fds[0]);
     var exec: Exec = undefined;
     for (0..2) |_| {
         try exec.queueWrite(alloc, &td, "failed write", false);
