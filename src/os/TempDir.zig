@@ -2,6 +2,7 @@
 //! store temporary data and is destroyed on deinit.
 const TempDir = @This();
 
+const builtin = @import("builtin");
 const std = @import("std");
 const Dir = std.Io.Dir;
 const file = @import("file.zig");
@@ -33,6 +34,7 @@ pub fn init() !TempDir {
         defer file.freeTmpDir(std.heap.page_allocator, tmp_dir);
         break :dir try cwd.openDir(global.io(), tmp_dir, .{});
     };
+    errdefer dir.close(global.io());
 
     // We now loop forever until we can find a directory that we can create.
     while (true) {
@@ -43,6 +45,7 @@ pub fn init() !TempDir {
             error.PathAlreadyExists => continue,
             else => |e| return e,
         };
+        errdefer dir.deleteTree(global.io(), tmp_path) catch {};
 
         return TempDir{
             .dir = try dir.openDir(global.io(), tmp_path, .{}),
@@ -61,25 +64,49 @@ pub fn name(self: *TempDir) []const u8 {
 /// Finish with the temporary directory. This deletes all contents in the
 /// directory.
 pub fn deinit(self: *TempDir) void {
-    self.dir.close(global.io());
-    self.parent.deleteTree(global.io(), self.name()) catch |err|
-        log.err("error deleting temp dir err={}", .{err});
+    self.close(.delete);
 }
 
-test {
+pub const CloseMode = enum { delete, retain };
+
+/// Close both handles. Retaining leaves the files available to consumers.
+pub fn close(self: *TempDir, mode: CloseMode) void {
+    self.dir.close(global.io());
+    if (mode == .delete) self.parent.deleteTree(global.io(), self.name()) catch |err|
+        log.err("error deleting temp dir err={}", .{err});
+    self.parent.close(global.io());
+}
+
+// Repetition also catches descriptor reuse and success-path leaks.
+test "TempDir closes handles and retains or deletes contents" {
     const testing = std.testing;
-
-    var td = try init();
-    errdefer td.deinit();
-
-    const nameval = td.name();
-    try testing.expect(nameval.len > 0);
-
-    // Can open a new handle to it proves it exists.
-    var dir = try td.parent.openDir(testing.io, nameval, .{});
-    dir.close(testing.io);
-
-    // Should be deleted after we deinit
-    td.deinit();
-    try testing.expectError(error.FileNotFound, td.parent.openDir(testing.io, nameval, .{}));
+    for (0..128) |i| {
+        var td = try init();
+        var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+        const path = path_buf[0..try td.dir.realPath(testing.io, &path_buf)];
+        const handles = [_]Dir.Handle{ td.dir.handle, td.parent.handle };
+        {
+            const f = try td.dir.createFile(testing.io, "screen.txt", .{});
+            defer f.close(testing.io);
+            try f.writeStreamingAll(testing.io, "terminal 日本語");
+        }
+        const retain = i % 2 == 0;
+        td.close(if (retain) .retain else .delete);
+        if (builtin.os.tag == .macos) {
+            for (handles) |handle| {
+                const result = std.posix.system.fcntl(handle, std.posix.F.GETFD);
+                try testing.expectEqual(std.posix.E.BADF, std.posix.errno(result));
+            }
+        }
+        if (retain) {
+            defer Dir.cwd().deleteTree(testing.io, path) catch {};
+            var dir = try Dir.openDirAbsolute(testing.io, path, .{});
+            defer dir.close(testing.io);
+            const contents = try dir.readFileAlloc(testing.io, "screen.txt", testing.allocator, .limited(1024));
+            defer testing.allocator.free(contents);
+            try testing.expectEqualStrings("terminal 日本語", contents);
+        } else {
+            try testing.expectError(error.FileNotFound, Dir.openDirAbsolute(testing.io, path, .{}));
+        }
+    }
 }

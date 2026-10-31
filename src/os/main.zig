@@ -43,6 +43,7 @@ pub const ResourcesDir = resourcesdir.ResourcesDir;
 pub const ShellEscapeWriter = shell.ShellEscapeWriter;
 
 test {
+    _ = TempDir;
     _ = file;
     _ = path;
     _ = uri;

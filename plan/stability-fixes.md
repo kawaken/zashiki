@@ -46,4 +46,7 @@
 
 ## 実装・検証記録
 
-調査や検証で判明した事項をここへ追記する。
+- #302: TempDirは成功時の2 handle漏れに加えて、deinitでもparent未close。initの親open後・子create後のエラー処理も不足していたため同時に修正する。
+- #303: DeferredFaceのCopy系文字列はreleaseされず、返却文字列も内部ポインタだった。bufへコピーしてreleaseする所有権へ揃える必要がある。
+
+- #302実装: 成功時はretain close、失敗・選択なしはdelete closeへ統一。initのエラー時も親handleと作成済みディレクトリを回収。128回のretain/delete、FD閉鎖、保持した日本語内容の再読込テストを追加し、osのtest rootへ登録した。親closeを外すとBADF期待で失敗、復元すると`just test-filter TempDir`成功。実際の外部エディタ起動は未実施。
