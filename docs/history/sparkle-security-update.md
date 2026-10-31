@@ -20,6 +20,8 @@ v0.12.0の正式版配布を基準にし、古いstable/preview分離は復活�
   Zashikiの最低OSはmacOS 15なので引き上げ不要。Package.swiftは
   swift-tools-version 5.5でバイナリXCFrameworkを提供する。
   Xcode 26系のCIと現在のXcodeでAPI・ソースツールのビルドを確認する。
+  [公式README](https://github.com/sparkle-project/Sparkle/blob/2.10.1/README.markdown)
+  のビルド要件は最新メジャーXcodeとその一つ前で、27/26が該当する。
 - 2.9.6は最低限の代替案だが、2.10.1のappcast解析とインストール修正も
   取り込む。2.10.1で互換性に問題があれば選定を見直す。
 - [公式security advisories](https://github.com/sparkle-project/Sparkle/security/advisories)
@@ -49,3 +51,37 @@ v0.12.0の正式版配布を基準にし、古いstable/preview分離は復活�
    未確認事項としてPRへ明記する。
 6. 結果を本Planへ追記しdocs/historyへ移動、PRのCI後に通常mergeのAutoMerge。
    マージ確認後にIssueへ記録しwipを外して明示的にcloseする。
+
+## 実装中の確認事項
+
+- release workflowは`-onlyUsePackageVersionsFromResolvedFile`で専用ディレクトリへ
+  依存を解決し、SparkleのHEADとlockfileのrevision一致を検査してからツールを
+  ビルドする。同オプションでの解決とrevision一致をローカルで確認した。
+- Xcode 27.2でgenerate_appcast・sign_updateのReleaseビルドに成功。
+  一時Ed25519 seedをファイルから標準入力へ渡し、Keychainや配布鍵を使わず検証した。
+  正しいZIP署名、generate_appcastとsign_updateの署名一致、同じサイズの改変ZIPと
+  別鍵の拒否、旧項目の保持、現行URL・version・length・最低OS、delta無しを確認。
+  一時秘密鍵ファイルは検証後に削除した。
+- ReleaseFast/nativeのZashiki.appビルド成功。同梱Sparkle 2.10.1、最低OS 12.0、
+  アプリ最低OS 15.0、`SUEnableAutomaticChecks=false`を生成済みplistで確認。
+- 2026-10-31の読み取り確認で、現在の公開feed
+  `https://apps.kawaken.dev/zashiki/appcast.xml` はHTTP 404だった。
+  既存のURL・配布基盤は本件で変更せず、オンライン更新チェック成功とは扱わない。
+  実アプリでの更新適用、配布鍵署名、Developer ID・notarizationも未検証。
+- GitHub Release v0.12.0のappcastは読み取り取得でき、正式版0.12.0と0.11.0の
+  項目・ZIP URL・EdDSA署名属性が存在した。公開feedの404と区別する。
+
+## 検証結果と完了手順
+
+- `just test`: exit 0。shell integration 2件、Zigフルテスト、macOS XCTestを実行。
+  XCTestは399件通過（更新状態・表示の既存テスト33件を含む）。
+- `just lint`: exit 0。Swift 204ファイルで違反0、Zig整形チェックも成功。
+- `zig build -Doptimize=ReleaseFast -Dxcframework-target=native`: exit 0。
+- release workflowのYAML読込・抽出したbashの`bash -n`と`git diff --check`: 成功。
+- Package.resolvedはXcodeの依存解決で生成し、Sparkle以外のpinは変更なし。
+  解決済みrevisionは`ab7d71291238df6e0492143b120c9b696a35f603`。
+- PR #314で`just test-fast`と`just lint`を最終headに対して確認してからAutoMergeする。
+  通常のPRアプリartifact buildはneeds-verification無しなのでskipされるが、
+  ローカルのReleaseFastビルドでアプリを検証済み。
+- 実リリース・既存Release assets・Developer ID・notarization・自動更新設定は変更しない。
+  マージ後、#304へ結果を記録しwipを外して明示的にcloseする。
