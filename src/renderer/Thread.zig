@@ -364,6 +364,10 @@ fn drainMailbox(self: *Thread) !void {
                 // Visibility affects our QoS class
                 self.setQosClass();
 
+                // Publish visibility before the catch-up draw. The renderer
+                // rejects all draws while hidden and may have no GPU resources.
+                self.renderer.setVisible(v);
+
                 // If we became visible then we immediately rebuild cells
                 // (renderCallback skips updateFrame while invisible) and draw.
                 if (v) {
@@ -374,9 +378,6 @@ fn drainMailbox(self: *Thread) !void {
                         log.warn("error rendering on visibility regain err={}", .{err});
                     self.drawFrame(false);
                 }
-
-                // Notify the renderer so it can update any state.
-                self.renderer.setVisible(v);
 
                 // Note that we're explicitly today not stopping any
                 // cursor timers, draw timers, etc. These things have very
