@@ -186,6 +186,7 @@ extension Zashiki {
 
         // This is set to non-null during keyDown to accumulate insertText contents
         private var keyTextAccumulator: [String]?
+        private var committedTextDecoder = CommittedTextDecoder()
 
         // True when we've consumed a left mouse-down only to move focus and
         // should suppress the matching mouse-up from being reported.
@@ -834,6 +835,7 @@ extension Zashiki {
         }
 
         override func resignFirstResponder() -> Bool {
+            committedTextDecoder.reset()
             let result = super.resignFirstResponder()
 
             // We sometimes call this manually (see SplitView) as a way to force us to
@@ -1179,6 +1181,9 @@ extension Zashiki {
             self.lastPerformKeyEvent = nil
 
             self.interpretKeyEvents([translationEvent])
+            if keyTextAccumulator?.isEmpty != false {
+                committedTextDecoder.reset()
+            }
 
             // If our keyboard changed from this we just assume an input method
             // grabbed it and do nothing.
@@ -1976,6 +1981,7 @@ extension Zashiki.SurfaceView: NSTextInputClient {
     }
 
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
+        committedTextDecoder.reset()
         switch string {
         case let v as NSAttributedString:
             self.markedText = NSMutableAttributedString(attributedString: v)
@@ -2121,15 +2127,7 @@ extension Zashiki.SurfaceView: NSTextInputClient {
         guard NSApp.currentEvent != nil else { return }
 
         // We want the string view of the any value
-        let chars: String
-        switch string {
-        case let value as NSAttributedString:
-            chars = value.string
-        case let value as String:
-            chars = value
-        default:
-            return
-        }
+        guard let chars = committedTextDecoder.decode(string) else { return }
 
         let hadMarkedText = hasMarkedText()
 
@@ -2590,5 +2588,40 @@ final class CachedValue<T> {
         value = nil
         expiryTask?.cancel()
         expiryTask = nil
+    }
+}
+
+/// Unicode Hex Input can commit a UTF-16 surrogate as a separate NSString.
+/// Inspect code units before bridging to String, which replaces lone surrogates.
+struct CommittedTextDecoder {
+    private var lead: unichar?
+
+    mutating func reset() {
+        lead = nil
+    }
+
+    mutating func decode(_ value: Any) -> String? {
+        if let attributed = value as? NSAttributedString {
+            reset()
+            return attributed.string
+        }
+        guard let text = value as? NSString else {
+            reset()
+            return nil
+        }
+        if text.length == 1 {
+            let unit = text.character(at: 0)
+            if UTF16.isLeadSurrogate(unit) {
+                lead = unit
+                return ""
+            }
+            if UTF16.isTrailSurrogate(unit) {
+                defer { reset() }
+                guard let lead else { return "" }
+                return String(decoding: [lead, unit], as: UTF16.self)
+            }
+        }
+        reset()
+        return text as String
     }
 }
