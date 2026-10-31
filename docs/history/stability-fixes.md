@@ -73,3 +73,13 @@
 - その他の後続差分: #299のfocus待ち確認queue・Kitty clipboard session grantは別機能として採用しない。非focused時に元から応答されない要求もsurface破棄時には追跡回収する。#300の後続にはexec環境の初期化失敗処理やtoolchain変更があるが、write poolの寿命変更ではない。#298のcache同期、#303の2 creation wrapperには追加の対象修正は見つからなかった。
 
 - #302の最終方式でも、parent closeだけを除くと実出力のFD増加検査が失敗し、修正を復元すると成功することを確認した。
+
+
+## 統合検証
+
+- `just test`: Zig全件とmacOS XCTestを実行して成功。新規CachedValue/clipboard Swiftテストもアプリのtest targetで成功した。
+- 以後の追加はscreen exportの回帰テスト登録と安定化、PTY errorテストの切断方式変更であり、各focused testで検証済み。
+- CachedValueとclipboard completionの実装をそのまま抽出したSwiftテストをTSan付きで実行し、9テスト成功・競合報告なし。アプリ全体のTSanではない。
+- CoreTextの日本語正常系と4種null注入を検証済み。
+- 全件CI相当チェックとアプリビルドの最終結果、GitHub CIはPR完了時に追記する。
+- 実機未確認: スリープ復帰、ディスプレイ抜き差し/解像度変更、ATOK下線とIME周辺文字列の視覚操作、確認sheetの操作、外部エディタ起動、実PTYへの手動大量貼り付け。これらを実施済みとは扱わず、ユーザー指示によりマージ条件にも設定しない。
