@@ -15,14 +15,14 @@
 
 ## 調査と設計
 
-| Issue | 現行コードの到達経路と問題 | 方針・回帰検証 |
-| --- | --- | --- |
-| #302 | `write_*_file` → `Surface.writeScreenFile`。成功時にTempDirの2つのhandleが閉じない。deinitもparentを閉じない。初期化エラー経路も確認する。 | ファイルを保持するcloseと削除を区別する。成功・失敗・選択なしをdeferで統一。handle閉鎖、保持した内容の再読み込み、反復時のFDを検証。 |
-| #300 | `Exec.queueWrite`は64 byte単位でSegmentedPoolを2つcheckoutする。grow後のmodulo巡回は未完了領域へ戻り得る。 | pointer-stableなMemoryPoolに要求とbufferを一体で保持し、完了した個体だけ返す。拡張・低速相手・CRLF・write error・終了時の寿命を検証。 |
-| #303 | `CTFontCopyDisplayName`、CFString生成、Typesetterのline生成のnullを非optional化している。 | optional/errorを呼び出し元まで伝播。表示名欠落はfamily nameにfallback。Copy所有権とshaperの失敗時解放を確認。日本語の正常描画と失敗注入を検証。 |
-| #298 | accessibilityとIMEが同じCachedValueを使用。Task失効はget/invalidateと非同期にvalue/taskを変更する。 | fetch中は状態lockを保持せず、invalidate世代とexpiry世代を検証する。再入・古いTask・並行get/invalidate・破棄を検証し、TSanの実行可否と限界を記録。 |
-| #299 | 重複clipboard確認の通知callback中にnative requestを同期完了している。 | 次のmain queue turnで元surfaceが生存している場合だけ拒否完了する。閉鎖、連続要求、承認・拒否・キャンセルとnative側の所有権を確認。 |
-| #301 | render threadのloopEnter/Exit、focus/visible、display変更からCVDisplayLinkを直接操作。Surfaceはcallback先のrenderer_threadを先に破棄。 | 状態要求は非同期にmain queueへ集約。mainがrenderをjoinする間もrenderはmainを同期waitしない。stop完了前にcallback先を解放しない。状態収束・queued close・寿命を検証。 |
+| Issue | 現行コードの到達経路と問題                                                                                                                 | 方針・回帰検証                                                                                                                                                       |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #302  | `write_*_file` → `Surface.writeScreenFile`。成功時にTempDirの2つのhandleが閉じない。deinitもparentを閉じない。初期化エラー経路も確認する。 | ファイルを保持するcloseと削除を区別する。成功・失敗・選択なしをdeferで統一。handle閉鎖、保持した内容の再読み込み、反復時のFDを検証。                                 |
+| #300  | `Exec.queueWrite`は64 byte単位でSegmentedPoolを2つcheckoutする。grow後のmodulo巡回は未完了領域へ戻り得る。                                 | pointer-stableなMemoryPoolに要求とbufferを一体で保持し、完了した個体だけ返す。拡張・低速相手・CRLF・write error・終了時の寿命を検証。                                |
+| #303  | `CTFontCopyDisplayName`、CFString生成、Typesetterのline生成のnullを非optional化している。                                                  | optional/errorを呼び出し元まで伝播。表示名欠落はfamily nameにfallback。Copy所有権とshaperの失敗時解放を確認。日本語の正常描画と失敗注入を検証。                      |
+| #298  | accessibilityとIMEが同じCachedValueを使用。Task失効はget/invalidateと非同期にvalue/taskを変更する。                                        | fetch中は状態lockを保持せず、invalidate世代とexpiry世代を検証する。再入・古いTask・並行get/invalidate・破棄を検証し、TSanの実行可否と限界を記録。                    |
+| #299  | 重複clipboard確認の通知callback中にnative requestを同期完了している。                                                                      | 次のmain queue turnで元surfaceが生存している場合だけ拒否完了する。閉鎖、連続要求、承認・拒否・キャンセルとnative側の所有権を確認。                                   |
+| #301  | render threadのloopEnter/Exit、focus/visible、display変更からCVDisplayLinkを直接操作。Surfaceはcallback先のrenderer_threadを先に破棄。     | 状態要求は非同期にmain queueへ集約。mainがrenderをjoinする間もrenderはmainを同期waitしない。stop完了前にcallback先を解放しない。状態収束・queued close・寿命を検証。 |
 
 ## 個別採用元
 
@@ -74,12 +74,13 @@
 
 - #302の最終方式でも、parent closeだけを除くと実出力のFD増加検査が失敗し、修正を復元すると成功することを確認した。
 
-
 ## 統合検証
 
 - `just test`: Zig全件とmacOS XCTestを実行して成功。新規CachedValue/clipboard Swiftテストもアプリのtest targetで成功した。
 - 以後の追加はscreen exportの回帰テスト登録と安定化、PTY errorテストの切断方式変更であり、各focused testで検証済み。
 - CachedValueとclipboard completionの実装をそのまま抽出したSwiftテストをTSan付きで実行し、9テスト成功・競合報告なし。アプリ全体のTSanではない。
 - CoreTextの日本語正常系と4種null注入を検証済み。
-- 全件CI相当チェックとアプリビルドの最終結果、GitHub CIはPR完了時に追記する。
+- `just ci`: Zig全件、embedded clipboard/exportテスト、Swiftビルド、lintを実行して成功。SwiftLintは207ファイルで違反0。最後のFD検査方式変更もfocused testで再検証した。
+- `just build`: macOSアプリのビルド成功。配布・更新設定の差分はない。
+- GitHub CIの結果は統合PR #316に記録する。CIで見つかったtest discovery境界と後続修正に関する判断は上記へ反映済み。
 - 実機未確認: スリープ復帰、ディスプレイ抜き差し/解像度変更、ATOK下線とIME周辺文字列の視覚操作、確認sheetの操作、外部エディタ起動、実PTYへの手動大量貼り付け。これらを実施済みとは扱わず、ユーザー指示によりマージ条件にも設定しない。
