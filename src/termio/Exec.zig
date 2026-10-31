@@ -22,7 +22,6 @@ const shell_integration = @import("shell_integration.zig");
 const terminal = @import("../terminal/main.zig");
 const termio = @import("../termio.zig");
 const Command = @import("../Command.zig");
-const SegmentedPool = @import("../datastruct/main.zig").SegmentedPool;
 const ptypkg = @import("../pty.zig");
 const Pty = ptypkg.Pty;
 const EnvMap = std.process.Environ.Map;
@@ -355,8 +354,9 @@ pub fn queueWrite(
     // our cached buffers that we can queue to the stream.
     var i: usize = 0;
     while (i < data.len) {
-        const req = try exec.write_req_pool.getGrow(alloc);
-        const buf = try exec.write_buf_pool.getGrow(alloc);
+        const w = try exec.write_pool.create(alloc);
+        w.td = exec;
+        const buf = &w.buf;
         const slice = slice: {
             // The maximum end index is either the end of our data or
             // the end of our buffer, whichever is smaller.
@@ -396,29 +396,28 @@ pub fn queueWrite(
         exec.write_stream.queueWrite(
             td.loop,
             &exec.write_queue,
-            req,
+            &w.req,
             .{ .slice = slice },
-            termio.Exec.ThreadData,
-            exec,
+            ThreadData.Write,
+            w,
             ttyWrite,
         );
     }
 }
 
 fn ttyWrite(
-    td_: ?*ThreadData,
+    w_: ?*ThreadData.Write,
     _: *xev.Loop,
     _: *xev.Completion,
     _: xev.Stream,
     _: xev.WriteBuffer,
     r: xev.WriteError!usize,
 ) xev.CallbackAction {
-    const td = td_.?;
-    td.write_req_pool.put();
-    td.write_buf_pool.put();
+    const w = w_.?;
+    w.td.write_pool.destroy(w);
 
     const d = r catch |err| {
-        log.err("write error: {}", .{err});
+        log.warn("write error: {}", .{err});
         return .disarm;
     };
     _ = d;
@@ -429,9 +428,12 @@ fn ttyWrite(
 
 /// The thread local data for the exec implementation.
 pub const ThreadData = struct {
-    // The preallocation size for the write request pool. This should be big
-    // enough to satisfy most write requests. It must be a power of 2.
-    const WRITE_REQ_PREALLOC = std.math.pow(usize, 2, 5);
+    /// A request and its buffer stay checked out together until completion.
+    pub const Write = struct {
+        td: *ThreadData,
+        req: xev.WriteRequest,
+        buf: [64]u8,
+    };
 
     /// Process start time and boolean of whether its already exited.
     start: std.Io.Timestamp,
@@ -443,12 +445,8 @@ pub const ThreadData = struct {
     /// The process watcher
     process: ?xev.Process,
 
-    /// This is the pool of available (unused) write requests. If you grab
-    /// one from the pool, you must put it back when you're done!
-    write_req_pool: SegmentedPool(xev.WriteRequest, WRITE_REQ_PREALLOC) = .{},
-
-    /// The pool of available buffers for writing to the pty.
-    write_buf_pool: SegmentedPool([64]u8, WRITE_REQ_PREALLOC) = .{},
+    /// Only the completed write is returned; pending writes never alias.
+    write_pool: std.heap.MemoryPool(Write) = .empty,
 
     /// The write queue for the data stream.
     write_queue: xev.WriteQueue = .{},
@@ -474,12 +472,6 @@ pub const ThreadData = struct {
     pub fn deinit(self: *ThreadData, alloc: Allocator) void {
         _ = posix.system.close(self.read_thread_pipe);
 
-        // Clear our write pools. We know we aren't ever going to do
-        // any more IO since we stop our data stream below so we can just
-        // drop this.
-        self.write_req_pool.deinit(alloc);
-        self.write_buf_pool.deinit(alloc);
-
         // Stop our process watcher
         if (self.process) |*p| p.deinit();
 
@@ -488,6 +480,10 @@ pub const ThreadData = struct {
 
         // Stop our termios timer
         self.termios_timer.deinit();
+
+        // The event loop has stopped and the stream is closed. No callback
+        // can access pending requests, so their storage can now be released.
+        self.write_pool.deinit(alloc);
     }
 };
 
@@ -1913,4 +1909,109 @@ test "execCommand: direct command, config freed" {
     try testing.expectEqual(2, result.len);
     try testing.expectEqualStrings(result[0], "foo");
     try testing.expectEqualStrings(result[1], "bar baz");
+}
+
+test "PTY writes remain stable across growth and partial drain" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    var loop = try xev.Loop.init(.{});
+    defer loop.deinit();
+    const fds = try compat_fd.pipe2(.{ .CLOEXEC = true, .NONBLOCK = true });
+    defer _ = posix.system.close(fds[0]);
+    defer _ = posix.system.close(fds[1]);
+    var td: termio.Termio.ThreadData = undefined;
+    td.loop = &loop;
+    td.backend = .{ .exec = .{
+        .start = .now(testing.io, .awake),
+        .write_stream = xev.Stream.initFd(fds[1]),
+        .process = null,
+        .read_thread = undefined,
+        .read_thread_pipe = -1,
+        .read_thread_fd = -1,
+        .termios_timer = try xev.Timer.init(),
+    } };
+    defer td.backend.deinit(alloc);
+    // queueWrite only uses the thread-local backend, not the subprocess.
+    var exec: Exec = undefined;
+    const size = 1024 * 1024;
+    const input = try alloc.alloc(u8, size);
+    defer alloc.free(input);
+    for (input, 0..) |*b, i| b.* = @intCast(i % 251);
+    // Keep a backlog while older writes complete, then grow it again.
+    var received: usize = 0;
+    var read_buf: [137]u8 = undefined;
+    for (0..3) |_| {
+        try exec.queueWrite(alloc, &td, input, false);
+        for (0..100) |_| {
+            try loop.run(.no_wait);
+            const n = posix.system.read(fds[0], &read_buf, read_buf.len);
+            if (n < 0) {
+                try testing.expectEqual(posix.E.AGAIN, posix.errno(n));
+                continue;
+            }
+            for (read_buf[0..@intCast(n)]) |b| {
+                try testing.expectEqual(input[received % size], b);
+                received += 1;
+            }
+        }
+    }
+    var iterations: usize = 0;
+    while (received < size * 3 and iterations < 100_000) : (iterations += 1) {
+        try loop.run(.no_wait);
+        const n = posix.system.read(fds[0], &read_buf, read_buf.len);
+        if (n < 0) {
+            try testing.expectEqual(posix.E.AGAIN, posix.errno(n));
+            continue;
+        }
+        for (read_buf[0..@intCast(n)]) |b| {
+            try testing.expectEqual(input[received % size], b);
+            received += 1;
+        }
+    }
+    try testing.expectEqual(size * 3, received);
+    try loop.run(.until_done);
+    try testing.expect(td.backend.exec.write_queue.empty());
+
+    // Normal CRLF conversion still follows the same completion path.
+    try exec.queueWrite(alloc, &td, "日本語\rtest\r", true);
+    try loop.run(.until_done);
+    const n = posix.system.read(fds[0], &read_buf, read_buf.len);
+    try testing.expect(n > 0);
+    try testing.expectEqualStrings("日本語\r\ntest\r\n", read_buf[0..@intCast(n)]);
+
+    // Shutdown with queued writes: the loop is stopped before pool teardown.
+    try exec.queueWrite(alloc, &td, input, false);
+    loop.stop();
+}
+
+test "PTY writes release requests after write errors" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    var loop = try xev.Loop.init(.{});
+    defer loop.deinit();
+    const fds = try compat_fd.pipe2(.{ .CLOEXEC = true, .NONBLOCK = true });
+    defer _ = posix.system.close(fds[0]);
+    var td: termio.Termio.ThreadData = undefined;
+    td.loop = &loop;
+    td.backend = .{ .exec = .{
+        .start = .now(testing.io, .awake),
+        .write_stream = xev.Stream.initFd(fds[1]),
+        .process = null,
+        .read_thread = undefined,
+        .read_thread_pipe = -1,
+        .read_thread_fd = -1,
+        .termios_timer = try xev.Timer.init(),
+    } };
+    defer td.backend.deinit(alloc);
+    // A positive, closed descriptor exercises the OS error completion.
+    _ = posix.system.close(fds[1]);
+    var exec: Exec = undefined;
+    for (0..2) |_| {
+        try exec.queueWrite(alloc, &td, "failed write", false);
+        try loop.run(.until_done);
+        try testing.expect(td.backend.exec.write_queue.empty());
+        // The exact failed request is reusable after its callback ran.
+        const w = try td.backend.exec.write_pool.create(alloc);
+        td.backend.exec.write_pool.destroy(w);
+    }
 }

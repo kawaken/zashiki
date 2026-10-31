@@ -50,3 +50,5 @@
 - #303: DeferredFaceのCopy系文字列はreleaseされず、返却文字列も内部ポインタだった。bufへコピーしてreleaseする所有権へ揃える必要がある。
 
 - #302実装: 成功時はretain close、失敗・選択なしはdelete closeへ統一。initのエラー時も親handleと作成済みディレクトリを回収。128回のretain/delete、FD閉鎖、保持した日本語内容の再読込テストを追加し、osのtest rootへ登録した。親closeを外すとBADF期待で失敗、復元すると`just test-filter TempDir`成功。実際の外部エディタ起動は未実施。
+
+- #300: libxevのkqueue backendはloop停止後に未処理callbackを再実行せず、stream.deinitはFDを閉じない。通常の終了はsubprocess.stopでFDを閉じ、IO thread内でpoolを最後に解放する。3MiBを137 byteずつ読み取りつつ3回追加する回帰テストは、元のSegmentedPoolでexpected 0 / found 125のデータ不一致を再現。修正後に一致しCRLF・日本語も維持。closed FDによる実OS write error callbackを検証。write errorは回復不能なapp障害ではなく、警告ログとしテストの意図したerror log失敗も避ける。未完了要求を残したloop停止でtesting allocatorに漏れなし。
