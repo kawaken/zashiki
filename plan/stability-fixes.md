@@ -67,3 +67,9 @@
 - #301実装・検証: CoreVideo操作をmainだけに限定し、render側はatomic desired stateと非同期queueのみ使用。停止を要求した後でもrenderer.Thread.draw_nowはrenderer.close完了まで生存させる。queued syncが残る場合はwrapperの解放を最後のqueued callbackへ委譲。mockの4テスト（集約、close、開始失敗/外部停止、開始中stop要求）成功。desired変更時のqueueを外すとstop要求テストが失敗。実際のスリープ・hotplug・解像度変更、thread spawn失敗注入は未実施。
 
 - #300テスト調整: closed FDはlibxev内でUnexpected errnoのstack traceを出すため、実際の切断相当のbroken pipeでerror completionを検証する形に変更。実行成功し、不要な診断出力もなくなった。
+- CI相当チェックで、screen exportテストのruntime型比較がstandalone側からembedded moduleのテストを読み込むことが判明。artifactを先に判定し、standaloneではembeddedを参照せずskipするよう修正した。focused実行だけでは出ないtest discovery境界の問題だった。
+
+- 後続修正調査: TempDirの[1ffdd741](https://github.com/ghostty-org/ghostty/commit/1ffdd7415a9fd852091d97f1de68fd8bf5a16cfd)はclose後のFD番号再利用でEBADF検査がflakyになるため削除していた。この指摘を採用し、単体テストはretain/deleteの観測可能な動作、実経路テストは多数反復後のFD総数の増加が小さいこと（無関係なI/Oの変動を8件まで許容）を検証する。初期の厳密FD検査は回帰再現の調査結果としてのみ記録し、常設テストには残さない。
+- その他の後続差分: #299のfocus待ち確認queue・Kitty clipboard session grantは別機能として採用しない。非focused時に元から応答されない要求もsurface破棄時には追跡回収する。#300の後続にはexec環境の初期化失敗処理やtoolchain変更があるが、write poolの寿命変更ではない。#298のcache同期、#303の2 creation wrapperには追加の対象修正は見つからなかった。
+
+- #302の最終方式でも、parent closeだけを除くと実出力のFD増加検査が失敗し、修正を復元すると成功することを確認した。

@@ -2,7 +2,6 @@
 //! store temporary data and is destroyed on deinit.
 const TempDir = @This();
 
-const builtin = @import("builtin");
 const std = @import("std");
 const Dir = std.Io.Dir;
 const file = @import("file.zig");
@@ -77,14 +76,13 @@ pub fn close(self: *TempDir, mode: CloseMode) void {
     self.parent.close(global.io());
 }
 
-// Repetition also catches descriptor reuse and success-path leaks.
-test "TempDir closes handles and retains or deletes contents" {
+// Repeatedly verify both observable lifetime modes.
+test "TempDir retains or deletes contents after close" {
     const testing = std.testing;
     for (0..128) |i| {
         var td = try init();
         var path_buf: [std.fs.max_path_bytes]u8 = undefined;
         const path = path_buf[0..try td.dir.realPath(testing.io, &path_buf)];
-        const handles = [_]Dir.Handle{ td.dir.handle, td.parent.handle };
         {
             const f = try td.dir.createFile(testing.io, "screen.txt", .{});
             defer f.close(testing.io);
@@ -92,12 +90,8 @@ test "TempDir closes handles and retains or deletes contents" {
         }
         const retain = i % 2 == 0;
         td.close(if (retain) .retain else .delete);
-        if (builtin.os.tag == .macos) {
-            for (handles) |handle| {
-                const result = std.posix.system.fcntl(handle, std.posix.F.GETFD);
-                try testing.expectEqual(std.posix.E.BADF, std.posix.errno(result));
-            }
-        }
+        // A closed descriptor number can immediately be reused by unrelated
+        // I/O, so it cannot identify the original handle after close.
         if (retain) {
             defer Dir.cwd().deleteTree(testing.io, path) catch {};
             var dir = try Dir.openDirAbsolute(testing.io, path, .{});
