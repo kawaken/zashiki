@@ -284,13 +284,25 @@ jobs:
             old_versions="$(grep -oE '<sparkle:version>[^<]+' "$history_path" | sed 's/<sparkle:version>//')"
           fi
 
-          sparkle_project=$(find "$HOME/Library/Developer/Xcode/DerivedData" \
-            -path '*/SourcePackages/checkouts/Sparkle/Sparkle.xcodeproj' \
-            -print -quit)
-          if [ -z "$sparkle_project" ]; then
-            echo "::error::Could not locate the Sparkle source package after the build."
+          # Resolve the committed lockfile into a dedicated directory instead
+          # of picking an arbitrary (possibly stale) DerivedData checkout.
+          packages_dir="$RUNNER_TEMP/zashiki-source-packages"
+          xcodebuild -resolvePackageDependencies \
+            -project macos/Zashiki.xcodeproj -scheme Zashiki \
+            -onlyUsePackageVersionsFromResolvedFile \
+            -clonedSourcePackagesDirPath "$packages_dir"
+          sparkle_checkout="$packages_dir/checkouts/Sparkle"
+          sparkle_revision="$(python3 -c '
+          import json
+          with open("macos/Zashiki.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved") as lockfile:
+              pins = json.load(lockfile)["pins"]
+          print(next(pin["state"]["revision"] for pin in pins if pin["identity"] == "sparkle"))
+          ')"
+          if [[ "$(git -C "$sparkle_checkout" rev-parse HEAD)" != "$sparkle_revision" ]]; then
+            echo "::error::Sparkle tools checkout does not match Package.resolved."
             exit 1
           fi
+          sparkle_project="$sparkle_checkout/Sparkle.xcodeproj"
 
           sparkle_derived_data="$RUNNER_TEMP/zashiki-sparkle-tools"
           xcodebuild -project "$sparkle_project" -scheme generate_appcast \
