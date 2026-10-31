@@ -45,6 +45,11 @@ pub fn build(b: *std.Build) !void {
         "test-filter",
         "Filter for test. Only applies to Zig tests.",
     ) orelse &[0][]const u8{};
+    const test_optimize = b.option(
+        std.builtin.OptimizeMode,
+        "test-optimize",
+        "Optimization mode for core tests and opt-in benchmarks (default Debug).",
+    ) orelse .Debug;
 
     // Ghostty dependencies used by many artifacts.
     const deps = try buildpkg.SharedDeps.init(b, &config);
@@ -233,7 +238,7 @@ pub fn build(b: *std.Build) !void {
             .root_module = b.createModule(.{
                 .root_source_file = b.path("src/main.zig"),
                 .target = config.baselineTarget(b.graph.io),
-                .optimize = .Debug,
+                .optimize = test_optimize,
                 .strip = false,
                 .omit_frame_pointer = false,
                 .unwind_tables = .sync,
@@ -258,7 +263,7 @@ pub fn build(b: *std.Build) !void {
         if (config.target.result.os.tag == .macos) {
             const embedded_tests = b.addTest(.{
                 .name = "ghostty-embedded-test",
-                .filters = &.{ "external paste", "screen export" },
+                .filters = &.{ "external paste", "screen export", "hidden GPU resources" },
                 .root_module = b.createModule(.{
                     .root_source_file = b.path("src/embedded_tests.zig"),
                     .target = config.baselineTarget(b.graph.io),

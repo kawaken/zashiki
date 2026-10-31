@@ -189,8 +189,10 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
         /// Health of the most recently completed frame.
         health: std.atomic.Value(Health) = .{ .raw = .healthy },
 
-        /// Our swap chain (multiple buffering)
-        swap_chain: SwapChain,
+        /// GPU context availability and the optional triple-buffered resources.
+        /// Hidden surfaces release the chain and rebuild it on their next draw.
+        display_realized: bool = true,
+        swap_chain: ?SwapChain,
 
         /// This value is used to force-update swap chain targets in the
         /// event of a config change that requires it (such as blending mode).
@@ -235,29 +237,21 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             /// frame state struct so we can start working on a new frame.
             frame_sema: std.Io.Semaphore = .{ .permits = buf_count },
 
-            /// Set to true when deinited, if you try to deinit a defunct
-            /// swap chain it will just be ignored, to prevent double-free.
-            ///
-            /// This is required because of `displayUnrealized`, since it
-            /// `deinits` the swapchain, which leads to a double-free if
-            /// the renderer is deinited after that.
-            defunct: bool = false,
-
             pub fn init(api: GraphicsAPI) !SwapChain {
                 var result: SwapChain = .{ .frames = undefined };
+                var initialized: usize = 0;
+                errdefer for (result.frames[0..initialized]) |*frame| frame.deinit();
 
                 // Initialize all of our frame state.
                 for (&result.frames) |*frame| {
                     frame.* = try FrameState.init(api);
+                    initialized += 1;
                 }
 
                 return result;
             }
 
             pub fn deinit(self: *SwapChain) void {
-                if (self.defunct) return;
-                self.defunct = true;
-
                 // Wait for all of our inflight draws to complete
                 // so that we can cleanly deinit our GPU state.
                 for (0..buf_count) |_| self.frame_sema.waitUncancelable(
@@ -269,11 +263,8 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             /// Get the next frame state to draw to. This will wait on the
             /// semaphore to ensure that the frame is available. This must
             /// always be paired with a call to releaseFrame.
-            pub fn nextFrame(self: *SwapChain) error{Defunct}!*FrameState {
-                if (self.defunct) return error.Defunct;
-
+            pub fn nextFrame(self: *SwapChain) *FrameState {
                 self.frame_sema.waitUncancelable(global.io());
-                errdefer self.frame_sema.post();
                 self.frame_index = (self.frame_index + 1) % buf_count;
                 return &self.frames[self.frame_index];
             }
@@ -618,7 +609,7 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             self.terminal_state.deinit(self.alloc);
             if (self.search_selected_match) |*m| m.arena.deinit();
             if (self.search_matches) |*m| m.arena.deinit();
-            self.swap_chain.deinit();
+            if (self.swap_chain) |*sc| sc.deinit();
 
             self.stopDisplayLink();
 
@@ -741,14 +732,13 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             self.draw_mutex.lockUncancelable(global.io());
             defer self.draw_mutex.unlock(global.io());
 
-            // We assume that the swap chain was deinited in
-            // `displayUnrealized`, in which case it should be
-            // marked defunct. If not, we have a problem.
-            assert(self.swap_chain.defunct);
+            assert(self.swap_chain == null);
+            assert(!self.display_realized);
 
             // We reinitialize our shaders and our swap chain.
             try self.initShaders();
             self.swap_chain = try SwapChain.init(self.api);
+            self.display_realized = true;
             self.reinitialize_shaders = false;
             self.target_config_modified = 1;
         }
@@ -767,11 +757,9 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             self.draw_mutex.lockUncancelable(global.io());
             defer self.draw_mutex.unlock(global.io());
 
-            // We deinit our swap chain and shaders.
-            //
-            // This will mark them as defunct so that they
-            // can't be double-freed or used in draw calls.
-            self.swap_chain.deinit();
+            if (self.swap_chain) |*sc| sc.deinit();
+            self.swap_chain = null;
+            self.display_realized = false;
             self.shaders.deinit(self.alloc);
         }
 
@@ -829,8 +817,37 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
 
         /// Must be called on the render thread.
         pub fn setVisible(self: *Self, visible: bool) void {
-            self.visible = visible;
+            // drawFrame also runs on the app thread via CoreAnimation.
+            // Serialize its visibility check with resource release.
+            {
+                self.draw_mutex.lockUncancelable(global.io());
+                defer self.draw_mutex.unlock(global.io());
+                self.visible = visible;
+                if (!visible) self.releaseGpuResourcesLocked();
+            }
             self.syncDisplayLink();
+        }
+
+        /// Wait for in-flight GPU work before releasing swap-chain resources.
+        /// DisplayLink requests stay outside draw_mutex and remain asynchronous.
+        pub fn releaseGpuResources(self: *Self) void {
+            self.draw_mutex.lockUncancelable(global.io());
+            defer self.draw_mutex.unlock(global.io());
+            self.releaseGpuResourcesLocked();
+        }
+
+        fn releaseGpuResourcesLocked(self: *Self) void {
+            if (self.swap_chain) |*sc| {
+                sc.deinit();
+                self.swap_chain = null;
+            }
+        }
+
+        /// Resolve the chain only with draw_mutex held and a valid GPU context.
+        fn ensureSwapChain(self: *Self) !bool {
+            if (self.swap_chain != null) return false;
+            self.swap_chain = try SwapChain.init(self.api);
+            return true;
         }
 
         /// Publish desired state without waiting for main. Main may itself be
@@ -851,6 +868,90 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             display_link.setRunning(self.focused and self.visible);
         }
 
+        test "hidden GPU resources release, wait for frames, and rebuild" {
+            if (comptime @import("../build_config.zig").artifact != .lib) return error.SkipZigTest;
+            if (comptime GraphicsAPI != renderer.Metal) return error.SkipZigTest;
+            const testing = std.testing;
+            const objc = @import("objc");
+            const mtl = @import("metal/api.zig");
+            const raw = mtl.MTLCreateSystemDefaultDevice() orelse return error.SkipZigTest;
+            const device = objc.Object.fromId(raw);
+            defer device.release();
+            const pool = objc.AutoreleasePool.init();
+            defer pool.deinit();
+
+            var r: Self = undefined;
+            r.api = undefined;
+            r.api.device = device;
+            r.api.blending = .native;
+            r.api.default_storage_mode = .shared;
+            r.draw_mutex = .init;
+            r.display_realized = true;
+            r.visible = true;
+            r.focused = true;
+            r.config.vsync = false;
+            r.display_link = null;
+            r.display_link_callback = null;
+            r.health = .init(.healthy);
+            r.swap_chain = null;
+            defer r.releaseGpuResources();
+
+            try testing.expect(try r.ensureSwapChain());
+            try testing.expect(!try r.ensureSwapChain());
+            for (&r.swap_chain.?.frames) |*frame| try frame.resize(r.api, 1200, 800);
+
+            // Simulate an outstanding GPU completion. Release must wait for
+            // this callback before clearing the chain it still references.
+            _ = r.swap_chain.?.nextFrame();
+            const worker = try std.Thread.spawn(.{}, struct {
+                fn complete(value: *Self) void {
+                    std.Io.sleep(testing.io, .fromMilliseconds(5), .awake) catch unreachable;
+                    value.frameCompleted(.healthy);
+                }
+            }.complete, .{&r});
+            r.setVisible(false);
+            worker.join();
+            try testing.expect(r.swap_chain == null);
+            r.setVisible(false);
+            r.releaseGpuResources();
+            try r.drawFrame(true); // Hidden CoreAnimation callback must be inert.
+            try testing.expect(r.swap_chain == null);
+            r.setVisible(true);
+            try testing.expect(try r.ensureSwapChain());
+            for (r.swap_chain.?.frames) |frame| {
+                try testing.expectEqual(0, frame.grayscale_modified);
+                try testing.expectEqual(0, frame.color_modified);
+                try testing.expectEqual(1, frame.target.width);
+            }
+
+            if (std.c.getenv("ZASHIKI_GPU_BENCHMARK") != null) {
+                // Isolated swap-chain allocations, not full application tabs.
+                const count = 21;
+                var hidden: [count - 1]Self = undefined;
+                for (&hidden) |*value| {
+                    value.* = r;
+                    value.draw_mutex = .init;
+                    value.swap_chain = try SwapChain.init(r.api);
+                    for (&value.swap_chain.?.frames) |*frame| try frame.resize(r.api, 1200, 800);
+                }
+                for (&r.swap_chain.?.frames) |*frame| try frame.resize(r.api, 1200, 800);
+                const before = device.getProperty(u64, "currentAllocatedSize");
+                for (&hidden) |*value| value.setVisible(false);
+                const after = device.getProperty(u64, "currentAllocatedSize");
+                try testing.expect(after < before);
+                std.debug.print("GPU chains={d} target=1200x800 before={d} after={d}\n", .{ count, before, after });
+                for (&hidden, 0..) |*value, i| {
+                    value.setVisible(true);
+                    const start = std.Io.Clock.awake.now(testing.io);
+                    _ = try value.ensureSwapChain();
+                    for (&value.swap_chain.?.frames) |*frame| try frame.resize(r.api, 1200, 800);
+                    const ns = start.durationTo(std.Io.Clock.awake.now(testing.io)).toNanoseconds();
+                    std.debug.print("GPU rebuild={d} ns={d}\n", .{ i, ns });
+                    value.releaseGpuResources();
+                }
+            }
+        }
+
         /// Set the new font grid.
         ///
         /// Must be called on the render thread.
@@ -864,10 +965,10 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             // Update all our textures so that they sync on the next frame.
             // We can modify this without a lock because the GPU does not
             // touch this data.
-            for (&self.swap_chain.frames) |*frame| {
+            if (self.swap_chain) |*sc| for (&sc.frames) |*frame| {
                 frame.grayscale_modified = 0;
                 frame.color_modified = 0;
-            }
+            };
 
             // Get our metrics from the grid. This doesn't require a lock because
             // the metrics are never recalculated.
@@ -906,6 +1007,39 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             };
         }
 
+        /// Periodically release retained CPU render state after large frames.
+        fn cycleTerminalState(self: *Self) void {
+            // About 12 minutes at 120Hz. Restart the interval after cleanup.
+            if (self.terminal_state_frame_count >= 100_000) {
+                self.terminal_state.deinit(self.alloc);
+                self.terminal_state = .empty;
+                self.terminal_state_frame_count = 0;
+            }
+            self.terminal_state_frame_count += 1;
+        }
+
+        test "retained terminal state cleanup restarts its interval" {
+            const testing = std.testing;
+            var r: Self = undefined;
+            r.alloc = testing.allocator;
+            r.terminal_state = .empty;
+            defer r.terminal_state.deinit(r.alloc);
+            r.terminal_state_frame_count = 99_999;
+            // A sentinel in otherwise empty state reveals unwanted rebuilds.
+            r.terminal_state.cols = 80;
+            r.cycleTerminalState();
+            try testing.expectEqual(80, r.terminal_state.cols);
+            r.cycleTerminalState();
+            try testing.expectEqual(0, r.terminal_state.cols);
+            try testing.expectEqual(1, r.terminal_state_frame_count);
+            r.terminal_state.cols = 80;
+            for (0..99_999) |_| r.cycleTerminalState();
+            try testing.expectEqual(80, r.terminal_state.cols);
+            r.cycleTerminalState();
+            try testing.expectEqual(0, r.terminal_state.cols);
+            try testing.expectEqual(1, r.terminal_state_frame_count);
+        }
+
         /// Update the frame data.
         pub fn updateFrame(
             self: *Self,
@@ -915,17 +1049,7 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             // Flush retained CoreText objects even when rebuilding fails.
             defer self.font_shaper.endFrame();
 
-            // We fully deinit and reset the terminal state every so often
-            // so that a particularly large terminal state doesn't cause
-            // the renderer to hold on to retained memory.
-            //
-            // Frame count is ~12 minutes at 120Hz.
-            const max_terminal_state_frame_count = 100_000;
-            if (self.terminal_state_frame_count >= max_terminal_state_frame_count) {
-                self.terminal_state.deinit(self.alloc);
-                self.terminal_state = .empty;
-            }
-            self.terminal_state_frame_count += 1;
+            self.cycleTerminalState();
 
             // Create an arena for all our temporary allocations while rebuilding
             var arena = ArenaAllocator.init(self.alloc);
@@ -1193,6 +1317,10 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             self.draw_mutex.lockUncancelable(global.io());
             defer self.draw_mutex.unlock(global.io());
 
+            // Background output and delayed CoreAnimation callbacks must not
+            // recreate resources while the tab is hidden.
+            if (!self.visible or !self.display_realized) return;
+
             // After the graphics API is complete (so we defer) we want to
             // update our scrollbar state.
             defer if (self.scrollbar_dirty) {
@@ -1215,6 +1343,8 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             // then drawing is absurd, so we just return.
             if (surface_size.width == 0 or surface_size.height == 0) return;
 
+            const swap_chain_rebuilt = try self.ensureSwapChain();
+            const swap_chain = &self.swap_chain.?;
             const size_changed =
                 self.size.screen.width != surface_size.width or
                 self.size.screen.height != surface_size.height;
@@ -1223,6 +1353,7 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             // don't need to since the previous frame should be identical.
             const needs_redraw =
                 size_changed or
+                swap_chain_rebuilt or
                 self.cells_rebuilt or
                 self.hasAnimations() or
                 sync;
@@ -1237,8 +1368,8 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             self.cells_rebuilt = false;
 
             // Wait for a frame to be available.
-            const frame = try self.swap_chain.nextFrame();
-            errdefer self.swap_chain.releaseFrame();
+            const frame = swap_chain.nextFrame();
+            errdefer swap_chain.releaseFrame();
             // log.debug("drawing frame index={}", .{self.swap_chain.frame_index});
 
             // If we need to reinitialize our shaders, do so.
@@ -1423,7 +1554,8 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             }
 
             // Always release our semaphore
-            self.swap_chain.releaseFrame();
+            // releaseGpuResources waits for all completions before clearing it.
+            self.swap_chain.?.releaseFrame();
         }
 
         /// Call this any time the background image path changes.
@@ -2715,6 +2847,52 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             }, cursor_style);
         }
 
+        test "preedit uses configured glyph thickening and preserves clause underlines" {
+            const testing = std.testing;
+            const alloc = testing.allocator;
+            var lib = try font.Library.init(alloc);
+            defer lib.deinit();
+            var collection = font.Collection.init();
+            collection.load_options = .{ .library = lib };
+            _ = try collection.add(alloc, try .init(lib, font.embedded.regular, .{
+                .size = .{ .points = 12, .xdpi = 96, .ydpi = 96 },
+            }), .{ .style = .regular, .fallback = false, .size_adjustment = .none });
+            var grid = try font.SharedGrid.init(alloc, .{ .collection = collection });
+            defer grid.deinit(alloc);
+            var r: Self = undefined;
+            r.alloc = alloc;
+            r.font_grid = &grid;
+            r.grid_metrics = grid.metrics;
+            r.cells = .{ .bg_cells = &.{} };
+            try r.cells.resize(alloc, .{ .rows = 1, .columns = 4 });
+            defer r.cells.deinit(alloc);
+            const fg: terminal.color.RGB = .{ .r = 255, .g = 255, .b = 255 };
+            for ([_]bool{ false, true }) |thicken| for ([_]u8{ 0, 100, 255 }) |strength| {
+                r.config.font_thicken = thicken;
+                r.config.font_thicken_strength = strength;
+                for ([_]bool{ false, true }) |emphasized| {
+                    r.cells.reset();
+                    try r.addPreeditCell(.{ .codepoint = 'A', .wide = true, .emphasized = emphasized }, .{ .x = 0, .y = 0 }, fg);
+                    const expected = (try grid.renderCodepoint(alloc, 'A', .regular, .text, .{
+                        .grid_metrics = grid.metrics,
+                        .thicken = thicken,
+                        .thicken_strength = strength,
+                    })).?;
+                    const underline = try grid.renderGlyph(alloc, font.sprite_index, @intFromEnum(
+                        if (emphasized) font.Sprite.underline_thick else font.Sprite.underline,
+                    ), .{ .cell_width = 1, .grid_metrics = grid.metrics });
+                    const cells = r.cells.fg_rows.lists[1].items;
+                    try testing.expectEqual(3, cells.len);
+                    try testing.expectEqual(expected.glyph.atlas_x, cells[0].glyph_pos[0]);
+                    try testing.expectEqual(expected.glyph.atlas_y, cells[0].glyph_pos[1]);
+                    for (cells[1..]) |cell| {
+                        try testing.expectEqual(underline.glyph.atlas_x, cell.glyph_pos[0]);
+                        try testing.expectEqual(underline.glyph.atlas_y, cell.glyph_pos[1]);
+                    }
+                }
+            };
+        }
+
         fn addPreeditCell(
             self: *Self,
             cp: renderer.State.Preedit.Codepoint,
@@ -2727,7 +2905,11 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
                 @intCast(cp.codepoint),
                 .regular,
                 .text,
-                .{ .grid_metrics = self.grid_metrics },
+                .{
+                    .grid_metrics = self.grid_metrics,
+                    .thicken = self.config.font_thicken,
+                    .thicken_strength = self.config.font_thicken_strength,
+                },
             ) catch |err| {
                 log.warn("error rendering preedit glyph err={}", .{err});
                 return;

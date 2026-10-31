@@ -1243,20 +1243,26 @@ pub const Page = struct {
         }
 
         if (comptime build_options.kitty_graphics) {
-            if (row.kitty_virtual_placeholder and
-                cells.len == self.size.cols)
-            {
-                for (cells) |c| {
-                    if (c.codepoint() == kitty.graphics.unicode.placeholder) {
-                        break;
-                    }
-                } else row.kitty_virtual_placeholder = false;
+            if (cells.len == self.size.cols) {
+                row.kitty_virtual_placeholder = false;
             }
         }
 
         // Zero the cells as u64s since empirically this seems
         // to be a bit faster than using @memset(cells, .{})
         @memset(@as([]u64, @ptrCast(cells)), 0);
+    }
+
+    /// Reset the given row to the default state: all cells zeroed and
+    /// all row metadata reset, as if the row was never used. This
+    /// reclaims memory used by graphemes, styles, etc. like clearCells.
+    ///
+    /// This must be used instead of clearCells whenever a row's storage
+    /// is recycled. Clearing the cells alone is not enough because row
+    /// metadata such as the wrap state and semantic prompt remain.
+    pub inline fn resetRow(self: *Page, row: *Row) void {
+        self.clearCells(row, 0, self.size.cols);
+        row.reset();
     }
 
     /// Returns the hyperlink ID for the given cell.
@@ -1857,7 +1863,11 @@ pub const Capacity = struct {
             //   - The row metadata itself
             //   - The cells per row (n=cols)
             const bits_per_row: usize = @bitSizeOf(Row) + @bitSizeOf(Cell) * @as(usize, @intCast(cols));
-            const new_rows: usize = @divFloor(available_bits, bits_per_row);
+            // Narrowing a very wide page can fit more rows than CellCountInt.
+            const new_rows: usize = @min(
+                @divFloor(available_bits, bits_per_row),
+                std.math.maxInt(size.CellCountInt),
+            );
 
             // If our rows go to zero then we can't fit any row metadata
             // for the desired number of columns.
@@ -2001,6 +2011,26 @@ pub const Row = packed struct(u64) {
     pub inline fn managedMemory(self: Row) bool {
         // Ordered on purpose for likelihood.
         return self.styled or self.hyperlink or self.grapheme;
+    }
+
+    /// Reset all row metadata to the default state, preserving only
+    /// the cells offset, and mark the row dirty. This is a single
+    /// 8-byte store.
+    ///
+    /// This must be applied to any row whose storage is recycled as a
+    /// blank row or retired into unused page capacity, in addition to
+    /// clearing its cells (in either order; this doesn't touch cell
+    /// memory). See Page.resetRow, which does both, for details. This
+    /// exists separately for callers that clear the cells in a
+    /// specialized way (e.g. filling with a background-colored blank
+    /// cell rather than zeroing).
+    ///
+    /// Asserts that the row has no managed memory: releasing that is
+    /// the cell-clearing side's job and must happen while the flags
+    /// are still accurate.
+    pub inline fn reset(self: *Row) void {
+        assert(!self.managedMemory());
+        self.* = .{ .cells = self.cells, .dirty = true };
     }
 };
 
@@ -2209,6 +2239,12 @@ pub const Cell = packed struct(u64) {
 /// struct T, used for masked compares of raw backing-integer values
 /// (e.g. `Row.Backing`, `Cell.Backing`). This is an implementation
 /// detail of `Mask`, which is the public API built on top of this.
+///
+/// A field may be a dot-separated path (e.g. "content.codepoint.data")
+/// to cover only a nested field of a packed struct or packed union
+/// member. This allows a mask to be more precise than a whole
+/// top-level field, e.g. covering the codepoint bits of a cell without
+/// its padding.
 fn fieldMask(
     comptime T: type,
     comptime fields: []const []const u8,
@@ -2216,16 +2252,33 @@ fn fieldMask(
     // Backing int of the packed struct
     const Int = @typeInfo(T).@"struct".backing_integer.?;
 
-    var mask: Int = 0;
-    inline for (fields) |field| {
+    comptime var mask: Int = 0;
+    inline for (fields) |path| {
+        // Walk the path to find the total bit offset and the type of
+        // the (possibly nested) field.
+        comptime var offset = 0;
+        comptime var Field = T;
+        comptime var it = std.mem.splitScalar(u8, path, '.');
+        inline while (comptime it.next()) |name| {
+            offset += switch (@typeInfo(Field)) {
+                .@"struct" => @bitOffsetOf(Field, name),
+
+                // Packed union members all share bit offset zero.
+                .@"union" => |u| offset: {
+                    comptime assert(u.layout == .@"packed");
+                    break :offset 0;
+                },
+
+                else => @compileError("invalid field path: " ++ path),
+            };
+            Field = @FieldType(Field, name);
+        }
+
         // The type that fits all the bits we need to set.
-        const Ones = std.meta.Int(
-            .unsigned,
-            @bitSizeOf(@FieldType(T, field)),
-        );
+        const Ones = std.meta.Int(.unsigned, @bitSizeOf(Field));
 
         // Mask out the ones
-        mask |= @as(Int, std.math.maxInt(Ones)) << @bitOffsetOf(T, field);
+        mask |= @as(Int, std.math.maxInt(Ones)) << offset;
     }
 
     return mask;
@@ -2348,6 +2401,21 @@ pub fn Mask(
             return pattern(v) == expected;
         }
 
+        /// Returns true if any value in the group of group_len values
+        /// starting at index i has masked fields equal to the expected
+        /// pattern (see `pattern`). This is the "any" counterpart to
+        /// `eql`: use it to detect the presence of a specific value
+        /// within a group, e.g. a run scan that must stop when it
+        /// encounters a sentinel codepoint anywhere in the group.
+        pub inline fn eqlAny(
+            values: []const T,
+            i: usize,
+            expected: Backing,
+        ) bool {
+            const masked = load(values, i) & @as(Group, @splat(mask));
+            return @reduce(.Or, masked == @as(Group, @splat(expected)));
+        }
+
         /// Like `eql` but returns the number of leading values whose
         /// masked fields equal the expected pattern, i.e. group_len if
         /// the entire group matches. This is useful for early-exit run
@@ -2466,6 +2534,59 @@ test "Mask" {
         styled_other.style_id = 6;
         try testing.expectEqual(M.strip(styled), M.strip(styled_other));
         try testing.expect(M.strip(styled) != M.strip(styled2));
+    }
+
+    // eqlAny: presence of a matching value anywhere in the group
+    {
+        const expected = M.pattern(styled);
+        var cells: [4]Cell = .{ plain, plain, plain, plain };
+        try testing.expect(!M.eqlAny(&cells, 0, expected));
+
+        cells[2] = styled;
+        try testing.expect(M.eqlAny(&cells, 0, expected));
+
+        // Masked compare: same masked fields with a different
+        // codepoint still matches.
+        cells[2] = styled2;
+        try testing.expect(M.eqlAny(&cells, 0, expected));
+    }
+}
+
+test "Mask nested field path" {
+    // Mask only the codepoint data bits of the content field, not
+    // the padding next to it or any other field.
+    const M = Mask(Cell, &.{"content.codepoint.data"}, 4);
+
+    const a: Cell = .init('A');
+    var b: Cell = .init('A');
+    b.style_id = 5;
+    b.wide = .wide;
+    const c: Cell = .init('C');
+
+    // Same codepoint matches regardless of other fields.
+    const expected = M.pattern(a);
+    try testing.expect(M.eqlScalar(b, expected));
+    try testing.expect(!M.eqlScalar(c, expected));
+
+    // The mask must cover exactly the codepoint data bits.
+    const cp_offset = @bitOffsetOf(Cell, "content");
+    try testing.expectEqual(
+        @as(u64, std.math.maxInt(u21)) << cp_offset,
+        comptime fieldMask(Cell, &.{"content.codepoint.data"}),
+    );
+
+    // Group variants
+    {
+        var cells: [4]Cell = .{ a, b, a, b };
+        try testing.expect(M.eql(&cells, 0, expected));
+        try testing.expect(M.eqlAny(&cells, 0, expected));
+
+        cells[1] = c;
+        try testing.expect(!M.eql(&cells, 0, expected));
+        try testing.expect(M.eqlAny(&cells, 0, expected));
+
+        const none: [4]Cell = .{ c, c, c, c };
+        try testing.expect(!M.eqlAny(&none, 0, expected));
     }
 }
 
@@ -2623,6 +2744,23 @@ test "Capacity maxCols with 1 row exactly" {
     try testing.expectEqual(@as(size.CellCountInt, 1), adjusted.rows);
 }
 
+test "Capacity adjust clamps rows to CellCountInt" {
+    // A max-width page narrowed to one column frees enough memory for far
+    // more rows than a page can hold. The row count must be capped, and
+    // the page must still fit in the original memory size.
+    const cap: Capacity = .{
+        .cols = std.math.maxInt(size.CellCountInt),
+        .rows = 4,
+        .styles = 0,
+        .grapheme_bytes = 0,
+        .hyperlink_bytes = 0,
+        .string_bytes = 0,
+    };
+    const adjusted = try cap.adjust(.{ .cols = 1 });
+    try testing.expectEqual(std.math.maxInt(size.CellCountInt), adjusted.rows);
+    try testing.expect(Page.layout(adjusted).total_size <= Page.layout(cap).total_size);
+}
+
 test "Page init" {
     var page = try Page.init(.{
         .cols = 120,
@@ -2732,6 +2870,24 @@ test "Page clearGrapheme not all cells" {
     try testing.expect(rac.row.grapheme);
     try testing.expect(!rac.cell.hasGrapheme());
     try testing.expect(rac2.cell.hasGrapheme());
+}
+
+test "Page clearCells full row clears kitty placeholder flag" {
+    if (comptime !build_options.kitty_graphics) return error.SkipZigTest;
+
+    var page = try Page.init(.{
+        .cols = 10,
+        .rows = 10,
+        .styles = 8,
+    });
+    defer page.deinit();
+
+    const rac = page.getRowAndCell(0, 0);
+    rac.cell.* = .init(kitty.graphics.unicode.placeholder);
+    rac.row.kitty_virtual_placeholder = true;
+
+    page.clearCells(rac.row, 0, page.size.cols);
+    try testing.expect(!rac.row.kitty_virtual_placeholder);
 }
 
 test "Page clone" {

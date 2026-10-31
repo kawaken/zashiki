@@ -83,6 +83,7 @@ test {
     @import("std").testing.refAllDecls(@This());
 
     // Internals
+    _ = @import("reflow_benchmark.zig");
     _ = @import("bitmap_allocator.zig");
     _ = @import("compress.zig");
     _ = @import("hash_map.zig");

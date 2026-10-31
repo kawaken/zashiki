@@ -2858,6 +2858,14 @@ pub fn insertLines(self: *Terminal, count: usize) void {
                 cur_row,
                 cells[self.scrolling_region.left .. self.scrolling_region.right + 1],
             );
+
+            // With a full-width scroll region the entire row is a
+            // fresh blank row: reset the metadata so nothing (wrap
+            // state, semantic prompt) is retained from the row whose
+            // storage it recycles. With left/right margins the row
+            // keeps content outside the margins so the metadata is
+            // preserved, matching the shift case above.
+            if (!left_right) cur_row.reset();
         }
 
         // Mark the row as dirty
@@ -3018,6 +3026,14 @@ pub fn deleteLines(self: *Terminal, count: usize) void {
                 cur_row,
                 cells[self.scrolling_region.left .. self.scrolling_region.right + 1],
             );
+
+            // With a full-width scroll region the entire row is a
+            // fresh blank row: reset the metadata so nothing (wrap
+            // state, semantic prompt) is retained from the row whose
+            // storage it recycles. With left/right margins the row
+            // keeps content outside the margins so the metadata is
+            // preserved, matching the shift case above.
+            if (!left_right) cur_row.reset();
         }
 
         // Mark the row as dirty
@@ -9453,6 +9469,70 @@ test "Terminal: eraseChars wide char wrap boundary conditions" {
     }
 }
 
+test "Terminal: eraseChars clearing wrapped wide char marks spacer head row dirty" {
+    const alloc = testing.allocator;
+    const io_impl = testing.io;
+    var t = try init(io_impl, alloc, .{ .rows = 3, .cols = 5 });
+    defer t.deinit(alloc);
+
+    // The wide char doesn't fit so it wraps, leaving a spacer head at
+    // the end of the first row.
+    try t.printString("ABCD字");
+    {
+        const list_cell = t.screens.active.pages.getCell(.{ .screen = .{ .x = 4, .y = 0 } }).?;
+        try testing.expectEqual(Cell.Wide.spacer_head, list_cell.cell.wide);
+        try testing.expect(list_cell.row.wrap);
+    }
+
+    t.setCursorPos(2, 1);
+    t.clearDirty();
+    t.eraseChars(1);
+    t.screens.active.cursor.page_pin.node.page().assertIntegrity();
+
+    // Erasing the wide char also clears the spacer head on the previous
+    // row, so that row must be dirty too.
+    try testing.expect(t.isDirty(.{ .screen = .{ .x = 0, .y = 0 } }));
+    try testing.expect(t.isDirty(.{ .screen = .{ .x = 0, .y = 1 } }));
+    try testing.expect(!t.isDirty(.{ .screen = .{ .x = 0, .y = 2 } }));
+
+    {
+        const list_cell = t.screens.active.pages.getCell(.{ .screen = .{ .x = 4, .y = 0 } }).?;
+        try testing.expectEqual(Cell.Wide.narrow, list_cell.cell.wide);
+    }
+}
+
+test "Terminal: wide erasure dirties previous page on both screens" {
+    const alloc = testing.allocator;
+    for ([_]bool{ false, true }) |alternate| {
+        for ([_]bool{ false, true }) |delete| {
+            var t = try init(testing.io, alloc, .{ .cols = 5, .rows = 3 });
+            defer t.deinit(alloc);
+            if (alternate) try t.switchScreenMode(.@"1049", true);
+            const boundary = 1;
+            const pages = &t.screens.active.pages;
+            try pages.split(pages.pin(.{ .active = .{ .y = boundary } }).?);
+            t.screens.active.cursorReload();
+            // A region straddling the page boundary, with a wide glyph
+            // wrapped from the final row of the first page onto the second.
+            t.setTopAndBottomMargin(boundary, boundary + 2);
+            t.setCursorPos(boundary, 1);
+            try t.printString("ABCD字");
+            const head = pages.pin(.{ .screen = .{ .x = 4, .y = boundary - 1 } }).?;
+            const glyph_pin = head.down(1).?;
+            try testing.expect(head.node != glyph_pin.node);
+            try testing.expectEqual(Cell.Wide.spacer_head, head.rowAndCell().cell.wide);
+            t.setCursorPos(boundary + 1, 1);
+            t.clearDirty();
+            if (delete) t.deleteChars(1) else t.eraseChars(1);
+            try testing.expect(t.isDirty(.{ .screen = .{ .y = boundary - 1 } }));
+            try testing.expect(t.isDirty(.{ .screen = .{ .y = boundary } }));
+            try testing.expect(!t.isDirty(.{ .screen = .{ .y = boundary + 1 } }));
+            try testing.expectEqual(Cell.Wide.narrow, head.rowAndCell().cell.wide);
+            t.screens.active.assertIntegrity();
+        }
+    }
+}
+
 test "Terminal: reverseIndex" {
     const alloc = testing.allocator;
     const io_impl = testing.io;
@@ -12887,8 +12967,15 @@ test "Terminal: deleteChars wide char wrap boundary conditions" {
     }
 
     t.setCursorPos(2, 2);
+    t.clearDirty();
     t.deleteChars(3);
     t.screens.active.cursor.page_pin.node.page().assertIntegrity();
+
+    // Deleting the wide char also clears the spacer head on the previous
+    // row, so that row must be dirty too.
+    try testing.expect(t.isDirty(.{ .screen = .{ .x = 0, .y = 0 } }));
+    try testing.expect(t.isDirty(.{ .screen = .{ .x = 0, .y = 1 } }));
+    try testing.expect(!t.isDirty(.{ .screen = .{ .x = 0, .y = 2 } }));
 
     {
         const str = try t.plainString(alloc);
@@ -13567,6 +13654,25 @@ test "Terminal: eraseLine complete preserves background sgr" {
             }, list_cell.cell.content.color_rgb);
         }
     }
+}
+
+test "Terminal: eraseLine complete clears kitty placeholder flag" {
+    if (comptime !build_options.kitty_graphics) return error.SkipZigTest;
+
+    const alloc = testing.allocator;
+    const io_impl = testing.io;
+    var t = try init(io_impl, alloc, .{ .rows = 5, .cols = 5 });
+    defer t.deinit(alloc);
+
+    try t.print(kitty.graphics.unicode.placeholder);
+    {
+        const list_cell = t.screens.active.pages.getCell(.{ .active = .{ .x = 0, .y = 0 } }).?;
+        try testing.expect(list_cell.row.kitty_virtual_placeholder);
+    }
+    t.eraseLine(.complete, false);
+
+    const list_cell = t.screens.active.pages.getCell(.{ .active = .{ .x = 0, .y = 0 } }).?;
+    try testing.expect(!list_cell.row.kitty_virtual_placeholder);
 }
 
 test "Terminal: eraseLine complete protected attributes respected with iso" {
@@ -15308,6 +15414,71 @@ test "Terminal: resize with high unique style per cell with wrapping" {
     try t.resize(alloc, .{ .cols = 60, .rows = 30 });
 }
 
+test "Terminal: saved cursor survives repeated widening" {
+    const alloc = testing.allocator;
+    var t = try init(testing.io, alloc, .{ .cols = 4, .rows = 5 });
+    defer t.deinit(alloc);
+
+    try t.printString("abc\nAAA|");
+    t.saveCursor();
+    try t.resize(alloc, .{ .cols = 5, .rows = 5 });
+    try t.resize(alloc, .{ .cols = 6, .rows = 5 });
+    t.restoreCursor();
+    try t.print('X');
+
+    const str = try t.plainString(alloc);
+    defer alloc.free(str);
+    try testing.expectEqualStrings("abc\nAAA|X", str);
+}
+
+test "Terminal: resize less cols without reflow cutting wide char tail" {
+    const alloc = testing.allocator;
+    const io_impl = testing.io;
+    var t = try init(io_impl, alloc, .{ .cols = 3, .rows = 1 });
+    defer t.deinit(alloc);
+
+    try t.print('a');
+    try t.print('一');
+    t.modes.set(.wraparound, false);
+    try t.resize(alloc, .{ .cols = 2, .rows = 1 });
+
+    try testing.expect(t.screens.active.pages.getCell(.{ .active = .{ .x = 1 } }).?.cell.isEmpty());
+}
+
+test "Terminal: reflow preserves mixed managed text and tracked cursor" {
+    const alloc = testing.allocator;
+    var t = try init(testing.io, alloc, .{ .cols = 12, .rows = 6, .max_scrollback_bytes = 5_000_000 });
+    defer t.deinit(alloc);
+    var stream = t.vtStream();
+    defer stream.deinit();
+    for (0..80) |_| stream.nextSlice("\x1b[31m日本語😀\x1b[0m e\u{0301} \x1b]8;;https://example.com/日本\x1b\\link語\x1b]8;;\x1b\\\r\n");
+    stream.nextSlice("cursor語");
+    // Track a text cell. Non-cursor pins in trailing blanks intentionally
+    // clamp to the destination width rather than introducing new content.
+    t.setCursorPos(t.screens.active.cursor.y + 1, 7);
+    const pages = &t.screens.active.pages;
+    const pin = try pages.trackPin(t.screens.active.cursor.page_pin.*);
+    defer pages.untrackPin(pin);
+    const cp = pin.rowAndCell().cell.codepoint();
+    var before: std.Io.Writer.Allocating = .init(alloc);
+    defer before.deinit();
+    var formatter: @import("formatter.zig").ScreenFormatter = .init(t.screens.active, .{ .emit = .vt, .unwrap = true });
+    try formatter.format(&before.writer);
+    for ([_]u16{ 5, 23, 7, 12, 31, 12 }) |cols| {
+        try t.resize(alloc, .{ .cols = cols, .rows = 6 });
+        try testing.expectEqual(cp, pin.rowAndCell().cell.codepoint());
+        try testing.expect(t.screens.active.cursor.page_pin.eql(pin.*));
+        t.screens.active.assertIntegrity();
+    }
+    var after: std.Io.Writer.Allocating = .init(alloc);
+    defer after.deinit();
+    formatter = .init(t.screens.active, .{ .emit = .vt, .unwrap = true });
+    try formatter.format(&after.writer);
+    // VT output compares styles, combining codepoints and OSC8 links as well
+    // as text, across all pages and both slow and bulk-copy rows.
+    try testing.expectEqualStrings(before.written(), after.written());
+}
+
 test "Terminal: resize with reflow and saved cursor" {
     const alloc = testing.allocator;
     const io_impl = testing.io;
@@ -15776,4 +15947,162 @@ test "Terminal: glyph APC stores session glossary entries" {
 
     t.fullReset();
     try testing.expect(!t.glyph_glossary.contains(0xE0A0));
+}
+
+test "Terminal: scroll region linefeed recycled row has default metadata" {
+    const alloc = testing.allocator;
+    const io_impl = testing.io;
+    var t = try init(io_impl, alloc, .{ .cols = 5, .rows = 5 });
+    defer t.deinit(alloc);
+
+    // A soft-wrapped line across rows 0-2 so that row 1 has both wrap
+    // flags set. Mark row 1 as a prompt as well (OSC 133 A would).
+    for (0..12) |_| try t.print('A');
+    t.screens.active.pages.getCell(
+        .{ .active = .{ .y = 1 } },
+    ).?.row.semantic_prompt = .prompt;
+
+    // DECSTBM rows 2-4, cursor to the region bottom, and linefeed:
+    // row 1 is discarded and its Row storage recycled as the new
+    // blank region-bottom row.
+    t.setTopAndBottomMargin(2, 4);
+    t.setCursorPos(4, 1);
+    try t.linefeed();
+
+    {
+        const rac = t.screens.active.pages.getCell(.{ .active = .{ .y = 3 } }).?;
+        try testing.expect(!rac.row.wrap);
+        try testing.expect(!rac.row.wrap_continuation);
+        try testing.expectEqual(.none, rac.row.semantic_prompt);
+    }
+}
+
+test "Terminal: alt screen scroll up recycled row has default metadata" {
+    const alloc = testing.allocator;
+    const io_impl = testing.io;
+    var t = try init(io_impl, alloc, .{ .cols = 5, .rows = 3 });
+    defer t.deinit(alloc);
+
+    try t.switchScreenMode(.@"1049", true);
+
+    // A soft-wrapped line across rows 0-1 and a prompt mark on row 0.
+    for (0..7) |_| try t.print('A');
+    t.screens.active.pages.getCell(
+        .{ .active = .{} },
+    ).?.row.semantic_prompt = .prompt;
+
+    // Scroll up: with no scrollback, row 0 is discarded and its Row
+    // storage recycled as the new blank bottom row.
+    try t.scrollUp(1);
+
+    {
+        const rac = t.screens.active.pages.getCell(.{ .active = .{ .y = 2 } }).?;
+        try testing.expect(!rac.row.wrap);
+        try testing.expect(!rac.row.wrap_continuation);
+        try testing.expectEqual(.none, rac.row.semantic_prompt);
+    }
+}
+
+test "Terminal: insertLines count over region blanks row metadata" {
+    const alloc = testing.allocator;
+    const io_impl = testing.io;
+    var t = try init(io_impl, alloc, .{ .cols = 5, .rows = 5 });
+    defer t.deinit(alloc);
+
+    // A soft-wrapped line across rows 0-2 so that row 1 has both wrap
+    // flags set, plus a prompt mark on row 1.
+    for (0..12) |_| try t.print('A');
+    t.screens.active.pages.getCell(
+        .{ .active = .{ .y = 1 } },
+    ).?.row.semantic_prompt = .prompt;
+
+    // Insert more lines than remain in the region: every row from the
+    // cursor to the region bottom is blanked in place, with no shifts.
+    t.setCursorPos(2, 1);
+    t.insertLines(10);
+
+    for (1..5) |y| {
+        const rac = t.screens.active.pages.getCell(
+            .{ .active = .{ .y = @intCast(y) } },
+        ).?;
+        try testing.expect(!rac.row.wrap);
+        try testing.expect(!rac.row.wrap_continuation);
+        try testing.expectEqual(.none, rac.row.semantic_prompt);
+    }
+}
+
+test "Terminal: deleteLines count over region blanks row metadata" {
+    const alloc = testing.allocator;
+    const io_impl = testing.io;
+    var t = try init(io_impl, alloc, .{ .cols = 5, .rows = 5 });
+    defer t.deinit(alloc);
+
+    for (0..12) |_| try t.print('A');
+    t.screens.active.pages.getCell(
+        .{ .active = .{ .y = 1 } },
+    ).?.row.semantic_prompt = .prompt;
+
+    t.setCursorPos(2, 1);
+    t.deleteLines(10);
+
+    for (1..5) |y| {
+        const rac = t.screens.active.pages.getCell(
+            .{ .active = .{ .y = @intCast(y) } },
+        ).?;
+        try testing.expect(!rac.row.wrap);
+        try testing.expect(!rac.row.wrap_continuation);
+        try testing.expectEqual(.none, rac.row.semantic_prompt);
+    }
+}
+
+test "Terminal: deleteLines blank row does not retain semantic prompt" {
+    const alloc = testing.allocator;
+    const io_impl = testing.io;
+    var t = try init(io_impl, alloc, .{ .cols = 5, .rows = 3 });
+    defer t.deinit(alloc);
+
+    // Mark row 0 as a prompt row, then delete it. The blank row that
+    // appears at the region bottom reuses the deleted row's storage
+    // and must not read as a prompt (e.g. for prompt navigation).
+    try t.print('$');
+    t.screens.active.pages.getCell(
+        .{ .active = .{} },
+    ).?.row.semantic_prompt = .prompt;
+
+    t.setCursorPos(1, 1);
+    t.deleteLines(1);
+
+    {
+        const rac = t.screens.active.pages.getCell(.{ .active = .{ .y = 2 } }).?;
+        try testing.expect(!rac.row.wrap);
+        try testing.expect(!rac.row.wrap_continuation);
+        try testing.expectEqual(.none, rac.row.semantic_prompt);
+    }
+}
+
+test "Terminal: eraseDisplay complete ignores stale prompt on recycled row" {
+    const alloc = testing.allocator;
+    const io_impl = testing.io;
+    var t = try init(io_impl, alloc, .{ .cols = 10, .rows = 3 });
+    defer t.deinit(alloc);
+
+    // Screen content that must NOT enter the scrollback on a clear.
+    try t.printString("hello");
+
+    // Mark row 1 as a prompt row and then discard it with a region
+    // scroll, recycling its storage as the blank bottom row.
+    t.screens.active.pages.getCell(
+        .{ .active = .{ .y = 1 } },
+    ).?.row.semantic_prompt = .prompt;
+    t.setTopAndBottomMargin(2, 3);
+    t.setCursorPos(3, 1);
+    try t.linefeed();
+    t.setTopAndBottomMargin(0, 0);
+
+    // ED2: since no prompt is on screen, this must NOT take the
+    // scroll-and-clear path that pushes content into scrollback. A
+    // stale prompt flag on the recycled blank bottom row would.
+    t.eraseDisplay(.complete, false);
+
+    try testing.expectEqual(t.screens.active.pages.rows, t.screens.active.pages.total_rows);
 }

@@ -5,4 +5,5 @@ const std = @import("std");
 test {
     std.testing.log_level = .err;
     _ = @import("apprt/embedded.zig");
+    _ = @import("renderer.zig");
 }
