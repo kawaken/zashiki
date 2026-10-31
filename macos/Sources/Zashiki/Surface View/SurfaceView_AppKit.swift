@@ -1183,6 +1183,11 @@ extension Zashiki {
             // If our keyboard changed from this we just assume an input method
             // grabbed it and do nothing.
             if !markedTextBefore && keyboardIdBefore != KeyboardLayout.id {
+                // An input source change can also commit text. The source
+                // switching key stays consumed, but its commits must survive.
+                for text in keyTextAccumulator ?? [] where !text.isEmpty {
+                    _ = committedTextAction(action, text: text)
+                }
                 return
             }
 
@@ -1214,7 +1219,7 @@ extension Zashiki {
                         continue
                     }
 
-                    _ = committedPreeditTextAction(action, text: text)
+                    _ = committedTextAction(action, text: text)
                 }
 
                 if shouldReplayCommittedPreeditKey(translationEvent) {
@@ -1537,12 +1542,22 @@ extension Zashiki {
             }
         }
 
-        private func committedPreeditTextAction(
+        private func committedTextAction(
             _ action: ghostty_input_action_e,
             text: String
         ) -> Bool {
             guard let surface = self.surface else { return false }
+            return Self.sendCommittedText(action, text: text) { ghostty_surface_key(surface, $0) }
+        }
 
+        /// Marshal input-method commits independently of the triggering key's
+        /// modifiers. The C string is valid only for the duration of sendKey.
+        static func sendCommittedText(
+            _ action: ghostty_input_action_e,
+            text: String,
+            sendKey: (ghostty_input_key_s) -> Bool
+        ) -> Bool {
+            guard !text.isEmpty else { return false }
             var key_ev = ghostty_input_key_s()
             key_ev.action = action
             key_ev.keycode = 0
@@ -1554,7 +1569,7 @@ extension Zashiki {
 
             return text.withCString { ptr in
                 key_ev.text = ptr
-                return ghostty_surface_key(surface, key_ev)
+                return sendKey(key_ev)
             }
         }
 
@@ -2104,15 +2119,14 @@ extension Zashiki.SurfaceView: NSTextInputClient {
     func insertText(_ string: Any, replacementRange: NSRange) {
         // We must have an associated event
         guard NSApp.currentEvent != nil else { return }
-        guard let surfaceModel else { return }
 
         // We want the string view of the any value
-        var chars = ""
+        let chars: String
         switch string {
-        case let v as NSAttributedString:
-            chars = v.string
-        case let v as String:
-            chars = v
+        case let value as NSAttributedString:
+            chars = value.string
+        case let value as String:
+            chars = value
         default:
             return
         }
@@ -2146,14 +2160,11 @@ extension Zashiki.SurfaceView: NSTextInputClient {
             }
         }
 
-        if hadMarkedText, !chars.isEmpty {
-            // Send preedit commits as key events instead of raw text for
-            // keybind interpretation by programs.
-            _ = committedPreeditTextAction(GHOSTTY_ACTION_PRESS, text: chars)
-            return
+        // Input methods, dictation and the character viewer all commit typed
+        // text. External drops keep their separate protected paste path.
+        if !chars.isEmpty {
+            _ = committedTextAction(GHOSTTY_ACTION_PRESS, text: chars)
         }
-
-        surfaceModel.sendText(chars)
     }
 
     /// This function needs to exist for two reasons:
