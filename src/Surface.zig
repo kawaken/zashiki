@@ -549,7 +549,8 @@ pub fn init(
         .rt_surface = rt_surface,
         .thread = &self.renderer_thread,
     });
-    errdefer renderer_impl.deinit();
+    var renderer_owner = &renderer_impl;
+    errdefer renderer_owner.deinit();
 
     // The mutex used to protect our renderer state.
     const mutex = try alloc.create(std.Io.Mutex);
@@ -565,11 +566,16 @@ pub fn init(
         &self.renderer_state,
         app_mailbox,
     );
-    errdefer render_thread.deinit();
+    var renderer_thread_owner = &render_thread;
+    errdefer {
+        renderer_owner.stopDisplayLink();
+        renderer_thread_owner.deinit();
+    }
 
     // Create the IO thread
     var io_thread = try termio.Thread.init(alloc);
-    errdefer io_thread.deinit();
+    var io_thread_owner = &io_thread;
+    errdefer io_thread_owner.deinit();
 
     self.* = .{
         .terminal_id = terminal_id: {
@@ -610,6 +616,10 @@ pub fn init(
         // lets us get the most likely correct color theme and so on.
         .config_conditional_state = app.config_conditional_state,
     };
+
+    renderer_owner = &self.renderer;
+    renderer_thread_owner = &self.renderer_thread;
+    io_thread_owner = &self.io_thread;
 
     // The command we're going to execute
     const command: ?configpkg.Command = command: {
@@ -699,7 +709,7 @@ pub fn init(
 
     // Give the renderer one more opportunity to finalize any surface
     // setup on the main thread prior to spinning up the rendering thread.
-    try renderer_impl.finalizeSurfaceInit(rt_surface);
+    try self.renderer.finalizeSurfaceInit(rt_surface);
 
     // Start our renderer thread
     self.renderer_thr = try std.Thread.spawn(
@@ -707,6 +717,11 @@ pub fn init(
         rendererpkg.Thread.threadMain,
         .{&self.renderer_thread},
     );
+    errdefer {
+        self.renderer_thread.stop.notify() catch {};
+        self.renderer_thr.join();
+        self.renderer.threadEnter(rt_surface) catch unreachable;
+    }
     self.renderer_thr.setName(global.io(), "renderer") catch {};
 
     // Start our IO thread
@@ -715,6 +730,10 @@ pub fn init(
         termio.Thread.threadMain,
         .{ &self.io_thread, &self.io },
     );
+    errdefer {
+        self.io_thread.stop.notify() catch {};
+        self.io_thr.join();
+    }
     self.io_thr.setName(global.io(), "io") catch {};
 
     // Determine our initial window size if configured. We need to do this
@@ -800,8 +819,9 @@ pub fn deinit(self: *Surface) void {
 
     // We need to deinit AFTER everything is stopped, since there are
     // shared values between the two threads.
-    self.renderer_thread.deinit();
+    // Stop the DisplayLink callback before freeing its draw_now target.
     self.renderer.deinit();
+    self.renderer_thread.deinit();
     self.io_thread.deinit();
     self.mouse.selection_gesture.deinit(&self.io.terminal);
     self.io.deinit();
@@ -5901,4 +5921,95 @@ fn presentSurface(self: *Surface) !void {
 /// not available on a particular platform.
 pub fn getProcessInfo(self: *Surface, comptime info: ProcessInfo) ?ProcessInfo.Type(info) {
     return self.io.getProcessInfo(info);
+}
+
+test "screen export closes descriptors on success error and no selection" {
+    if (comptime apprt.runtime != apprt.embedded) return error.SkipZigTest;
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    const Capture = struct {
+        path_buf: [std.fs.max_path_bytes]u8 = undefined,
+        path_len: usize = 0,
+        calls: usize = 0,
+
+        fn write(
+            ud: ?*anyopaque,
+            _: c_int,
+            contents: [*]const apprt.embedded.CAPI.ClipboardContent,
+            len: usize,
+            confirm: bool,
+        ) callconv(.c) void {
+            assert(len == 1 and !confirm);
+            const self: *@This() = @ptrCast(@alignCast(ud.?));
+            const path = std.mem.span(contents[0].data);
+            @memcpy(self.path_buf[0..path.len], path);
+            self.path_len = path.len;
+            self.calls += 1;
+        }
+
+        fn countFds() usize {
+            var count: usize = 0;
+            for (0..4096) |fd| {
+                const r = std.posix.system.fcntl(@as(c_int, @intCast(fd)), std.posix.F.GETFD);
+                if (std.posix.errno(r) == .SUCCESS) count += 1;
+            }
+            return count;
+        }
+    };
+    var capture: Capture = .{};
+    const core_app = try alloc.create(App);
+    defer alloc.destroy(core_app);
+    core_app.alloc = alloc;
+    var app: apprt.App = undefined;
+    app.core_app = core_app;
+    app.opts.write_clipboard = Capture.write;
+    var rt: apprt.Surface = undefined;
+    rt.app = &app;
+    rt.userdata = &capture;
+    var s: Surface = undefined;
+    s.alloc = alloc;
+    s.rt_surface = &rt;
+    s.io.terminal = try terminal.Terminal.init(testing.io, alloc, .{ .cols = 20, .rows = 2 });
+    defer s.io.terminal.deinit(alloc);
+    var mutex: std.Io.Mutex = .init;
+    s.renderer_state.mutex = &mutex;
+    var stream = s.io.terminal.vtStream();
+    defer stream.deinit();
+    stream.nextSlice("日本語\r\nsecond\r\nthird\r\nfourth");
+    const screen = s.io.terminal.screens.active;
+    try screen.select(terminal.Selection.init(
+        screen.pages.getTopLeft(.screen),
+        screen.pages.getBottomRight(.screen).?,
+        false,
+    ));
+
+    const baseline = Capture.countFds();
+    for (0..8) |_| {
+        for ([_]WriteScreenLoc{ .screen, .history, .selection }) |loc| {
+            for ([_]input.Binding.Action.WriteScreen.Format{ .plain, .vt, .html }) |emit| {
+                const before = capture.calls;
+                try s.writeScreenFile(loc, .{ .action = .copy, .emit = emit });
+                try testing.expectEqual(before + 1, capture.calls);
+                try testing.expectEqual(baseline, Capture.countFds());
+                // The consumer can still read the file after every handle
+                // owned by writeScreenFile has been closed.
+                const path = capture.path_buf[0..capture.path_len];
+                const contents = try std.Io.Dir.cwd().readFileAlloc(testing.io, path, alloc, .limited(1024 * 1024));
+                defer alloc.free(contents);
+                try testing.expect(contents.len > 0);
+                try std.Io.Dir.cwd().deleteTree(testing.io, std.fs.path.dirname(path).?);
+            }
+        }
+        // Inject a failure after writing, before handing the path to the host.
+        var failing = testing.FailingAllocator.init(alloc, .{ .fail_index = 0 });
+        s.alloc = failing.allocator();
+        try testing.expectError(error.OutOfMemory, s.writeScreenFile(.screen, .copy));
+        s.alloc = alloc;
+        try testing.expectEqual(baseline, Capture.countFds());
+    }
+    try screen.select(null);
+    const before = capture.calls;
+    for (0..32) |_| try s.writeScreenFile(.selection, .copy);
+    try testing.expectEqual(before, capture.calls);
+    try testing.expectEqual(baseline, Capture.countFds());
 }

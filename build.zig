@@ -258,7 +258,7 @@ pub fn build(b: *std.Build) !void {
         if (config.target.result.os.tag == .macos) {
             const embedded_tests = b.addTest(.{
                 .name = "ghostty-embedded-test",
-                .filters = &.{"external paste"},
+                .filters = &.{ "external paste", "screen export" },
                 .root_module = b.createModule(.{
                     .root_source_file = b.path("src/embedded_tests.zig"),
                     .target = config.baselineTarget(b.graph.io),
