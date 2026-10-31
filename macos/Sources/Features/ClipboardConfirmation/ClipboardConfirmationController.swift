@@ -9,17 +9,15 @@ import GhosttyKit
 class ClipboardConfirmationController: NSWindowController {
     override var windowNibName: NSNib.Name? { "ClipboardConfirmation" }
 
-    let surface: ghostty_surface_t
+    let completion: ClipboardRequestCompletion
     let contents: String
     let request: Zashiki.ClipboardRequest
-    let state: UnsafeMutableRawPointer?
     weak private var delegate: ClipboardConfirmationViewDelegate?
 
-    init(surface: ghostty_surface_t, contents: String, request: Zashiki.ClipboardRequest, state: UnsafeMutableRawPointer?, delegate: ClipboardConfirmationViewDelegate) {
-        self.surface = surface
+    init(completion: ClipboardRequestCompletion, contents: String, request: Zashiki.ClipboardRequest, delegate: ClipboardConfirmationViewDelegate) {
+        self.completion = completion
         self.contents = contents
         self.request = request
-        self.state = state
         self.delegate = delegate
         super.init(window: nil)
     }

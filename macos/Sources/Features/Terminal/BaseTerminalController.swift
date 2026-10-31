@@ -1359,19 +1359,21 @@ class BaseTerminalController: NSWindowController,
         guard let state = notification.userInfo?[Zashiki.Notification.ConfirmClipboardStateKey] as? UnsafeMutableRawPointer? else { return }
         guard let request = notification.userInfo?[Zashiki.Notification.ConfirmClipboardRequestKey] as? Zashiki.ClipboardRequest else { return }
 
-        // If we already have a clipboard confirmation view up, we ignore this request.
-        // This shouldn't be possible...
+        let completion = ClipboardRequestCompletion(
+            surface: surface,
+            currentSurface: { [weak target] in target?.surface },
+            state: state
+        )
+        // Never consume native request state inside its confirmation callback.
         guard self.clipboardConfirmation == nil else {
-            Zashiki.App.completeClipboardRequest(surface, data: "", state: state, confirmed: true)
+            completion.denyDeferred()
             return
         }
 
-        // Show our paste confirmation
         self.clipboardConfirmation = ClipboardConfirmationController(
-            surface: surface,
+            completion: completion,
             contents: str,
             request: request,
-            state: state,
             delegate: self
         )
         window.beginSheet(self.clipboardConfirmation!.window!)
@@ -1403,7 +1405,7 @@ class BaseTerminalController: NSWindowController,
                 str = cc.contents
             }
 
-            Zashiki.App.completeClipboardRequest(cc.surface, data: str, state: cc.state, confirmed: true)
+            cc.completion.complete(data: str)
         }
     }
 
