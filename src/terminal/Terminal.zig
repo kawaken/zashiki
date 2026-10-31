@@ -15363,6 +15363,37 @@ test "Terminal: resize with high unique style per cell with wrapping" {
     try t.resize(alloc, .{ .cols = 60, .rows = 30 });
 }
 
+test "Terminal: saved cursor survives repeated widening" {
+    const alloc = testing.allocator;
+    var t = try init(testing.io, alloc, .{ .cols = 4, .rows = 5 });
+    defer t.deinit(alloc);
+
+    try t.printString("abc\nAAA|");
+    t.saveCursor();
+    try t.resize(alloc, .{ .cols = 5, .rows = 5 });
+    try t.resize(alloc, .{ .cols = 6, .rows = 5 });
+    t.restoreCursor();
+    try t.print('X');
+
+    const str = try t.plainString(alloc);
+    defer alloc.free(str);
+    try testing.expectEqualStrings("abc\nAAA|X", str);
+}
+
+test "Terminal: resize less cols without reflow cutting wide char tail" {
+    const alloc = testing.allocator;
+    const io_impl = testing.io;
+    var t = try init(io_impl, alloc, .{ .cols = 3, .rows = 1 });
+    defer t.deinit(alloc);
+
+    try t.print('a');
+    try t.print('一');
+    t.modes.set(.wraparound, false);
+    try t.resize(alloc, .{ .cols = 2, .rows = 1 });
+
+    try testing.expect(t.screens.active.pages.getCell(.{ .active = .{ .x = 1 } }).?.cell.isEmpty());
+}
+
 test "Terminal: resize with reflow and saved cursor" {
     const alloc = testing.allocator;
     const io_impl = testing.io;
