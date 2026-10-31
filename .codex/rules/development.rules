@@ -1,0 +1,9 @@
+# Shared permissions for the repository's development tasks.
+# Loaded by Codex only after the project is trusted. These rules allow
+# matching commands outside the sandbox; review changes to justfile too.
+prefix_rule(
+    pattern = ["just", ["build", "build-core", "test", "test-fast", "test-filter", "test-shell-integration", "lint", "ci"]],
+    decision = "allow",
+    match = ["just test", "just test-filter paste", "just build-core", "just ci"],
+    not_match = ["just clean", "just run", "just glad", "just dist", "bash -c echo"],
+)

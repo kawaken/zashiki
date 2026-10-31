@@ -2,7 +2,15 @@
   "model": "sonnet",
   "permissions": {
     "allow": [
-      "Edit(*.md)"
+      "Edit(*.md)",
+      "Bash(just build)",
+      "Bash(just build-core)",
+      "Bash(just test)",
+      "Bash(just test-fast)",
+      "Bash(just test-filter *)",
+      "Bash(just test-shell-integration)",
+      "Bash(just lint)",
+      "Bash(just ci)"
     ]
   }
 }

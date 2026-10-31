@@ -38,3 +38,24 @@ XCTest を含むフルテストを実行します。特定の Zig テストだ�
 ```sh
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer just test-fast
 ```
+
+### Codex / Claude Codeの実行許可
+
+テスト・Lint・ビルドの承認を繰り返さずに実行できるよう、共有設定を配置しています。
+
+- Codex: `.codex/rules/development.rules`
+- Claude Code: `.claude/settings.json`
+
+対象は `just build`、`build-core`、`test`、`test-fast`、`test-filter`、
+`test-shell-integration`、`lint`、`ci` です。`test-filter` はテスト名が変わっても
+許可が適用されます。実行時はリポジトリを作業ディレクトリにして、
+`just test-filter "テスト名"` のように呼び出してください。
+
+Codexではプロジェクトを信頼済みにしてから再起動してください。ルールは一致する
+コマンドのサンドボックス外実行を許可するもので、引数はprefixで照合されます。
+Claude Codeではプロジェクトの信頼確認を済ませ、`/permissions` で設定を確認できます。
+共有設定は `justfile` の処理も信頼する前提なので、タスク定義の変更もレビューしてください。
+
+端末や組織の管理ポリシーが優先される場合や、ラッパー・環境変数・複合コマンドなどで
+許可パターンに一致しない場合は、追加承認が必要になることがあります。
+ChatGPT Workのローカル接続・クラウド実行の権限は別設定で、この設定だけでは変更されません。
