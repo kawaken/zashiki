@@ -21,13 +21,13 @@ pub const String = opaque {
 
     pub fn createWithCharactersNoCopy(
         unichars: []const u16,
-    ) *String {
-        return @as(*String, @ptrFromInt(@intFromPtr(c.CFStringCreateWithCharactersNoCopy(
+    ) Allocator.Error!*String {
+        return @as(?*String, @ptrFromInt(@intFromPtr(c.CFStringCreateWithCharactersNoCopy(
             null,
             @ptrCast(unichars.ptr),
             @intCast(unichars.len),
             foundation.c.kCFAllocatorNull,
-        ))));
+        )))) orelse error.OutOfMemory;
     }
 
     pub fn release(self: *String) void {

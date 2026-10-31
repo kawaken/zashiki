@@ -922,6 +922,9 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             state: *renderer.State,
             cursor_blink_visible: bool,
         ) Allocator.Error!void {
+            // Flush retained CoreText objects even when rebuilding fails.
+            defer self.font_shaper.endFrame();
+
             // We fully deinit and reset the terminal state every so often
             // so that a particularly large terminal state doesn't cause
             // the renderer to hold on to retained memory.
@@ -1185,10 +1188,6 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
                     else => {},
                 };
             }
-
-            // Notify our shaper we're done for the frame. For some shapers,
-            // such as CoreText, this triggers off-thread cleanup logic.
-            self.font_shaper.endFrame();
         }
 
         /// Draw the frame to the screen.

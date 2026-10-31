@@ -48,7 +48,10 @@
 
 - #302: TempDirは成功時の2 handle漏れに加えて、deinitでもparent未close。initの親open後・子create後のエラー処理も不足していたため同時に修正する。
 - #303: DeferredFaceのCopy系文字列はreleaseされず、返却文字列も内部ポインタだった。bufへコピーしてreleaseする所有権へ揃える必要がある。
+- #299: 通常の確認sheetもraw surfaceを保持しており、閉鎖後に応答すると古いsurfaceを参照し得る。Swift側で元surfaceの生存確認と完了一回性を共通化する。native側は未完了要求を追跡してsurface破棄時に回収する（現行はheap requestを追跡しておらず閉鎖時に漏れる）。
 
 - #302実装: 成功時はretain close、失敗・選択なしはdelete closeへ統一。initのエラー時も親handleと作成済みディレクトリを回収。128回のretain/delete、FD閉鎖、保持した日本語内容の再読込テストを追加し、osのtest rootへ登録した。親closeを外すとBADF期待で失敗、復元すると`just test-filter TempDir`成功。実際の外部エディタ起動は未実施。
 
 - #300: libxevのkqueue backendはloop停止後に未処理callbackを再実行せず、stream.deinitはFDを閉じない。通常の終了はsubprocess.stopでFDを閉じ、IO thread内でpoolを最後に解放する。3MiBを137 byteずつ読み取りつつ3回追加する回帰テストは、元のSegmentedPoolでexpected 0 / found 125のデータ不一致を再現。修正後に一致しCRLF・日本語も維持。closed FDによる実OS write error callbackを検証。write errorは回復不能なapp障害ではなく、警告ログとしテストの意図したerror log失敗も避ける。未完了要求を残したloop停止でtesting allocatorに漏れなし。
+
+- #303実装: display name欠落はfamily nameへfallback。Copy文字列は呼び出し側bufferにコピーしてrelease。descriptor/family/PostScriptの失敗もoptional化し、font resizeはOOM、fallback discoveryは候補なしとして扱う。CFString・Typesetter lineのOOMをshaperへ伝播し、renderer.updateFrameはdeferでendFrameを必ず呼ぶ。日本語shapingと8 frame反復を検証。dyld interpositionによるdisplay/string/typesetter/lineの4種類のnull注入はすべて成功。displayのnull判定だけ外すとSIGABRTで失敗し、復元後に再成功。実OSのOOMやATOKの視覚操作は未実施。

@@ -202,12 +202,8 @@ pub const Face = struct {
     /// but sometimes allocation isn't required and a static string is
     /// returned.
     pub fn name(self: *const Face, buf: []u8) Allocator.Error![]const u8 {
-        const family_name = self.font.copyFamilyName();
-        if (family_name.cstringPtr(.utf8)) |str| return str;
-
-        // "NULL if the internal storage of theString does not allow
-        // this to be returned efficiently." In this case, we need
-        // to allocate.
+        const family_name = self.font.copyFamilyName() orelse return "unknown";
+        defer family_name.release();
         return family_name.cstring(buf, .utf8) orelse error.OutOfMemory;
     }
 
@@ -231,7 +227,7 @@ pub const Face = struct {
         if (vs.len == 0) return;
 
         // Create a new font descriptor with all the variations set.
-        var desc = self.font.copyDescriptor();
+        var desc = self.font.copyDescriptor() orelse return error.OutOfMemory;
         defer desc.release();
         for (vs) |v| {
             const id = try macos.foundation.Number.create(.int, @ptrCast(&v.id));

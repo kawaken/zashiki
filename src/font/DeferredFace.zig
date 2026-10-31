@@ -50,30 +50,22 @@ pub fn familyName(self: DeferredFace, buf: []u8) ![]const u8 {
         .coretext => if (self.ct) |ct| {
             const family_name = ct.font.copyAttribute(.family_name) orelse
                 return "unknown";
-            return family_name.cstringPtr(.utf8) orelse unsupported: {
-                break :unsupported family_name.cstring(buf, .utf8) orelse
-                    return error.OutOfMemory;
-            };
+            defer family_name.release();
+            return family_name.cstring(buf, .utf8) orelse error.OutOfMemory;
         },
     }
 
     return "";
 }
 
-/// Returns the name of this face. The memory is always owned by the
-/// face so it doesn't have to be freed.
+/// Returns the name of this face in buf (or a static fallback string).
 pub fn name(self: DeferredFace, buf: []u8) ![]const u8 {
     switch (options.backend) {
         .coretext => if (self.ct) |ct| {
-            const display_name = ct.font.copyDisplayName();
-            return display_name.cstringPtr(.utf8) orelse unsupported: {
-                // "NULL if the internal storage of theString does not allow
-                // this to be returned efficiently." In this case, we need
-                // to allocate. But we can't return an allocated string because
-                // we don't have an allocator. Let's use the stack and log it.
-                break :unsupported display_name.cstring(buf, .utf8) orelse
-                    return error.OutOfMemory;
-            };
+            const display_name = ct.font.copyDisplayName() orelse
+                return self.familyName(buf);
+            defer display_name.release();
+            return display_name.cstring(buf, .utf8) orelse error.OutOfMemory;
         },
     }
 
@@ -175,4 +167,30 @@ test "coretext" {
     var face = try def.load(lib, .{ .size = .{ .points = 12 } });
     defer face.deinit();
     try testing.expect(face.glyphIndex(' ') != null);
+}
+
+test "CoreText boundary font names own their output and fall back" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    var lib = try Library.init(alloc);
+    defer lib.deinit();
+    var discovery = font.discovery.CoreText.init(lib);
+    var it = try discovery.discover(alloc, .{ .family = "Monaco", .size = 12 });
+    defer it.deinit();
+    var face = (try it.next()).?;
+    defer face.deinit();
+    var buf: [1024]u8 = undefined;
+    const name_ = try face.name(&buf);
+    try testing.expect(name_.len > 0);
+    try testing.expect(@intFromPtr(name_.ptr) >= @intFromPtr(&buf));
+    try testing.expect(@intFromPtr(name_.ptr) < @intFromPtr(&buf) + buf.len);
+    // With fault injection, CTFontCopyDisplayName returns null; name must
+    // still be the family name, copied before its CF object is released.
+    if (std.c.getenv("ZASHIKI_CORETEXT_FAULT")) |mode| {
+        if (std.mem.eql(u8, std.mem.span(mode), "display")) {
+            var family_buf: [1024]u8 = undefined;
+            try testing.expectEqualStrings(try face.familyName(&family_buf), name_);
+        }
+    }
+    try testing.expectError(error.OutOfMemory, face.name(buf[0..1]));
 }
